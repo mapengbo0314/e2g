@@ -1,4 +1,4 @@
-The Elephant-Goldfish Model: Flowchart (courtesy of truty@)
+The Elephant-Goldfish Model: Flowchart
 [ Phase 0: Legacy Prep ] (Only if starting in a large, undocumented codebase)
 L> Bottom-Up Recursive Summarization → [ Context READMEs ]
 [ Phase 1: The Elephant (Co-Design) | <-
@@ -111,5 +111,3 @@ If your new SWE is going to focus on a particular part of the system, tell that 
 2) Give the notebook to the SWE and tell them to use it to learn enough about the system to write an excellent design doc that complies with the above.
 3) When they can write a good doc, you can feel confident that they know enough to productively contribute to the code.
 4) Profit;-)
-Using Internal Tools: Glimpse + Spec
-[note from the Ed: Readers of this doc may have heard of two tools being actively developed at Google named Glimpse and Spec. We are very much in favor of any automation that makes the adoption of the above process easier for SWEs. The Snippets Machine team has just started onboarding these tools. If all goes according to plan (fingers crossed) we'll make some serious revisions to this doc. In the meantime, the following info will tell you more about the tools in case you want to start experimenting, too. -dave;-)
