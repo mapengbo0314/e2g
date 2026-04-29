@@ -1,7 +1,7 @@
 01_design_load_context
 description: Loads initial context about the project or feature area. Instructs the AI to read specified documents or code and summarize its understanding for verification.
 Workflow: Load Context for Design Discussion
-Please read google3/corp/snippets/snippets_machine/README.md and any resource that is provided in the prompt.
+Please read monorepo/corp/snippets/snippets_machine/README.md and any resource that is provided in the prompt.
 
 After reading, please provide a high-level description of what you learned so I can correct your understanding and ensure we are on the same page before we discuss the new feature. Focus on the purpose of the system/area and its main components.
 
