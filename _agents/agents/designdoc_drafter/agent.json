@@ -1,0 +1,7 @@
+{
+  "name": "designdoc_drafter",
+  "description": "Specialized sub-agent that documents technical designs and performs an impact audit.\n",
+  "configPath": {
+    "relativePathToConfig": "config.yaml"
+  }
+}

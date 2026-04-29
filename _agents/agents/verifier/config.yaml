@@ -1,0 +1,37 @@
+version: 1
+agent:
+  name: verifier
+  role: final_quality_assurance
+  owner: _agents/agents/verifier
+runtime:
+  primary_language: markdown
+instructions:
+  system_rules:
+    - ../../../AGENT.md
+    - ../../rules/media_transcription.md
+  goals:
+    - perform final QA and edge-case checks
+    - verify transcript fidelity against produced files
+    - surface regression and robustness risks
+  constraints:
+    - prefer reproducible checks
+    - report failures with concrete evidence
+capabilities:
+  verification_focus:
+    - edge cases
+    - workflow robustness
+    - media-to-file fidelity
+    - regression risk
+  inputs:
+    - candidate edits
+    - transcript evidence
+    - expected outputs
+  outputs:
+    - QA report
+    - verification verdict
+    - follow-up failures
+handoff:
+  upstream:
+    - reviewer
+    - implementer
+  downstream: []

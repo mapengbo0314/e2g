@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Essential Indexing Reference Workspace</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Essential Workspace</p>
+          <h1>Indexing reference plus agent harness</h1>
+          <p class="lede">
+            A reduced version of the imported reference architecture, focused on
+            the directories and files we want to preserve as design input, with
+            a native agent harness for future video-to-file transcription workflows.
+          </p>
+        </div>
+        <div class="hero-stats" id="hero-stats"></div>
+      </header>
+
+      <main class="layout">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Essential tree</h2>
+            <p>The repository now keeps only the layers needed for the reference scaffold.</p>
+          </div>
+          <div id="tree-root" class="tree-root"></div>
+        </section>
+
+        <section class="panel wide">
+          <div class="panel-head">
+            <h2>Core architecture</h2>
+            <p>
+              Rebuilt from your reference images and trimmed to the parts we
+              actually plan to keep as a working reference.
+            </p>
+          </div>
+          <svg id="architecture-map" class="architecture-map" viewBox="0 0 1400 820" role="img" aria-label="Indexing reference architecture diagram"></svg>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Agent harness</h2>
+            <p>The `_agents/` root now holds workflows, sub-agents, MCP notes, and formal agent configs.</p>
+          </div>
+          <div id="module-list" class="module-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+  </html>
