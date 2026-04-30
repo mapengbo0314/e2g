@@ -327,9 +327,9 @@ This file will be updated so accuracy rules are encoded directly in the system p
 This file will be extended to support explicit verification interactions in
 addition to summary generation and merging. It should expose methods for
 running verifier prompts, parsing verifier outputs, and returning structured
-verification results to callers. The rationale for this change is that the rest
+verification results to callers. **Additionally, it will implement a Factory Pattern to support multiple LLM providers (`GoogleAiConversation`, `OpenAiConversation`, `AnthropicConversation`, and `OllamaConversation`), allowing the pipeline to be vendor-agnostic and run entirely locally when needed.** The rationale for this change is that the rest
 of the system needs a stable programmatic interface for trust checks rather
-than reusing generation APIs for unrelated validation behavior.
+than reusing generation APIs for unrelated validation behavior, and it must support flexible, multi-provider execution environments.
 
 #### `indexing/llm_indexer.py`
 

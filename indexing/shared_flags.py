@@ -5,7 +5,14 @@ Organized into logical groups for better discoverability and standardization.
 
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass, field
+
+class LlmProvider(str, enum.Enum):
+    GEMINI = "gemini"
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    OLLAMA = "ollama"
 
 
 @dataclass
@@ -17,9 +24,12 @@ class LlmConfig:
     throttling_strategy: str = "semaphore"  # "semaphore" | "token_bucket"
     max_parallelization: int = 8
     token_limit_per_minute: int = 7_000_000
-    use_vertex_ai: bool = True
-    vertex_project_id: str | None = "project-tom-meridian"
-    google_api_key: str | None = None
+    use_vertex_ai: bool = False
+    vertex_project_id: str | None = None
+    
+    # API identity and permissions.
+    provider: LlmProvider = LlmProvider.GEMINI
+    api_key: str | None = None
     allow_mock_fallback: bool = False  # Set to False for strict production runs
 
 
@@ -97,7 +107,9 @@ class LegacyFlags:
     def vertex_ai_project_id(self) -> str | None: return config.llm.vertex_project_id
     # Execution mode flags.
     @property
-    def google_api_key(self) -> str | None: return config.llm.google_api_key
+    def api_key(self) -> str | None: return config.llm.api_key
+    @property
+    def provider(self) -> LlmProvider: return config.llm.provider
     @property
     def dry_run(self) -> bool: return config.pipeline.dry_run
     @property
@@ -131,7 +143,8 @@ LLM_TOKEN_LIMIT_PER_MINUTE = _legacy.llm_token_limit_per_minute
 USE_VERTEX_AI_API = _legacy.use_vertex_ai_api
 VERTEX_AI_PROJECT_ID = _legacy.vertex_ai_project_id
 # Pipeline behavior constants.
-GOOGLE_API_KEY = _legacy.google_api_key
+API_KEY = _legacy.api_key
+LLM_PROVIDER = _legacy.provider
 DRY_RUN = _legacy.dry_run
 MAX_PARALLEL_BUNDLES = _legacy.max_parallel_bundles
 # Feature-specific flag constants.

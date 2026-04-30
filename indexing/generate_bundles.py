@@ -149,7 +149,8 @@ def create_llm_prompter(
             research_gemini_model=llm_cfg.model,
             use_vertex_ai=llm_cfg.use_vertex_ai,
             vertex_ai_project_id=llm_cfg.vertex_project_id,
-            google_api_key=llm_cfg.google_api_key,
+            provider=llm_cfg.provider.value,
+            api_key=llm_cfg.api_key,
             # Dry run and mock fallback flags.
             dry_run=shared_flags.config.pipeline.dry_run,
             allow_mock_fallback=llm_cfg.allow_mock_fallback,
@@ -339,6 +340,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--reindex", action="store_true", help="Perform an incremental re-indexing run"
     )
+    parser.add_argument(
+        "--llm_provider", type=str, choices=["gemini", "openai", "anthropic", "ollama"], default="gemini",
+        help="The LLM provider to use for indexing"
+    )
+    parser.add_argument(
+        "--model_name", type=str, help="The specific model to use for the selected provider"
+    )
 
     # Parse command line arguments to configure the execution environment.
     args = parser.parse_args()
@@ -349,16 +357,38 @@ if __name__ == "__main__":
         # Enable mock fallback if dry run is requested.
         shared_flags.config.llm.allow_mock_fallback = True
         
-    # Pick up API key from environment for local execution.
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if api_key:
-        shared_flags.config.llm.google_api_key = api_key
-        # We also need to set use_vertex_ai to False to use the direct API instead.
-        shared_flags.config.llm.use_vertex_ai = False
-        
-    # Validate that an API key is provided for real execution runs.
-    if not args.dry_run and not api_key:
-        print("ERROR: GEMINI_API_KEY environment variable is required when not performing a dry run.")
+    # Configure the provider globally.
+    shared_flags.config.llm.provider = shared_flags.LlmProvider(args.llm_provider)
+
+    # Ensure the user has explicitly specified a model name.
+    if not args.model_name:
+        print("ERROR: --model_name must be explicitly provided.")
+        sys.exit(1)
+    shared_flags.config.llm.model = args.model_name
+
+    # Resolve API key environment variable based on provider.
+    if args.llm_provider == "gemini":
+        env_var = "GEMINI_API_KEY"
+    elif args.llm_provider == "openai":
+        env_var = "OPENAI_API_KEY"
+    elif args.llm_provider == "anthropic":
+        env_var = "ANTHROPIC_API_KEY"
+    elif args.llm_provider == "ollama":
+        env_var = None  # Ollama operates locally and does not require an API key.
+    else:
+        env_var = "LLM_API_KEY"
+
+    # Default api_key state to None and fetch from environment if needed.
+    api_key = None
+    if env_var:
+        # Pick up API key from environment for local execution.
+        api_key = os.environ.get(env_var)
+        if api_key:
+            shared_flags.config.llm.api_key = api_key
+            
+    # Validate that an API key is provided for real execution runs (except for local providers).
+    if not args.dry_run and env_var and not api_key:
+        print(f"ERROR: {env_var} environment variable is required when not performing a dry run.")
         sys.exit(1)
     
     config = BundleConfig(

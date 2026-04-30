@@ -121,6 +121,9 @@ py_library(
         ":verification_types",
         requirement("google-generativeai"),
         requirement("google-cloud-aiplatform"),
+        requirement("openai"),
+        requirement("anthropic"),
+        requirement("ollama"),
     ],
 )
 

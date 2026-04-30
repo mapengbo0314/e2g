@@ -31,9 +31,28 @@ except ImportError:
     genai = None
 
 try:
+    # Continuation of processing logic.
     import pydantic
 except ImportError:  # pragma: no cover
     pydantic = None
+
+try:
+    # Continuation of processing logic.
+    import openai
+except ImportError:
+    openai = None
+
+try:
+    # Continuation of processing logic.
+    import anthropic
+except ImportError:
+    anthropic = None
+
+try:
+    # Continuation of processing logic.
+    import ollama
+except ImportError:
+    ollama = None
 
 # Dynamic resolution of indexing project modules with fallback mechanisms.
 try:
@@ -151,7 +170,7 @@ class GeminiLlmPrompterConfig:
     synthesis_gemini_model: str = "gemini-1.5-flash"
     use_vertex_ai: bool = False
     vertex_ai_project_id: str | None = None
-    google_api_key: str | None = None
+    api_key: str | None = None
     dry_run: bool = False
     dry_run_map: dict[str, str] | None = None
     # Continuation of processing logic.
@@ -160,6 +179,7 @@ class GeminiLlmPrompterConfig:
     max_attempts_per_conversation: int = 3
     include_search_tool: bool = True
     generate_content_config: Any | None = None
+    provider: str = "gemini"
     # If False, raises error if no real API found.
     allow_mock_fallback: bool = True
 
@@ -281,6 +301,104 @@ class GoogleAiConversation:
         return response.text
 
 
+class OpenAiConversation:
+    """Conversation implementation using OpenAI."""
+
+    def __init__(
+        self,
+        system_prompt: str,
+        model_name: str,
+        api_key: str,
+        output_schema_type: type[Any] | None = None,
+    ):
+        if openai is None:
+            raise ImportError("openai library not found. Install openai.")
+        self.client = openai.Client(api_key=api_key)
+        # Continuation of processing logic.
+        self.model_name = model_name
+        self.system_prompt = system_prompt
+        self.output_schema_type = output_schema_type
+        self.history = [{"role": "system", "content": system_prompt}] if system_prompt else []
+
+    def prompt(self, user_prompt: str) -> str:
+        self.history.append({"role": "user", "content": user_prompt})
+        # Continuation of processing logic.
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=self.history,
+            response_format={"type": "json_object"}
+        )
+        text = response.choices[0].message.content
+        self.history.append({"role": "assistant", "content": text})
+        return text
+
+
+class AnthropicConversation:
+    """Conversation implementation using Anthropic."""
+
+    def __init__(
+        self,
+        system_prompt: str,
+        model_name: str,
+        api_key: str,
+        output_schema_type: type[Any] | None = None,
+    ):
+        if anthropic is None:
+            raise ImportError("anthropic library not found. Install anthropic.")
+        self.client = anthropic.Anthropic(api_key=api_key)
+        # Continuation of processing logic.
+        self.model_name = model_name
+        self.system_prompt = system_prompt + "\n\nYou must respond strictly in JSON format." if system_prompt else "You must respond strictly in JSON format."
+        self.output_schema_type = output_schema_type
+        self.history = []
+
+    def prompt(self, user_prompt: str) -> str:
+        self.history.append({"role": "user", "content": user_prompt})
+        # Continuation of processing logic.
+        response = self.client.messages.create(
+            model=self.model_name,
+            system=self.system_prompt,
+            messages=self.history,
+            max_tokens=4096
+        )
+        text = response.content[0].text
+        self.history.append({"role": "assistant", "content": text})
+        return text
+
+
+class OllamaConversation:
+    """Conversation implementation using local Ollama."""
+
+    def __init__(
+        self,
+        system_prompt: str,
+        model_name: str,
+        output_schema_type: type[Any] | None = None,
+    ):
+        if ollama is None:
+            raise ImportError("ollama library not found. Install ollama.")
+        self.model_name = model_name
+        # Continuation of processing logic.
+        self.output_schema_type = output_schema_type
+        self.history = [{"role": "system", "content": system_prompt}] if system_prompt else []
+
+    def prompt(self, user_prompt: str) -> str:
+        self.history.append({"role": "user", "content": user_prompt})
+        # Continuation of processing logic.
+        try:
+            response = ollama.chat(
+                model=self.model_name,
+                messages=self.history,
+                format="json"
+            )
+            # Parse response correctly
+            text = response['message']['content']
+            self.history.append({"role": "assistant", "content": text})
+            return text
+        except Exception as e:
+            raise RuntimeError(f"Ollama request failed. Is the daemon running? {e}")
+
+
 class DryRunConversation:
     """Conversation implementation for dry runs (mocked)."""
 
@@ -383,44 +501,79 @@ class GeminiLlmPrompter(LlmPrompter):
             )
 
         # --- Backend Detection Logic ---
-        # We prioritize Vertex AI (enterprise) over Google AI (developer/testing).
-        # If neither is available and dry_run is NOT enabled, we should ideally 
-        # fail fast rather than returning a silent mock if allow_mock_fallback is False.
-        
-        # 1. Try Vertex AI first (requires vertex_ai_project_id and gcloud ADC)
-        if self._config.use_vertex_ai and self._config.vertex_ai_project_id:
-            try:
-                # Initialize a Vertex AI chat session with system instructions.
-                return VertexAiConversation(
-                    system_prompt=system_prompt,
-                    model_name=model_name,
-                    project_id=self._config.vertex_ai_project_id,
-                    output_schema_type=output_schema_type,
-                )
-            except Exception as e:
-                # Fallback to next backend if Vertex initialization fails.
-                logging.warning("Failed to initialize Vertex AI conversation: %s", e)
+        if self._config.provider == "gemini":
+            # 1. Try Vertex AI first (requires vertex_ai_project_id and gcloud ADC)
+            if self._config.use_vertex_ai and self._config.vertex_ai_project_id:
+                try:
+                    # Initialize a Vertex AI chat session with system instructions.
+                    return VertexAiConversation(
+                        system_prompt=system_prompt,
+                        model_name=model_name,
+                        project_id=self._config.vertex_ai_project_id,
+                        output_schema_type=output_schema_type,
+                    )
+                except Exception as e:
+                    # Fallback to next backend if Vertex initialization fails.
+                    logging.warning("Failed to initialize Vertex AI conversation: %s", e)
 
-        # 2. Try Google AI Studio (requires google_api_key)
-        if self._config.google_api_key:
+            # 2. Try Google AI Studio (requires api_key)
+            if self._config.api_key:
+                try:
+                    # Initialize a Google AI Studio chat session using an API key.
+                    return GoogleAiConversation(
+                        system_prompt=system_prompt,
+                        model_name=model_name,
+                        api_key=self._config.api_key,
+                        output_schema_type=output_schema_type,
+                    )
+                except Exception as e:
+                    # Fallback to mock or error if API Key initialization fails.
+                    logging.warning("Failed to initialize Google AI conversation: %s", e)
+
+        elif self._config.provider == "openai":
+            if self._config.api_key:
+                # Continuation of processing logic.
+                try:
+                    return OpenAiConversation(
+                        system_prompt=system_prompt,
+                        model_name=model_name,
+                        api_key=self._config.api_key,
+                        output_schema_type=output_schema_type,
+                    )
+                except Exception as e:
+                    logging.warning("Failed to initialize OpenAI conversation: %s", e)
+
+        # Check if the requested provider is Anthropic.
+        elif self._config.provider == "anthropic":
+            if self._config.api_key:
+                # Continuation of processing logic.
+                try:
+                    return AnthropicConversation(
+                        system_prompt=system_prompt,
+                        model_name=model_name,
+                        api_key=self._config.api_key,
+                        output_schema_type=output_schema_type,
+                    )
+                except Exception as e:
+                    logging.warning("Failed to initialize Anthropic conversation: %s", e)
+
+        elif self._config.provider == "ollama":
+            # Continuation of processing logic.
             try:
-                # Initialize a Google AI Studio chat session using an API key.
-                return GoogleAiConversation(
+                return OllamaConversation(
                     system_prompt=system_prompt,
                     model_name=model_name,
-                    api_key=self._config.google_api_key,
                     output_schema_type=output_schema_type,
                 )
             except Exception as e:
-                # Fallback to mock or error if API Key initialization fails.
-                logging.warning("Failed to initialize Google AI conversation: %s", e)
+                logging.warning("Failed to initialize Ollama conversation: %s", e)
 
         # 3. Fallback or Fail Fast
         if not self._config.allow_mock_fallback:
             # Raise error if production environment requires real LLM connectivity.
             raise RuntimeError(
                 "No real LLM backend could be initialized, and allow_mock_fallback is False. "
-                "Check your PROJECT_ID or API_KEY environment variables."
+                "Check your PROJECT_ID or API_KEY environment variables, or ensure Ollama is running."
             )
 
         # Silent fallback to mock behavior for local development/testing.

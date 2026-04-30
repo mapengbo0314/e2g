@@ -1,6 +1,6 @@
-# Local Development Guide: Codebase Indexing Pipeline
+# Walkthrough Guide: Codebase Indexing Pipeline
 
-This guide explains how to run the Trust-Oriented Codebase Indexing Pipeline locally. We have updated the core modules to run without requiring upstream dependencies (like Borg or internal databases), and we support falling back to the standard Gemini API or performing a full mock execution.
+This guide explains how to run the Trust-Oriented Codebase Indexing Pipeline locally. We have updated the core modules to run without requiring upstream dependencies (like Borg or internal databases), and we support falling back to standard provider APIs (Gemini, OpenAI, Anthropic) or performing a full mock execution, or running completely locally via Ollama.
 
 ## 1. Environment Setup
 
@@ -12,17 +12,28 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # Install required dependencies
-pip install google-generativeai pydantic
+pip install -r requirements.txt
 ```
 
 ## 2. LLM Integration & API Keys
 
-To perform a real indexing run, the pipeline uses Google's Generative AI to summarize and merge codebase directories. 
+The pipeline supports multiple LLM providers. You can choose which provider to use by passing the `--llm_provider` flag (options: `gemini`, `openai`, `anthropic`, `ollama`).
 
-Set your `GEMINI_API_KEY` as an environment variable before running the orchestrator. The pipeline automatically switches from Vertex AI to the direct Google API when this key is detected.
+Set the appropriate environment variable for your chosen provider before running the orchestrator:
 
 ```bash
+# For Gemini
 export GEMINI_API_KEY="your_api_key_here"
+
+# For OpenAI
+export OPENAI_API_KEY="your_api_key_here"
+
+# For Anthropic
+export ANTHROPIC_API_KEY="your_api_key_here"
+
+# For Ollama (Local)
+# No API key required, but ensure the Ollama daemon is running locally with the desired model installed.
+# e.g., ollama run llama3
 ```
 
 ## 3. Running the Pipeline
@@ -55,12 +66,13 @@ bazel run //indexing:generate_bundles -- \
 
 ### B. Performing a Full Indexing Run
 
-Once you are confident the paths are correctly resolved, you can remove the `--dry_run` flag and allow the LLM Prompter to do the heavy lifting:
+Once you are confident the paths are correctly resolved, you can remove the `--dry_run` flag and specify your provider to allow the LLM Prompter to do the heavy lifting:
 
 ```bash
 PYTHONPATH=. python indexing/generate_bundles.py \
     --input_dir="./src" \
-    --output_dir="./local_index_output"
+    --output_dir="./local_index_output" \
+    --llm_provider=openai
 ```
 
 ## 4. Running the Engineering Standards Audit
