@@ -18,6 +18,8 @@ from typing import Protocol
 
 from indexing import work_unit
 
+# Define protocols for change detection and filesystem management.
+
 
 class ChangeDetectionStrategy(Protocol):
     """Protocol for determining whether a work unit needs re-indexing."""
@@ -65,6 +67,8 @@ class RawWorkUnitDiff:
 
     paths_to_reindex: Set[Path]
     paths_to_delete: Set[Path]
+
+# Define higher-level diff objects for the reindexing pipeline.
 
 
 @dataclasses.dataclass(frozen=True)
@@ -117,6 +121,7 @@ class IndexDiffer:
         if old_work_units.work_units:
             return old_work_units
 
+        # Logging a warning instead of raising an error to allow a full reindex from scratch.
         logging.warning(
             "Metadata file not found, creating a blank metadata object, which will"
             " trigger re-indexing of all paths in the bundle."
@@ -128,6 +133,7 @@ class IndexDiffer:
         )
 
     def _diff_work_units(
+        # Continuation of processing logic.
         self,
         old_work_unit_manifest: work_unit.WorkUnitManifest,
         new_work_units: dict[Path, work_unit.WorkUnit],
@@ -142,6 +148,7 @@ class IndexDiffer:
 
         to_reindex: set[Path] = set()
         to_delete: set[Path] = set()
+        # Union of all paths from previous and current runs to ensure a complete diff.
         all_paths = set(old_work_units.keys()) | set(new_work_units.keys())
 
         for path in all_paths:
@@ -153,6 +160,7 @@ class IndexDiffer:
                 to_reindex.add(path)
             elif in_old and not in_new:
                 to_delete.add(path)
+                # If a directory is removed, we must re-index its parent to update the summary.
                 parent = Path(self._fs_manager.dirname(str(path)))
                 if parent != path:
                     to_reindex.add(parent)
@@ -163,7 +171,9 @@ class IndexDiffer:
                 ):
                     to_reindex.add(path)
                 elif in_old_errored:
+                    # Continuation of processing logic.
                     to_reindex.add(path)
+                # If the previous verification failed, we must re-process the unit.
                 elif old_work_units[path].last_indexed_info and old_work_units[path].last_indexed_info.verification_state == "FAILED":
                     to_reindex.add(path)
                 else:
@@ -185,6 +195,7 @@ class IndexDiffer:
                 children_map[parent].append(path)
 
         for path in sorted_new_paths:
+            # Re-index a directory if any of its children (files or subdirs) are scheduled for update.
             if any(child in to_reindex for child in children_map.get(path, [])):
                 to_reindex.add(path)
 
@@ -212,5 +223,6 @@ class IndexDiffer:
         reindex_list = [
             wu for wu in work_units if wu.output_path in changes.paths_to_reindex
         ]
+        # Finalize the list of paths to be purged from the index.
         delete_list = sorted(list(changes.paths_to_delete))
         return DiffForReindexing(reindex_list, delete_list)

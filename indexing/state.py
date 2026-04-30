@@ -18,6 +18,11 @@ ROOT_MAP_FILE_PATTERN = r"root_map_v(\d+)\.(?:md|json)"
 LLM_INDEX_FILE_PATTERN = r"llm_index_v(\d+)\.(?:md|json)"
 
 
+# ---------------------------------------------------------------------------
+# Path and filename utilities for epoch-based state management.
+# ---------------------------------------------------------------------------
+
+
 def get_index_file_name(epoch: int, extension: str = "md") -> str:
     """Returns the index file name for the given epoch."""
     return f"llm_index_v{epoch}.{extension}"
@@ -80,6 +85,11 @@ class State(Protocol):
         """Deletes the root map for the given epoch from storage."""
 
 
+# ---------------------------------------------------------------------------
+# Local implementation of the state persistence protocol.
+# ---------------------------------------------------------------------------
+
+
 class LocalState(State):
     """Implementation of the State protocol using the local file system."""
 
@@ -104,6 +114,8 @@ class LocalState(State):
     # Metadata Methods
     def get_display_path(self, path: str) -> str:
         """Gets the display path for a given path."""
+        # Stripping the input prefix allows the state directory structure to mirror
+        # the repository structure without repeating the base repository path.
         if self._input_prefix_to_strip and path.startswith(self._input_prefix_to_strip):
             try:
                 return str(Path(path).relative_to(self._input_prefix_to_strip))
@@ -117,25 +129,35 @@ class LocalState(State):
         version = -1
         latest_file: Path | None = None
         regex = ROOT_MAP_FILE_PATTERN
+        
+        # Traverse the state directory to find files matching the root map pattern.
         if self._state_dir.exists():
             for file_path in self._state_dir.iterdir():
                 match = re.fullmatch(regex, file_path.name)
                 if not match:
+                    # Skip files that do not follow the root_map_vX.md convention.
                     continue
+                
+                # Extract the epoch number to identify the most recent map.
                 current_version = int(match.group(1))
                 if current_version > version:
                     version = current_version
                     latest_file = file_path
+        
+        # Return the content of the highest-versioned root map.
         if latest_file:
             return latest_file.read_text(encoding="utf-8")
         raise ValueError(f"No root map file found in {self._state_dir}.")
 
     def read_summary(self, path: str, epoch: int) -> str:
         """Reads the content of the index file for the given path and epoch."""
+        # Validate file existence before attempting to read content.
         if not self.exist_summary(path, epoch):
             raise FileNotFoundError(
                 f"Index file not found for path {path} and epoch {epoch}"
             )
+        
+        # Resolve the fully qualified path for the summary markdown file.
         full_path = self._get_path(path, epoch)
         return full_path.read_text(encoding="utf-8")
 
@@ -159,10 +181,12 @@ class LocalState(State):
         """Reads the content of the index files for the given paths and epoch."""
         results = {}
         for path in paths:
+            # Batch read summaries if they exist, ignoring missing files.
             if self.exist_summary(path, epoch):
                 try:
                     results[path] = self.read_summary(path, epoch)
                 except FileNotFoundError:
+                    # Skip files that were concurrently deleted.
                     pass
         return results
 
@@ -174,11 +198,13 @@ class LocalState(State):
     def latest_epoch(self, path: str) -> int | None:
         """Returns the latest epoch for which an index file exists."""
         path_obj = Path(path)
+        # Resolve the directory path within the state directory.
         if (
             self._input_prefix_to_strip
             and str(path_obj).startswith(self._input_prefix_to_strip)
         ):
             try:
+                # Attempt to normalize the path relative to the input prefix.
                 relative = path_obj.relative_to(self._input_prefix_to_strip)
                 dir_path = self._state_dir / relative
             except ValueError:
@@ -189,11 +215,15 @@ class LocalState(State):
         if not dir_path.is_dir():
             return None
 
+        # Filter and parse epoch numbers from files in the directory.
         epochs = []
         for filename in (entry.name for entry in dir_path.iterdir()):
             epoch = _parse_epoch_from_filename(filename)
             if epoch is not None:
+                # Store valid epochs for comparison.
                 epochs.append(epoch)
+        
+        # Return the highest epoch found, or None if no index files exist.
         return max(epochs) if epochs else None
 
     # Write/Mutating Methods
@@ -246,7 +276,16 @@ class LocalState(State):
         return self._state_dir / path_obj / get_index_file_name(epoch, extension)
 
 
+# ---------------------------------------------------------------------------
+# ShadowState (Read-Through Cache)
+# ---------------------------------------------------------------------------
+
 class ShadowState(State):
+    """Implementation of the State protocol that shadows another State.
+    
+    This is used for migrations or read-through caching where we have a
+    primary storage and a secondary storage.
+    """
     """A State that shadows reads and writes to a primary and secondary state.
 
     Writes are sent to both states. Reads are done from both, but only the
@@ -261,20 +300,25 @@ class ShadowState(State):
         return self._primary.get_display_path(path)
 
     def get_latest_rootmap(self) -> str:
+        # Retrieve the latest root map from primary storage first.
         primary_result = self._primary.get_latest_rootmap()
         try:
+            # Attempt to read from secondary to ensure synchronization parity.
             secondary_result = self._secondary.get_latest_rootmap()
             if primary_result != secondary_result:
                 logging.warning(
                     "ShadowState: Primary and secondary latest rootmaps differ."
                 )
         except Exception:
+            # Return the primary result, but log any discrepancies found in the shadow storage.
             logging.exception("ShadowState: Failed to read from secondary state.")
         return primary_result
 
     def read_summary(self, path: str, epoch: int) -> str:
+        # Read the summary from primary storage for the given directory and epoch.
         primary_result = self._primary.read_summary(path, epoch)
         try:
+            # Perform a validation read against secondary storage to detect data skew.
             secondary_result = self._secondary.read_summary(path, epoch)
             if primary_result != secondary_result:
                 logging.warning(
@@ -283,12 +327,15 @@ class ShadowState(State):
                     epoch,
                 )
         except Exception:
+            # Summaries are read-through from primary with validation against secondary.
             logging.exception("ShadowState: Failed to read from secondary state.")
         return primary_result
 
     def read_latest_summary(self, path: str) -> str:
+        # Resolve and read the latest available summary from primary storage.
         primary_result = self._primary.read_latest_summary(path)
         try:
+            # Shadow the read against secondary storage for consistency auditing.
             secondary_result = self._secondary.read_latest_summary(path)
             if primary_result != secondary_result:
                 logging.warning(
@@ -296,6 +343,7 @@ class ShadowState(State):
                     path,
                 )
         except Exception:
+            # Latest summaries are also shadowed for consistency checks.
             logging.exception("ShadowState: Failed to read from secondary state.")
         return primary_result
 
@@ -307,9 +355,12 @@ class ShadowState(State):
                 logging.warning(
                     "ShadowState: Primary and secondary artifacts differ for path %s, epoch %d.",
                     path,
+                    # Continuation of processing logic.
                     epoch,
                 )
+        # Shadowing artifacts ensures both storage backends remain synchronized.
         except Exception:
+            # Artifact reads are similarly isolated for reliability.
             logging.exception("ShadowState: Failed to read artifact from secondary state.")
         return primary_result
 
@@ -321,6 +372,7 @@ class ShadowState(State):
                 logging.warning(
                     "ShadowState: Primary and secondary summaries differ for epoch %d.",
                     epoch,
+                # Continuation of processing logic.
                 )
         except Exception:
             logging.exception("ShadowState: Failed to read from secondary state.")
@@ -332,7 +384,9 @@ class ShadowState(State):
             secondary_result = self._secondary.exist_summary(path, epoch)
             if primary_result != secondary_result:
                 logging.warning(
+                    # Continuation of processing logic.
                     "ShadowState: Primary and secondary exist_summary differ for path %s, epoch %d.",
+                    # Continuation of processing logic.
                     path,
                     epoch,
                 )
@@ -344,7 +398,9 @@ class ShadowState(State):
         primary_result = self._primary.latest_epoch(path)
         try:
             secondary_result = self._secondary.latest_epoch(path)
+            # Continuation of processing logic.
             if primary_result != secondary_result:
+                # Continuation of processing logic.
                 logging.warning(
                     "ShadowState: Primary and secondary latest_epoch differ for path %s.",
                     path,
@@ -356,6 +412,7 @@ class ShadowState(State):
     def write_summary(self, path: str, epoch: int, content: str) -> None:
         self._primary.write_summary(path, epoch, content)
         try:
+            # Continuation of processing logic.
             self._secondary.write_summary(path, epoch, content)
         except Exception:
             logging.exception("ShadowState: Failed to write to secondary state.")
@@ -368,7 +425,9 @@ class ShadowState(State):
             logging.exception("ShadowState: Failed to write artifact to secondary state.")
 
     def write_rootmap(self, epoch: int, content: str) -> None:
+        # Continuation of processing logic.
         self._primary.write_rootmap(epoch, content)
+        # Continuation of processing logic.
         try:
             self._secondary.write_rootmap(epoch, content)
         except Exception:
@@ -381,7 +440,9 @@ class ShadowState(State):
         except Exception:
             logging.exception("ShadowState: Failed to delete from secondary state.")
 
+    # Continuation of processing logic.
     def delete_rootmap(self, epoch: int) -> None:
+        # Continuation of processing logic.
         self._primary.delete_rootmap(epoch)
         try:
             self._secondary.delete_rootmap(epoch)

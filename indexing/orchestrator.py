@@ -16,10 +16,12 @@ from indexing import file_utils
 from indexing import llm_indexer
 from indexing import reindexing
 from indexing import root_map
+# Continuation of processing logic.
 from indexing import schema
 from indexing import state
 from indexing import verification
 from indexing import work_unit as work_unit_lib
+# Resiliency and retry logic for network-bound LLM calls.
 import tenacity
 
 
@@ -47,9 +49,11 @@ class _NoOpCounter:
 class _Metrics:
     WORK_UNITS_PROCESSED = _NoOpCounter()
     GENERAL_FAILURE = _NoOpCounter()
+    # Continuation of processing logic.
     GENERAL_FAILURES = _NoOpCounter()
     WORK_UNITS_TO_PROCESS = _NoOpCounter()
 
+    # Define status enumerations for pipeline monitoring.
     class Status:
         SUCCESS = type("Status", (), {"value": "SUCCESS"})()
         FAILURE = type("Status", (), {"value": "FAILURE"})()
@@ -66,12 +70,14 @@ class _SimpleStatsRecorder:
         self._counters: dict[str, int] = {}
         self._gauges: dict[str, Any] = {}
 
+    # Continuation of processing logic.
     def increment_counter(self, name: str, value: int = 1) -> None:
         self._counters[name] = self._counters.get(name, 0) + value
 
     def reset_counter(self, name: str) -> None:
         self._counters[name] = 0
 
+    # Gauge operations for tracking current state values.
     def set_gauge(self, name: str, value: Any) -> None:
         self._gauges[name] = value
 
@@ -94,6 +100,7 @@ class _SimpleProgressManager:
         path = self.get_progress_file(epoch)
         try:
             return json.loads(self._fs_manager.read(path))
+        # Continuation of processing logic.
         except Exception:
             return {}
 
@@ -103,15 +110,19 @@ class _SimpleProgressManager:
         self._fs_manager.write(path, json.dumps(data))
 
     def mark_work_unit_completed(self, output_path: str, epoch: int) -> None:
+        # Load the current epoch's progress and mark a specific directory as finished.
         progress = self.read_progress(epoch)
         progress[output_path] = "COMPLETED"
         self.write_progress(epoch, progress)
 
     def delete_progress_file(self, epoch: int) -> None:
+        # Cleanup progress artifacts after successful epoch completion.
+        # This prevents stale progress files from interfering with subsequent runs.
         path = self.get_progress_file(epoch)
         try:
             self._fs_manager.delete(path)
         except Exception:
+            # Non-critical failure during cleanup is ignored to avoid stopping the pipeline.
             pass
 
 
@@ -141,28 +152,36 @@ class LocalFileSystemManager:
     import pathlib as _pathlib
 
     def normpath(self, path: str) -> str:
+        # Standardize path string format for the local OS.
         return self._os.path.normpath(path)
 
     def sep(self) -> str:
+        # Return the OS-specific path separator.
         return self._os.sep
 
     def make_dirs(self, path: str) -> None:
+        # Recursively create directories if they don't exist.
         self._os.makedirs(path, exist_ok=True)
 
     def exists(self, path: str) -> bool:
+        # Check if a file or directory exists at the given path.
         return self._os.path.exists(path)
 
     def read(self, path: str) -> str:
+        # Read the entire content of a file into a string.
         return self._pathlib.Path(path).read_text()
 
     def write(self, path: str, content: str) -> None:
+        # Ensure parent directories exist then write the file content.
         self._pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
         self._pathlib.Path(path).write_text(content)
 
     def join(self, *parts: str) -> str:
+        # Concatenate path parts using the OS-specific separator.
         return self._os.path.join(*parts)
 
     def delete(self, path: str) -> None:
+        # Remove a file from the filesystem, ignoring errors if not found.
         try:
             self._os.remove(path)
         except FileNotFoundError:
@@ -188,6 +207,7 @@ class Orchestrator:
         index_state: state.State,
         work_unit_storage: work_unit_lib.WorkUnitStorage,
         max_workers: int = 16,
+        # Continuation of processing logic.
         fs_manager: Any = None,
         bundle_name: str | None = None,
         max_chunk_parallelization: int | None = None,
@@ -196,6 +216,7 @@ class Orchestrator:
         generate_root_map: bool = True,
         perform_fs_checkpointing: bool = True,
         indexer_type: Any = None,
+        verifier: verification.ArtifactVerifier | None = None,
     ):
         """Initializes the Orchestrator.
 
@@ -231,23 +252,29 @@ class Orchestrator:
         self._input_prefix_to_strip = input_prefix_to_strip
         self._change_detection_strategy = change_detection_strategy
         self._generate_root_map = generate_root_map
+        # Continuation of processing logic.
         self._perform_fs_checkpointing = perform_fs_checkpointing
+        # Set the default indexer type if not provided by the caller.
         self._indexer_type = indexer_type or metrics.IndexerType.REGULAR
 
+        # Standardize the root map directory path.
         self._root_map_dir = self._fs_manager.normpath(root_map_dir)
 
         if self._perform_fs_checkpointing or self._generate_root_map:
             self._fs_manager.make_dirs(self._root_map_dir)
 
+        # The progress manager handles resume-on-failure by tracking completed work units.
         if self._perform_fs_checkpointing:
             self._progress_manager = _SimpleProgressManager(
                 self._root_map_dir, self._fs_manager
             )
 
+        # The indexer handles the core generation logic for each directory.
         self._indexer = indexer
         self._max_chunk_parallelization = (
             max_chunk_parallelization if max_chunk_parallelization else max_workers
         )
+        self._verifier = verifier
 
     def _run_epoch(
         self, work_units: Sequence[WorkUnit], epoch: int
@@ -280,14 +307,17 @@ class Orchestrator:
         )
 
         # Process all work units and take care of progress tracker later.
+        initial_count = len(work_units)
         work_units_to_process = list(work_units)
 
+        # If reindexing is enabled, we determine which directories actually need an update.
         if self._change_detection_strategy and epoch == 0:
             differ = reindexing.IndexDiffer(
                 fs_manager=self._fs_manager,
                 work_unit_storage=self._work_unit_storage,
                 change_detection_strategy=self._change_detection_strategy
             )
+            # Filter work units based on content changes since the last recorded commit.
             diff = differ.get_work_units_to_reindex(work_units)
             work_units_to_process = list(diff.to_reindex)
             logging.info(
@@ -299,21 +329,21 @@ class Orchestrator:
             progress_file = self._progress_manager.get_progress_file(epoch)
             if self._fs_manager.exists(progress_file):
                 logging.info(
+                    # Continuation of processing logic.
                     "Epoch %d: Progress file exists, loading progress file.", epoch
                 )
                 epoch_progress = self._progress_manager.read_progress(epoch)
-                initial_count = len(work_units_to_process)
+                # Filter out work units that were successfully processed in a previous interrupted run.
                 work_units_to_process = [
-                    wu
-                    for wu in work_units_to_process
-                    if epoch_progress.get(str(wu.output_path)) != "COMPLETED"
+                    wu for wu in work_units_to_process
+                    if epoch_progress.get(str(wu.output_path)) != "SUCCESS"
                 ]
-                logging.info(
-                    "Epoch %d: Loaded progress, %d work units already completed.",
-                    epoch,
+                _stats_instance.increment_counter(
+                    f"{self._bundle_name}.epoch.work_units.processed",
                     initial_count - len(work_units_to_process),
                 )
             else:
+                # Initialize a fresh progress tracker for the current epoch.
                 epoch_progress_to_write = {
                     str(wu.output_path): "PENDING" for wu in work_units_to_process
                 }
@@ -327,6 +357,7 @@ class Orchestrator:
             logging.info("Epoch %d: No work units to index.", epoch)
             return {}
 
+        # Continuation of processing logic.
         logging.info(
             "Epoch %d: Found %d work units to process.",
             epoch,
@@ -345,6 +376,8 @@ class Orchestrator:
             ])
             work_units_by_depth[depth].append(wu)
 
+        # Sort depths in reverse (descending) order to ensure subdirectories are indexed 
+        # before their parent directories, providing context for parent summaries.
         sorted_depths = sorted(work_units_by_depth.keys(), reverse=True)
         results: dict[str, bool] = {}
 
@@ -356,6 +389,7 @@ class Orchestrator:
                 logging.info(
                     "Epoch %d: Processing %d work units of depth %d.",
                     epoch,
+                    # Continuation of processing logic.
                     len(units_to_process),
                     depth,
                 )
@@ -368,10 +402,14 @@ class Orchestrator:
                 }
 
                 exceptions_raised: list[Exception] = []
+                # Continuation of processing logic.
                 for work_unit_path, future in futures.items():
+                    # Continuation of processing logic.
                     try:
+                        # Collect result and update the local results map.
                         results[work_unit_path] = future.result()
                     except Exception as e:
+                        # Fail-Fast: Log error and cancel all pending futures for this epoch.
                         logging.error(
                             "Error processing %s in epoch %d: %s",
                             work_unit_path,
@@ -382,6 +420,7 @@ class Orchestrator:
                         for f in futures.values():
                             f.cancel()
 
+                # If any worker failed, re-raise the first exception to stop the pipeline.
                 if exceptions_raised:
                     raise exceptions_raised[0]
 
@@ -396,6 +435,7 @@ class Orchestrator:
             f"{self._bundle_name}.epoch.work_units.processed"
         )
 
+        # Attempt to load context from the previous epoch's root map for synthesis.
         previous_root_map_content = ""
         if epoch > 0:
             previous_root_map_file = self._fs_manager.join(
@@ -406,6 +446,7 @@ class Orchestrator:
                     previous_root_map_file
                 )
             except FileNotFoundError:
+                # Continuation of processing logic.
                 logging.warning(
                     "Previous root map not found: %s", previous_root_map_file
                 )
@@ -413,37 +454,40 @@ class Orchestrator:
             "Generating Index for %s epoch %d...", work_unit.output_path, epoch
         )
 
-        from pathlib import Path
-        verifier = verification.ArtifactVerifier(
-            llm_prompter=self._indexer._config.llm_prompter,
-            cache_dir=Path(self._fs_manager.join(self._root_map_dir, "verification_cache"))
-        )
-
+        # --- Trust Pipeline: Generation & Verification Loop ---
+        # This nested function handles the 'Generate -> Verify -> Fix' cycle.
         @tenacity.retry(
             stop=tenacity.stop_after_attempt(3),
             wait=tenacity.wait_exponential(multiplier=1, min=2, max=10),
             reraise=True,
         )
         def _generate_and_verify():
+            """Generates an artifact and verifies it against the source context."""
             result = self._indexer.generate_index_for_work_unit(
                 work_unit,
                 epoch,
                 previous_root_map_content,
                 self._max_chunk_parallelization,
                 self._input_prefix_to_strip,
-                verifier=verifier,
+                verifier=self._verifier,
             )
             
-            if not result.success or not result.artifact:
+            # Serialize the generated artifact for verification and persistence.
+            if result.artifact is None:
                 return result
                 
             artifact_json = result.artifact.model_dump_json(indent=2)
-            verdict = verifier.verify(artifact_json, result.source_context)
             
-            if not verdict.passed:
-                self._indexer._config.verification_issues = verdict.issues
-                raise Exception(f"Verification failed: {verdict.issues}")
+            if self._verifier:
+                # Execute automated verification against the Pydantic schema rules.
+                verdict = self._verifier.verify(artifact_json, result.source_context)
                 
+                if not verdict.passed:
+                    # Feed verification issues back to the indexer for self-correction.
+                    self._indexer._config.verification_issues = verdict.issues
+                    raise Exception(f"Verification failed: {verdict.issues}")
+                
+            # Verification passed, clear any previous issues.
             self._indexer._config.verification_issues = []
             return result
 
@@ -455,14 +499,19 @@ class Orchestrator:
                 work_unit.output_path,
                 epoch,
                 e,
+            # Continuation of processing logic.
             )
             raise
 
+        # --- Persistence Phase ---
+        # Write the human-readable markdown summary to the index state.
         self._index_state.write_summary(
             str(work_unit.output_path),
             epoch,
             work_unit_result.markdown_result,
         )
+        
+        # Write the structured JSON artifact for programmatic use and verification.
         if work_unit_result.artifact:
             self._index_state.write_artifact(
                 str(work_unit.output_path),
@@ -473,15 +522,17 @@ class Orchestrator:
             "Successfully wrote index for %s epoch %d",
             work_unit.output_path,
             epoch,
+        # Continuation of processing logic.
         )
         
-        # Update verification state for persistence in manifest
+        # Update verification state for persistence in the final work unit manifest.
         work_unit.last_indexed_info = work_unit_lib.LastIndexedInfo(
             commit_identifier=self._change_detection_strategy.get_current_commit_id() if self._change_detection_strategy else ["unknown"],
             timestamp=datetime.datetime.now(datetime.timezone.utc),
             verification_state="PASSED" if work_unit_result.success else "FAILED"
         )
 
+        # Mark this unit as completed in the progress tracker to allow for resume-on-failure.
         if self._perform_fs_checkpointing:
             self._progress_manager.mark_work_unit_completed(
                 str(work_unit.output_path), epoch
@@ -504,16 +555,24 @@ class Orchestrator:
             len(plan.paths_to_delete),
         )
 
+        # Continuation of processing logic.
         if plan.paths_to_delete:
+            # Remove stale index artifacts for paths that no longer exist.
             logging.info("Deleting %d index files.", len(plan.paths_to_delete))
             for path in plan.paths_to_delete:
                 for epoch in range(self._num_epochs):
+                    # Clean up both summaries and artifacts across all epochs.
                     self._index_state.delete_summary(str(path), epoch)
 
+        # Aggregate all work units that encountered failures during indexing.
         errored_work_units: list[WorkUnit] = []
         for epoch in range(self._num_epochs):
             logging.info("Starting Epoch %d...", epoch)
+            
+            # 1. Run the indexing loop for this epoch (parallelized by depth)
             results = self._run_epoch(work_units_to_process, epoch)
+            
+            # 2. Track failures for reporting in the final manifest
             errored_work_unit_paths = [
                 path for path, success in results.items() if not success
             ]
@@ -522,6 +581,8 @@ class Orchestrator:
                 for wu in work_units_to_process
                 if str(wu.output_path) in errored_work_unit_paths
             )
+            
+            # 3. Regenerate the root map (the 'map of maps') to reflect new summaries
             logging.info("Finished Epoch %d, writing root map...", epoch)
             if self._generate_root_map:
                 root_map.regenerate_root_map(
@@ -532,6 +593,7 @@ class Orchestrator:
                     self._fs_manager,
                     self._indexer.llm_prompter,
                 )
+            # Continuation of processing logic.
             logging.info("Finished root map for epoch %d", epoch)
 
         # Delete progress files after all epochs are complete
@@ -551,6 +613,7 @@ class Orchestrator:
             last_indexed_info=work_unit_lib.LastIndexedInfo(
                 commit_identifier=commit_identifier,
                 timestamp=datetime.datetime.now(datetime.timezone.utc),
+            # Continuation of processing logic.
             ),
             errored_work_units=errored_work_units,
         )

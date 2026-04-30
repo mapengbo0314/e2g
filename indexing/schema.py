@@ -7,14 +7,15 @@ concepts not present in the source code, preventing the LLM from
 hallucinating missing information.
 """
 
+# Standard library imports for schema validation and serialization.
 from __future__ import annotations
-
 import abc
 import datetime
 import json
 import re
 from typing import Any, Dict, List, Optional
 
+# Conditional import for Pydantic to support restricted environments.
 try:
     import pydantic
 except ImportError:  # pragma: no cover
@@ -22,23 +23,31 @@ except ImportError:  # pragma: no cover
 
 
 if pydantic is None:  # pragma: no cover
+    # Provide a minimal fallback for environments without Pydantic.
     class _BaseModel:
         def __init__(self, **kwargs):
+            # Initialize fields from keyword arguments.
             for key, value in kwargs.items():
                 setattr(self, key, value)
 
         def model_dump(self):
+            # Convert attributes to a dictionary.
             return dict(self.__dict__)
 
         def model_dump_json(self, indent: int | None = None):
+            # Serialize model data to JSON.
             return json.dumps(self.model_dump(), indent=indent, default=str)
 
     def _field(default=None, default_factory=None, description: str = ""):
+        # Minimal Field stand-in.
         if default_factory is not None:
             return default_factory()
         return default
 
+    # Define a custom validator decorator stand-in.
+
 else:
+    # Use real Pydantic if available.
     _BaseModel = pydantic.BaseModel
     _field = pydantic.Field
 
@@ -64,12 +73,18 @@ class Interface(_BaseModel):
             "The name or signature of the interface, API, or conceptual abstraction."
         )
     )
+    # The detailed description explains the abstraction's purpose and usage patterns.
     description: str = _field(
         description=(
             "A description of what the interface does, what abstraction it represents, "
             "and how it is intended to be used by consumers."
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# High-level relational models for tracking project architecture.
+# ---------------------------------------------------------------------------
 
 
 class Dependency(_BaseModel):
@@ -95,6 +110,7 @@ class ConfigurationItem(_BaseModel):
     description: str = _field(
         description="A description of how the item is used or configured."
     )
+    # Comments are optional and provide extra context for configuration nuances.
     comments: str = _field(
         default="",
         description="Additional comments, such as typical values or caveats.",
@@ -108,10 +124,6 @@ class ConfigurationItem(_BaseModel):
 class Section(_BaseModel, abc.ABC):
     """Base class for all sections."""
 
-    @abc.abstractmethod
-    def to_markdown(self) -> Optional[str]:
-        """Renders the section to markdown, or None if the section is empty."""
-
 
 class Overview(Section):
     """Conceptual overview of the directory."""
@@ -119,9 +131,6 @@ class Overview(Section):
     content: str = _field(
         description="A high-level overview of the directory and what it provides."
     )
-
-    def to_markdown(self) -> Optional[str]:
-        return f"# Overview\n\n{self.content}" if self.content else None
 
 
 class DeepDive(Section):
@@ -132,9 +141,6 @@ class DeepDive(Section):
         description="A detailed explanation of important behavior and structure. Use null if not applicable.",
     )
 
-    def to_markdown(self) -> Optional[str]:
-        return f"# Deep Dive\n\n{self.content}" if self.content else None
-
 
 class KeyIndividualComponents(Section):
     """Key individual components of the directory."""
@@ -143,14 +149,6 @@ class KeyIndividualComponents(Section):
         default_factory=list,
         description="Important files and subdirectories, with their responsibilities. Use null or empty list if none.",
     )
-
-    def to_markdown(self) -> Optional[str]:
-        if not self.components:
-            return None
-        items = "\n".join(
-            [f"- **{component.name}**: {component.description}" for component in self.components]
-        )
-        return f"# Key Individual Components\n\n{items}"
 
 
 class KeyInterfaces(Section):
@@ -161,14 +159,6 @@ class KeyInterfaces(Section):
         description="Key classes, functions, or APIs exported by this directory. Use null or empty list if none.",
     )
 
-    def to_markdown(self) -> Optional[str]:
-        if not self.interfaces:
-            return None
-        items = "\n".join(
-            [f"- **{interface.name}**: {interface.description}" for interface in self.interfaces]
-        )
-        return f"# Key Interfaces\n\n{items}"
-
 
 class KeyDependencies(Section):
     """Key dependencies of the code in this directory."""
@@ -177,14 +167,6 @@ class KeyDependencies(Section):
         default_factory=list,
         description="External systems, libraries, or codebase areas this code depends on. Use null or empty list if none.",
     )
-
-    def to_markdown(self) -> Optional[str]:
-        if not self.dependencies:
-            return None
-        items = "\n".join(
-            [f"- **{dependency.name}**: {dependency.usage_description}" for dependency in self.dependencies]
-        )
-        return f"# Key Dependencies\n\n{items}"
 
 
 class ArchitecturalPatternsAndGotchas(Section):
@@ -195,13 +177,6 @@ class ArchitecturalPatternsAndGotchas(Section):
         description="Important design decisions, order-of-operations rules, and pitfalls. Use null if not applicable.",
     )
 
-    def to_markdown(self) -> Optional[str]:
-        return (
-            f"# Architectural Patterns and Gotchas\n\n{self.content}"
-            if self.content
-            else None
-        )
-
 
 class TestingStrategy(Section):
     """Testing strategy for the code in this directory."""
@@ -210,9 +185,6 @@ class TestingStrategy(Section):
         default=None,
         description="Describe the testing strategy for the code in this directory. Use null if not applicable.",
     )
-
-    def to_markdown(self) -> Optional[str]:
-        return f"# Testing Strategy\n\n{self.content}" if self.content else None
 
 
 class Configurations(Section):
@@ -223,19 +195,6 @@ class Configurations(Section):
         description="Important configuration items and how they are used. Use null or empty list if none.",
     )
 
-    def to_markdown(self) -> Optional[str]:
-        if not self.configurations:
-            return None
-        items = "\n".join(
-            [
-                f"- **{config.name}**: {config.description} "
-                f"(Defined in: {config.definition_link})"
-                f"{' Comments: ' + config.comments if config.comments else ''}"
-                for config in self.configurations
-            ]
-        )
-        return f"# Configuration and flags\n\n{items}"
-
 
 class CustomSectionData(Section):
     """Output of a custom section requested by the user."""
@@ -244,9 +203,6 @@ class CustomSectionData(Section):
     content: str = _field(
         description="The generated markdown content for this section."
     )
-
-    def to_markdown(self) -> Optional[str]:
-        return f"# {self.title}\n\n{self.content}" if self.content else None
 
 
 class CustomSectionsDocument(_BaseModel):
@@ -261,16 +217,21 @@ class CustomSectionsDocument(_BaseModel):
         @pydantic.model_validator(mode="after")
         def check_unique_titles(self):
             titles = [section.title for section in self.custom_sections]
+            # Check for duplicate titles to prevent ambiguous section rendering.
             if len(titles) != len(set(titles)):
                 raise ValueError("Custom section titles must be unique.")
+            # Return the validated instance if all titles are unique.
             return self
 
 
 class KeyComponentsDocument(_BaseModel):
+    # Aggregation of key components for the generator agent.
     key_individual_components: KeyIndividualComponents
     key_interfaces: KeyInterfaces
+    # Aggregation of key dependencies for the generator agent.
     key_dependencies: KeyDependencies
     architectural_patterns_and_gotchas: ArchitecturalPatternsAndGotchas
+    # Aggregation of testing and configuration for the generator agent.
     testing_strategy: TestingStrategy
     configurations: Configurations
 
@@ -278,6 +239,7 @@ class KeyComponentsDocument(_BaseModel):
 class DeepDiveDocument(_BaseModel):
     """Output of the Deep Dive agent."""
 
+    # Wrapper for the core deep dive section.
     deep_dive: DeepDive
 
 
@@ -294,6 +256,7 @@ class OverviewDocument(_BaseModel):
 class GenerationMetadata(_BaseModel):
     """Metadata about how an artifact was generated."""
 
+    # Model and epoch information.
     model_name: Optional[str] = _field(
         default=None,
         description="The model used for generation.",
@@ -302,6 +265,7 @@ class GenerationMetadata(_BaseModel):
         default=0,
         description="The epoch during which this artifact was generated.",
     )
+    # Timestamps and processing details.
     generated_at: Optional[str] = _field(
         default=None,
         description="ISO timestamp of when generation completed.",
@@ -310,6 +274,7 @@ class GenerationMetadata(_BaseModel):
         default=1,
         description="Number of chunks used (1 = direct, >1 = chunked + merged).",
     )
+    # Tracking retries for trust auditing.
     retry_count: int = _field(
         default=0,
         description="Number of verification retries before this version was accepted.",
@@ -319,6 +284,7 @@ class GenerationMetadata(_BaseModel):
 class VerificationState(_BaseModel):
     """Records the verification status of an artifact."""
 
+    # Core verification status.
     verified: bool = _field(
         default=False,
         description="Whether this artifact has passed verification.",
@@ -327,6 +293,7 @@ class VerificationState(_BaseModel):
         default=None,
         description="The model used for semantic verification.",
     )
+    # Timing and scoring metadata.
     verified_at: Optional[str] = _field(
         default=None,
         description="ISO timestamp of when verification completed.",
@@ -335,6 +302,7 @@ class VerificationState(_BaseModel):
         default=0.0,
         description="The confidence score from the verifier (0.0-1.0).",
     )
+    # Detailed issue list if verification failed.
     issues: List[str] = _field(
         default_factory=list,
         description="Issues found during verification (empty if passed).",
@@ -353,23 +321,28 @@ class IndexDocument(_BaseModel):
     concept, rather than being pressured to hallucinate.
     """
 
+    # Core content sections.
     overview: Overview
     key_individual_components: Optional[KeyIndividualComponents] = None
     deep_dive: Optional[DeepDive] = None
+    # Detailed patterns and interfaces.
     architectural_patterns_and_gotchas: Optional[
         ArchitecturalPatternsAndGotchas
     ] = None
     key_interfaces: Optional[KeyInterfaces] = None
+    # Dependencies and configurations.
     key_dependencies: Optional[KeyDependencies] = None
     configurations: Optional[Configurations] = None
     testing_strategy: Optional[TestingStrategy] = None
+    # Extensions and metadata.
     custom_sections: List[CustomSectionData] = _field(default_factory=list)
 
-    # Trust metadata (not generated by the LLM, populated by the pipeline)
+    # Trust metadata (populated by the pipeline).
     generation_metadata: Optional[GenerationMetadata] = _field(
         default=None,
         description="Metadata about how this artifact was generated.",
     )
+    # Verification audit trail.
     verification_state: Optional[VerificationState] = _field(
         default=None,
         description="The verification status of this artifact.",
@@ -380,43 +353,6 @@ class IndexDocument(_BaseModel):
 # Utility functions
 # ---------------------------------------------------------------------------
 
-def sanitize_unicode(text: str) -> str:
-    """Removes control characters and replaces invalid UTF-8 characters."""
-    text = re.sub(r"[\x00-\x08\x0b-\x1f]", "", text)
-    text = text.encode("utf-8", errors="replace").decode("utf-8")
-    return text
-
-
-def to_markdown(doc: IndexDocument) -> str:
-    """Converts an IndexDocument to a Markdown string."""
-    output = []
-    section_order = [
-        "overview",
-        "deep_dive",
-        "architectural_patterns_and_gotchas",
-        "key_individual_components",
-        "key_interfaces",
-        "key_dependencies",
-        "configurations",
-        "testing_strategy",
-    ]
-
-    for field_name in section_order:
-        section = getattr(doc, field_name)
-        if section and isinstance(section, Section):
-            md = section.to_markdown()
-            if md:
-                output.append(md.strip())
-
-    for custom_section in doc.custom_sections:
-        md = custom_section.to_markdown()
-        if md:
-            output.append(md.strip())
-
-    output = "\n\n".join(output)
-    return sanitize_unicode(output)
-
-
 def to_json(doc: IndexDocument, indent: int = 2) -> str:
     """Serializes an IndexDocument to a canonical JSON string."""
     return doc.model_dump_json(indent=indent)
@@ -426,5 +362,7 @@ def from_json(json_str: str) -> IndexDocument:
     """Deserializes an IndexDocument from a JSON string."""
     data = json.loads(json_str)
     if pydantic is not None:
+        # Use Pydantic's strict validation if available.
         return IndexDocument.model_validate(data)
+    # Fallback to direct instantiation in restricted environments.
     return IndexDocument(**data)

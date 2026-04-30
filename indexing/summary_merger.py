@@ -20,6 +20,7 @@ from indexing import prompt_templates
 from indexing import schema
 
 
+# Template for the final user prompt used during the LLM merge phase.
 USER_PROMPT_TEMPLATE_MERGE = (
     "Please merge the partial summaries above into a single, coherent"
     " document for the directory {directory_path}."
@@ -69,6 +70,7 @@ def _serialize_doc(doc: Any) -> str:
 def _get_subdirectory_indexes(
     index_state: IndexStateProtocol,
     directory_path: str,
+    # Filtering configuration for selecting relevant subdirectory data.
     filtering_config: object | None = None,
 ) -> dict[str, str]:
     """Best-effort local stand-in for file_utils.get_subdirectory_indexes(...)."""
@@ -84,6 +86,7 @@ def _get_subdirectory_indexes(
     try:
         return index_state.read_summaries(child_paths, 0)
     except Exception:
+        # Fallback to an empty dictionary if the state read fails.
         return {}
 
 
@@ -129,18 +132,22 @@ class SummaryMerger:
         """
         self._stats.increment_counter("merges.started")
         if not docs:
+            # Avoid processing empty document lists.
             raise ValueError("No indexes to merge.")
 
         if len(docs) == 1:
+            # Optimization: Skip LLM call if only a single document exists.
             self._stats.increment_counter("merges.skipped_single_index")
             return docs[0]
 
+        # Construct the context-heavy system prompt for the merge task.
         system_prompt = (
             prompt_templates.create_merger_prompt()
             + "\n Partial summaries: \n"
             + "\n\n---\n\n".join(_serialize_doc(doc) for doc in docs)
             + "\n Subdirectory Indexes: "
             + json.dumps(
+                # Include nested indexes to help the LLM maintain hierarchical context.
                 _get_subdirectory_indexes(
                     self._index_state,
                     directory_path,
@@ -151,6 +158,7 @@ class SummaryMerger:
             )
         )
 
+        # Prepare the final user prompt directing the LLM to unify the provided docs.
         initial_user_prompt = USER_PROMPT_TEMPLATE_MERGE.format(
             directory_path=directory_path
         )
@@ -161,6 +169,7 @@ class SummaryMerger:
             initial_user_prompt,
         )
 
+        # Delegate the final synthesis to the LLM prompter.
         return self._llm_prompter.prompt_for_merging(
             directory_path=directory_path,
             system_prompt=system_prompt,

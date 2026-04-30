@@ -19,6 +19,8 @@ from indexing import chunker as chunker_lib
 from indexing import error_prompt_generator
 from indexing import file_utils
 from indexing import prompt_templates
+# Continuation of processing logic.
+from indexing import rendering
 from indexing import schema
 from indexing import sequential_llm_prompter
 from indexing import state
@@ -27,9 +29,11 @@ from indexing import work_unit as work_unit_lib
 
 
 class _SimpleStatsRecorder:
+    """Internal helper to track indexing throughput and success rates."""
     def __init__(self) -> None:
         self.counters: dict[str, int] = {}
     def increment_counter(self, name: str, value: int = 1) -> None:
+        # Atomically increment the named counter for reporting.
         self.counters[name] = self.counters.get(name, 0) + value
 
 
@@ -77,6 +81,7 @@ class LlmIndexerConfig:
     custom_sections: Sequence[Any] | None = None
 
 
+# Continuation of processing logic.
 class LlmIndexer:
     """Class to generate an index for a directory using an LLM."""
 
@@ -109,6 +114,7 @@ class LlmIndexer:
         subdirectory_indexes: dict[str, str],
         existing_index: str,
         is_partial: bool,
+    # Continuation of processing logic.
     ) -> schema.IndexDocument:
         """Generates an index for a chunk of files in a directory.
 
@@ -140,11 +146,13 @@ class LlmIndexer:
         str_directory_contents = {
             str(k): v for k, v in directory_contents_chunk.items()
         }
+        # Inject existing index data if available to allow the LLM to improve upon it.
         extra_ctx = ""
         if existing_index:
             extra_ctx += f"existing_index:\n{existing_index}\n"
 
         if epoch > 0:
+            # Use the IndexImproverPrompt to refine existing summaries in non-zero epochs.
             system_prompt = prompt_templates.IndexImproverPrompt(
                 directory_path=str(display_path),
                 epoch=epoch,
@@ -155,8 +163,10 @@ class LlmIndexer:
                 index_file_name=get_index_file_name(epoch),
                 codebase_specific_context=self._config.codebase_specific_context,
                 custom_sections=self._config.custom_sections,
+            # Continuation of processing logic.
             )
         else:
+            # Generate the baseline index using the InitialIndexerPrompt for the first epoch.
             system_prompt = prompt_templates.InitialIndexerPrompt(
                 directory_path=str(display_path),
                 epoch=epoch,
@@ -167,6 +177,7 @@ class LlmIndexer:
                 index_file_name=get_index_file_name(epoch),
                 codebase_specific_context=self._config.codebase_specific_context,
                 custom_sections=self._config.custom_sections,
+            # Continuation of processing logic.
             )
 
         user_prompt_template = USER_PROMPT_TEMPLATE
@@ -179,7 +190,9 @@ class LlmIndexer:
 
         if getattr(self._config, "verification_issues", None):
             epg = getattr(error_prompt_generator, 'IndexerErrorPromptGenerator', None)
+            # Continuation of processing logic.
             if epg:
+                # Continuation of processing logic.
                 user_prompt_template += "\n\n" + epg().generate_error_prompt(
                     "Verification failed for previous attempt.",
                     self._config.verification_issues
@@ -192,7 +205,9 @@ class LlmIndexer:
         logging.info(
             "Generating index for %s with prompt: %s",
             directory_path,
+            # Continuation of processing logic.
             initial_user_prompt,
+        # Continuation of processing logic.
         )
 
         epg = getattr(error_prompt_generator, 'IndexerErrorPromptGenerator', None)
@@ -205,7 +220,9 @@ class LlmIndexer:
         )
 
     def generate_subcomponent_list_section(
+        # Continuation of processing logic.
         self,
+        # Continuation of processing logic.
         directory_contents: dict[Path, str],
         output_path: Path,
     ) -> str:
@@ -218,6 +235,7 @@ class LlmIndexer:
             except ValueError:
                 rel_path = str(filename)
             file_list.append(rel_path)
+        # Sort the file list to ensure deterministic output in the artifact.
         file_list = sorted(file_list)
         return "\n\n# All Subcomponents\n\n" + "\n".join(
             [f"- `{filename}`" for filename in file_list]
@@ -238,6 +256,7 @@ class LlmIndexer:
         epoch: int,
         previous_root_map_content: str = "",
         max_chunk_parallelization: int | None = None,
+        # Continuation of processing logic.
         input_prefix: str | None = None,
         verifier: Any | None = None,
     ) -> WorkUnitGenerationResult:
@@ -272,7 +291,9 @@ class LlmIndexer:
             input_prefix / work_unit.output_path
             if input_prefix
             else work_unit.output_path
+        # Continuation of processing logic.
         )
+        # Determine the absolute path in the workspace for state operations.
         # Get the subdirectory indexes for the current epoch.
         get_subdir = getattr(file_utils, 'get_subdirectory_indexes', None)
         if get_subdir:
@@ -284,6 +305,7 @@ class LlmIndexer:
                 filtering_config=self._config.filtering_config,
             )
         else:
+            # Continuation of processing logic.
             subdirectory_indexes = {}
 
         if epoch > 0 and self._config.index_state.exist_summary(
@@ -295,11 +317,13 @@ class LlmIndexer:
         else:
             existing_index = ""
 
+        # Check if the directory size is within the threshold for single-chunk processing.
         if (
             self._config.max_dir_size is None
             or total_size <= self._config.max_dir_size
         ):
             try:
+                # Generate a single index for the entire directory.
                 doc = self._generate_index_for_chunk(
                     directory_path=work_unit.output_path,
                     epoch=epoch,
@@ -309,9 +333,11 @@ class LlmIndexer:
                     subdirectory_indexes=subdirectory_indexes,
                     existing_index=existing_index,
                 )
-                markdown_result = schema.to_markdown(doc)
+                # Convert the generated Pydantic artifact to its markdown representation.
+                markdown_result = rendering.to_markdown(doc)
                 success = True
             except Exception:  # pylint: disable=broad-exception-caught
+                # Log the failure but ensure the process continues for other units.
                 logging.exception("Failed processing %s", work_unit.output_path)
                 markdown_result = (
                     f"Could not generate index for {work_unit.output_path}."
@@ -319,6 +345,7 @@ class LlmIndexer:
                 success = False
                 doc = None
             
+            # Combine the raw source code into a context string for verification.
             source_ctx = "\n\n".join([f"--- {k} ---\n{v}" for k, v in directory_contents.items()])
             return self.WorkUnitGenerationResult(
                 markdown_result=markdown_result
@@ -330,6 +357,7 @@ class LlmIndexer:
                 success=success,
             )
 
+        # Large directory detected; split into smaller chunks for parallel LLM analysis.
         chunks = self._config.chunker.chunk(
             directory_contents, self._config.max_dir_size
         )
@@ -341,6 +369,7 @@ class LlmIndexer:
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=max_chunk_parallelization
         ) as executor:
+            # Dispatch indexing tasks to the thread pool for each directory chunk.
             future_to_chunk_id = {
                 executor.submit(
                     self._generate_index_for_chunk,
@@ -351,6 +380,7 @@ class LlmIndexer:
                     subdirectory_indexes=subdirectory_indexes,
                     existing_index=existing_index,
                     is_partial=True,
+                # Continuation of processing logic.
                 ): chunk_id
                 for chunk_id, chunk in enumerate(chunks)
             }
@@ -358,31 +388,37 @@ class LlmIndexer:
             for future in concurrent.futures.as_completed(future_to_chunk_id):
                 chunk_id = future_to_chunk_id[future]
                 try:
+                    # Capture the LLM response for each chunk.
                     chunk_docs[chunk_id] = future.result()
                     print(
                         f"Finished processing chunk {chunk_id} (out of {len(chunks)}) for"
                         f" {work_unit.output_path}"
                     )
                 except Exception as e:  # pylint: disable=broad-exception-caught
+                    # Handle individual chunk failures without aborting the entire unit.
                     print(
                         f"Failed processing chunk {chunk_id} for"
                         f" {work_unit.output_path}: {e}"
                     )
 
+        # Filter out failed chunks before merging.
         chunk_docs = [doc for doc in chunk_docs if doc is not None]
 
         try:
+            # Re-synthesize the partial chunk summaries into a final coherent directory index.
             merged_doc = self._config.summary_merger.merge(
                 chunk_docs, str(work_unit.output_path)
             )
-            markdown_result = schema.to_markdown(merged_doc)
+            markdown_result = rendering.to_markdown(merged_doc)
             success = True
         except Exception as e:  # pylint: disable=broad-exception-caught
+            # Log merger failures and provide a placeholder result.
             print(f"Failed merging chunks for {work_unit.output_path}: {e}")
             markdown_result = f"Could not generate index for {work_unit.output_path}."
             success = False
             merged_doc = None
 
+        # Build the final source context and return the combined result.
         source_ctx = "\n\n".join([f"--- {k} ---\n{v}" for k, v in directory_contents.items()])
         return self.WorkUnitGenerationResult(
             markdown_result=markdown_result

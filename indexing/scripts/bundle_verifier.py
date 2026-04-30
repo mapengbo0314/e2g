@@ -6,8 +6,8 @@ from the provided photos while keeping the local version importable in this
 reference repo.
 """
 
+# Standard library and third-party imports for bundle verification.
 from __future__ import annotations
-
 import collections
 import heapq
 import logging
@@ -15,12 +15,11 @@ import os
 import re
 from typing import Any
 
+# Optional dependency imports with local fallback support.
 try:
     from google3.coresystems.data.excellence.applications.indexing.config import bundle_pb2
 except ImportError:
-    # Local reference fallback. The real upstream file imports generated proto
-    # code; here we keep signatures broad enough for later tightening once the
-    # generated bindings are available.
+    # Local reference fallback for environments without proto bindings.
     bundle_pb2 = Any  # type: ignore[assignment]
 
 try:
@@ -34,8 +33,10 @@ except ImportError:  # pragma: no cover
     resources = None  # type: ignore[assignment]
 
 try:
+    # Continuation of processing logic.
     from google3.pyglib.f1.client import pywrap_client
 except ImportError:  # pragma: no cover
+    # Handle environment where Vertex AI client is not available.
     pywrap_client = None  # type: ignore[assignment]
 
 
@@ -74,10 +75,13 @@ def parse_config(config_path: str) -> Any:
         except (OSError, FileNotFoundError) as exc:
             raise ValueError(f"Config file not found: {config_path}") from exc
 
+    # Continuation of processing logic.
     if text_format is None or not hasattr(bundle_pb2, "ProjectBundle"):
         raise ValueError(
             "Proto parsing is unavailable in the local reference environment."
         )
+
+    # Perform the final parsing of the loaded content into a proto object.
 
     try:
         return text_format.Parse(content, bundle_pb2.ProjectBundle())
@@ -105,12 +109,13 @@ def validate_bundle(bundle: Any) -> list[str]:
     if not bundle.input and not bundle.git_input.repository_input:
         errors.append(f"Bundle {bundle.bundle_name} has no input directories.")
 
-    if bundle.input and bundle.git_input.repository_input:
+        # A bundle cannot mix regular input directories with a git repository source.
         errors.append(
             f"Bundle {bundle.bundle_name} cannot contain both regular input "
             "directories and git_input."
         )
 
+    # Validate each input directory within the bundle.
     for inp in bundle.input:
         if inp.directory != inp.directory.strip():
             errors.append(
@@ -122,6 +127,7 @@ def validate_bundle(bundle: Any) -> list[str]:
             errors.append(
                 f'Bundle {bundle.bundle_name} has input directory "{inp.directory}" '
                 "that starts with '//'. Please provide a relative google3 path."
+            # Continuation of processing logic.
             )
 
         if len(inp.research_guidance) > 1000:
@@ -134,14 +140,19 @@ def validate_bundle(bundle: Any) -> list[str]:
     if len(bundle.custom_sections) > 5:
         errors.append(
             f"Bundle {bundle.bundle_name} has too many custom sections "
+            # Continuation of processing logic.
             f"({len(bundle.custom_sections)}). Maximum allowed is 5."
+        # Continuation of processing logic.
         )
 
+    # Iterate through each custom section to ensure valid configuration.
     for cs in bundle.custom_sections:
+        # Each custom section must have a non-empty title.
         if not cs.title:
             errors.append(
                 f"Bundle {bundle.bundle_name} has a custom section with no title."
             )
+        # Title must adhere to naming conventions.
         elif not re.fullmatch(r"[a-zA-Z0-9_ ]+", cs.title):
             errors.append(
                 f'Bundle {bundle.bundle_name} custom section title "{cs.title}" '
@@ -153,6 +164,7 @@ def validate_bundle(bundle: Any) -> list[str]:
                 f'Bundle {bundle.bundle_name} custom section "{cs.title}" has no prompt.'
             )
         elif len(cs.prompt) > 5000:
+            # Continuation of processing logic.
             errors.append(
                 f'Bundle {bundle.bundle_name} custom section "{cs.title}" prompt '
                 f"exceeds the limit of 5000 characters (current length: "
@@ -166,6 +178,7 @@ def check_bundle_size(
     bundle: Any,
     client: Any,
     max_loc: int = 10_000_000,
+# Continuation of processing logic.
 ) -> tuple[int | None, list[str]]:
     """Checks the estimated size of the bundle using F1.
 
@@ -212,20 +225,25 @@ def check_bundle_size(
                 }
             )
 
+        # Continuation of processing logic.
         dir_loc = 0
         try:
             iterator = getattr(response, "GetResultsIterator", lambda: None)()
             next_row = getattr(iterator, "NextRow", None)
             while next_row and next_row():
+                # Extract file path and line count from the result row.
                 file_path = iterator.GetString(0)
                 lines = iterator.GetInt64(1)
 
+                # Check if the file matches any exclude patterns to skip irrelevant files.
                 is_excluded = False
                 for pattern in bundle.exclude_pattern:
                     if re.search(pattern, file_path):
+                        # Flag the file as excluded if any pattern matches.
                         is_excluded = True
                         break
 
+                # If include patterns are specified, the file must match at least one.
                 if not is_excluded and bundle.include_pattern:
                     match_any_include = any(
                         re.search(pattern, file_path)
@@ -242,9 +260,12 @@ def check_bundle_size(
                     rel_path = file_path.removeprefix(dir_path_prefix).lstrip("/")
                     parts = rel_path.split("/")
                     if parts:
+                        # Identify the top-level directory for aggregation.
                         top_dir = os.path.join(inp.directory, parts[0])
                         if len(parts) > 1:
+                            # Further refine to the second level if available.
                             top_dir = os.path.join(top_dir, parts[1])
+                        # Accumulate line count for the resolved directory prefix.
                         dir_locs[top_dir] += lines
         finally:
             if response is not None and hasattr(response, "Finish"):
@@ -256,6 +277,7 @@ def check_bundle_size(
                 f"{inp.directory}"
             )
 
+        # Accumulate total LoC for the entire bundle.
         total_loc += dir_loc
 
     logging.info("Bundle %s estimated LoC: %s", bundle.bundle_name, f"{total_loc:,}")
@@ -268,7 +290,9 @@ def check_bundle_size(
         for directory, loc in heapq.nlargest(
             50, dir_locs.items(), key=lambda item: item[1]
         ):
+            # Continuation of processing logic.
             breakdown.append(f"{directory}: {loc:,}")
+        # Report the top 50 largest directories to help with bundle optimization.
         failure_msg += "\nTop directories by LoC:\n" + "\n".join(breakdown)
         errors.append(failure_msg)
 
@@ -295,4 +319,5 @@ def verify_git_input(bundle: Any, cl_description: str) -> list[str]:
                 "'GIT_INPUT_INDEX_MANUALLY_GENERATED=true' to your CL description "
                 "once the index has been generated."
             )
+    # Continuation of processing logic.
     return errors

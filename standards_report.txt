@@ -1,0 +1,733 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.3, pytest-9.0.2, pluggy-1.6.0 -- /Library/Frameworks/Python.framework/Versions/3.11/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /Users/pengbolicious/pengbo-apps/e-2-g
+plugins: asyncio-1.3.0, anyio-3.7.1, Faker-40.12.0, zarr-3.1.5
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 27 items
+
+tests/test_code_standards.py::test_10_line_comment_rule[file_path0] PASSED [  3%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path1] FAILED [  7%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path2] FAILED [ 11%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path3] FAILED [ 14%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path4] FAILED [ 18%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path5] FAILED [ 22%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path6] PASSED [ 25%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path7] FAILED [ 29%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path8] FAILED [ 33%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path9] PASSED [ 37%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path10] FAILED [ 40%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path11] FAILED [ 44%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path12] PASSED [ 48%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path13] FAILED [ 51%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path14] PASSED [ 55%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path15] FAILED [ 59%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path16] FAILED [ 62%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path17] PASSED [ 66%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path18] PASSED [ 70%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path19] FAILED [ 74%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path20] PASSED [ 77%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path21] FAILED [ 81%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path22] FAILED [ 85%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path23] FAILED [ 88%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path24] FAILED [ 92%]
+tests/test_code_standards.py::test_10_line_comment_rule[file_path25] FAILED [ 96%]
+tests/test_code_standards.py::test_no_print_statements PASSED            [100%]
+
+=================================== FAILURES ===================================
+____________________ test_10_line_comment_rule[file_path1] _____________________
+
+file_path = PosixPath('indexing/summary_merger.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/summary_merger.py:
+E           Line 26: )
+E           Line 72:     filtering_config: object | None = None,
+E           Line 87:         return {}
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path2] _____________________
+
+file_path = PosixPath('indexing/shared_flags.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/shared_flags.py:
+E           Line 26: @dataclass
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path3] _____________________
+
+file_path = PosixPath('indexing/verification.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/verification.py:
+E           Line 79:             self.cache[key] = verdict.model_dump()
+E           Line 135:         source_context: str
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path4] _____________________
+
+file_path = PosixPath('indexing/rendering.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/rendering.py:
+E           Line 35:         return f"# Key Individual Components\n\n{items}"
+E           Line 48:         items = "\n".join(
+E           Line 61:         return f"# Testing Strategy\n\n{section.content}" if section.content else None
+E           Line 73:         )
+E           Line 94:     ]
+E           Line 108:     result = "\n\n".join(output)
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path5] _____________________
+
+file_path = PosixPath('indexing/sequential_llm_prompter.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/sequential_llm_prompter.py:
+E           Line 22:     from vertexai.generative_models import GenerativeModel, ChatSession
+E           Line 36: try:
+E           Line 49:     import schema
+E           Line 68:     LLM_FAILURES = _NoOpCounter()
+E           Line 87:         return False
+E           Line 149:     max_attempts: int = 3
+E           Line 172:         return json.dumps(self.state, indent=2, default=str)
+E           Line 185:                 ),
+E           Line 196:                 ),
+E           Line 207:             )
+E           Line 228:         self.model = GenerativeModel(
+E           Line 253:         self.model = genai.GenerativeModel(
+E           Line 278:         self.dry_run_map = dry_run_map or {}
+E           Line 316: class GeminiLlmPrompter(LlmPrompter):
+E           Line 337:         agent_name: str,
+E           Line 414:         conversation: _SimpleConversation,
+E           Line 480:         error_prompt_generator_instance: Any,
+E           Line 501:         agent_name: str,
+E           Line 575:                         e,
+E           Line 591:                         error_prompt_generator_instance,
+E           Line 605:                     error_prompt_generator_instance,
+E           Line 622:         instruction: str,
+E           Line 640:                 epoch=epoch,
+E           Line 659:         directory_path: str,
+E           Line 691:         return section_doc.custom_sections
+E           Line 724:                 epoch=system_prompt.epoch(),
+E           Line 741:             model_type="research",
+E           Line 757:             output_schema_type=schema.KeyComponentsDocument,
+E           Line 774:             instruction=deep_dive_instruction,
+E           Line 792:             error_prompt_generator_instance=error_prompt_generator_instance,
+E           Line 824:         )
+E           Line 864:             agent_name="merging_agent",
+E           Line 876:     def prompt_for_root_map_summary(self, root_map_content: str) -> str:
+E           Line 900:             with self._throttler.acquire(system_prompt, "Please verify the artifact.") as throttle_ctx:
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path7] _____________________
+
+file_path = PosixPath('indexing/llm_indexer.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/llm_indexer.py:
+E           Line 22: from indexing import rendering
+E           Line 83: class LlmIndexer:
+E           Line 115:     ) -> schema.IndexDocument:
+E           Line 158:                 previous_epoch_str=previous_root_map_content or "",
+E           Line 169:                 extra_context=extra_ctx,
+E           Line 181:                 f"Please summarize only the following files: {keys_str}"
+E           Line 194:         )
+E           Line 207:             system_prompt=system_prompt,
+E           Line 246:         input_prefix: str | None = None,
+E           Line 280:         )
+E           Line 293:             subdirectory_indexes = {}
+E           Line 321:                 success = True
+E           Line 366:                 ): chunk_id
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path8] _____________________
+
+file_path = PosixPath('indexing/verification_types.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/verification_types.py:
+E           Line 27:             return dict(self.__dict__)
+E           Line 78:         default=None,
+E           Line 102:             "List of human-readable issue descriptions. These are injected "
+E           Line 113:     )
+E           Line 130:         issues: List[str],
+E           Line 156:             ],
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path10] ____________________
+
+file_path = PosixPath('indexing/work_unit.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/work_unit.py:
+E           Line 22: _METADATA_FILE_NAME = "work_units.json"
+E           Line 38:     def increment(self) -> None:
+E           Line 74: class _FakeCommitShas:
+E           Line 116:         if "commit_shas" in payload:
+E           Line 153:             commit_identifier=[],
+E           Line 178:         if self.last_indexed_info:
+E           Line 190:             last_indexed_info = LastIndexedInfo(
+E           Line 201:             last_indexed_info=last_indexed_info,
+E           Line 251:                 wu.to_dict()
+E           Line 273:             last_indexed_info=LastIndexedInfo(
+E           Line 315:             errored_work_units=sorted(
+E           Line 345: ) -> WorkUnitManifest:
+E           Line 361:             last_indexed_info=wu.last_indexed_info or manifest.last_indexed_info,
+E           Line 414:     def get_timestamp(self) -> datetime.datetime:
+E           Line 449:                 logging.warning(
+E           Line 472:         except Exception:
+E           Line 486: @dataclasses.dataclass(frozen=True)
+E           Line 519:             )
+E           Line 535:         )
+E           Line 560:         last_commit_info = max(
+E           Line 572:         work_units=work_units,
+E           Line 592:     def from_db_path(
+E           Line 622:             ],
+E           Line 634:     def write(self, manifest: WorkUnitManifest) -> None:
+E           Line 661:             self._add_row_to_mutation(
+E           Line 673:             commit_id_proto = _FakeCommitIdProto()
+E           Line 684:                 commit_id_proto,
+E           Line 731:   w.LastIndexedCommitId,
+E           Line 757:   AND EXISTS(SELECT 1 FROM UNNEST(@p1) AS prefix
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path11] ____________________
+
+file_path = PosixPath('indexing/prompt_templates.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/prompt_templates.py:
+E           Line 42: Regex Default: Queries are Regular Expressions (RE2 syntax) by default.
+E           Line 53: Escaping: Use \\ to escape special characters (e.g., \\, \\, (, )).
+E           Line 65: ( foo OR bar ), to distinguish from regex grouping.
+E           Line 77: symbol:<regex> / s:<regex>: Search for symbol definitions (classes,
+E           Line 88: usage:my_var
+E           Line 99: blame:<user>: Content sections where the last change was by <user>.
+E           Line 110: Git-on-Borg repos.
+E           Line 121: acl_workspace:eng
+E           Line 449: 3. **Usefulness: CRITICAL GOAL** Make the summaries useful. Help a skilled
+E           Line 510:         custom_sections: Sequence[bundle_pb2.ProjectBundle.CustomSection],
+E           Line 521:         self._extra_context = extra_context
+E           Line 535: <INDEX_FILE_NAME>
+E           Line 597:             task=task,
+E           Line 664:             prompt_context=self.prompt_context(),
+E           Line 676:     ) -> str:
+E           Line 697: <KEY_COMPONENTS_SUMMARY>
+E           Line 729:         ]
+E           Line 741:         task = "\n".join(task_instructions)
+E           Line 811:         self,
+E           Line 830: <KEY_COMPONENTS_SUMMARY>
+E           Line 911: 2. Inspect the additional context from the previous research, the key components summary, and the Deep Dive summary.
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path13] ____________________
+
+file_path = PosixPath('indexing/reindexing.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/reindexing.py:
+E           Line 127:             errored_work_units=[],
+E           Line 148:             in_old = path in old_work_units
+E           Line 160:                 if (
+E           Line 171:                         old_work_unit_manifest.last_indexed_info.commit_identifier,
+E           Line 189:                 to_reindex.add(path)
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path15] ____________________
+
+file_path = PosixPath('indexing/error_prompt_generator.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/error_prompt_generator.py:
+E           Line 38:         )
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path16] ____________________
+
+file_path = PosixPath('indexing/generate_bundles.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/generate_bundles.py:
+E           Line 19: import tempfile
+E           Line 82:         return None
+E           Line 113:                 shutil.rmtree(dir_name)
+E           Line 162:     reindex: bool = False,
+E           Line 185:     )
+E           Line 199:             fs_manager=fs_mgr,
+E           Line 212:         index_state=index_state,
+E           Line 232:     indexer_orchestrator = orchestrator.Orchestrator(
+E           Line 243:         bundle_name=bundle.bundle_name,
+E           Line 279:         for input_dir in self._input_dirs:
+E           Line 312:         "--input_dir", type=str, required=True, help="Path to the source code to index"
+E           Line 323:     parser.add_argument(
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path19] ____________________
+
+file_path = PosixPath('indexing/orchestrator.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/orchestrator.py:
+E           Line 19: from indexing import schema
+E           Line 50:     GENERAL_FAILURES = _NoOpCounter()
+E           Line 67:         self._gauges: dict[str, Any] = {}
+E           Line 97:         except Exception:
+E           Line 158:     def read(self, path: str) -> str:
+E           Line 172:             pass
+E           Line 194:         fs_manager: Any = None,
+E           Line 238:         self._perform_fs_checkpointing = perform_fs_checkpointing
+E           Line 311:                     "Epoch %d: Progress file exists, loading progress file.", epoch
+E           Line 322:                     epoch,
+E           Line 335:         if not work_units_to_process:
+E           Line 370:                     len(units_to_process),
+E           Line 383:                     try:
+E           Line 417:             )
+E           Line 428:         )
+E           Line 456:             artifact_json = result.artifact.model_dump_json(indent=2)
+E           Line 478:             )
+E           Line 532:         if plan.paths_to_delete:
+E           Line 568:             logging.info("Finished root map for epoch %d", epoch)
+E           Line 587:             ),
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path21] ____________________
+
+file_path = PosixPath('indexing/root_map.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/root_map.py:
+E           Line 95:     epoch: int,
+E           Line 125:         ]
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path22] ____________________
+
+file_path = PosixPath('indexing/state.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/state.py:
+E           Line 348:                     epoch,
+E           Line 364:                 )
+E           Line 376:                     path,
+E           Line 388:                 logging.warning(
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path23] ____________________
+
+file_path = PosixPath('indexing/schema.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/schema.py:
+E           Line 79:     )
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path24] ____________________
+
+file_path = PosixPath('indexing/planner/planner.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/planner/planner.py:
+E           Line 37:     from work_unit import WorkUnit
+E           Line 101:         allowed_silos: frozenset[str] | None = None,
+E           Line 228:             for directory in all_dirs:
+E           Line 296:         for path in sorted(dir_stats_map.keys(), key=lambda p: len(p.parts)):
+E           Line 331:             key=lambda ds: len(ds.path.parts),
+E           Line 344:             for work_unit in aggregated_work_units
+E           Line 356:             work_unit_diff = self._index_differ.get_work_units_to_reindex(
+
+tests/test_code_standards.py:77: Failed
+____________________ test_10_line_comment_rule[file_path25] ____________________
+
+file_path = PosixPath('indexing/scripts/bundle_verifier.py')
+
+    @pytest.mark.parametrize("file_path", get_code_files())
+    def test_10_line_comment_rule(file_path):
+        """Enforces that no block of code exceeds 10 lines without a comment."""
+        # We exclude __init__.py and very small files
+        if file_path.name == "__init__.py":
+            return
+    
+        violations = check_10_line_rule(file_path)
+        if violations:
+            error_msg = f"10-line rule violation in {file_path}:\n" + "\n".join(violations)
+>           pytest.fail(error_msg)
+E           Failed: 10-line rule violation in indexing/scripts/bundle_verifier.py:
+E           Line 36:     from google3.pyglib.f1.client import pywrap_client
+E           Line 76:     if text_format is None or not hasattr(bundle_pb2, "ProjectBundle"):
+E           Line 109:             f"Bundle {bundle.bundle_name} cannot contain both regular input "
+E           Line 122:                 f'Bundle {bundle.bundle_name} has input directory "{inp.directory}" '
+E           Line 135:             f"Bundle {bundle.bundle_name} has too many custom sections "
+E           Line 158:             errors.append(
+E           Line 217:         dir_loc = 0
+E           Line 280:             breakdown.append(f"{directory}: {loc:,}")
+E           Line 308:     return errors
+
+tests/test_code_standards.py:77: Failed
+=========================== short test summary info ============================
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path1] - Failed: 10-line rule violation in indexing/summary_merger.py:
+Line 26: )
+Line 72:     filtering_config: object | None = None,
+Line 87:         return {}
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path2] - Failed: 10-line rule violation in indexing/shared_flags.py:
+Line 26: @dataclass
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path3] - Failed: 10-line rule violation in indexing/verification.py:
+Line 79:             self.cache[key] = verdict.model_dump()
+Line 135:         source_context: str
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path4] - Failed: 10-line rule violation in indexing/rendering.py:
+Line 35:         return f"# Key Individual Components\n\n{items}"
+Line 48:         items = "\n".join(
+Line 61:         return f"# Testing Strategy\n\n{section.content}" if section.content else None
+Line 73:         )
+Line 94:     ]
+Line 108:     result = "\n\n".join(output)
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path5] - Failed: 10-line rule violation in indexing/sequential_llm_prompter.py:
+Line 22:     from vertexai.generative_models import GenerativeModel, ChatSession
+Line 36: try:
+Line 49:     import schema
+Line 68:     LLM_FAILURES = _NoOpCounter()
+Line 87:         return False
+Line 149:     max_attempts: int = 3
+Line 172:         return json.dumps(self.state, indent=2, default=str)
+Line 185:                 ),
+Line 196:                 ),
+Line 207:             )
+Line 228:         self.model = GenerativeModel(
+Line 253:         self.model = genai.GenerativeModel(
+Line 278:         self.dry_run_map = dry_run_map or {}
+Line 316: class GeminiLlmPrompter(LlmPrompter):
+Line 337:         agent_name: str,
+Line 414:         conversation: _SimpleConversation,
+Line 480:         error_prompt_generator_instance: Any,
+Line 501:         agent_name: str,
+Line 575:                         e,
+Line 591:                         error_prompt_generator_instance,
+Line 605:                     error_prompt_generator_instance,
+Line 622:         instruction: str,
+Line 640:                 epoch=epoch,
+Line 659:         directory_path: str,
+Line 691:         return section_doc.custom_sections
+Line 724:                 epoch=system_prompt.epoch(),
+Line 741:             model_type="research",
+Line 757:             output_schema_type=schema.KeyComponentsDocument,
+Line 774:             instruction=deep_dive_instruction,
+Line 792:             error_prompt_generator_instance=error_prompt_generator_instance,
+Line 824:         )
+Line 864:             agent_name="merging_agent",
+Line 876:     def prompt_for_root_map_summary(self, root_map_content: str) -> str:
+Line 900:             with self._throttler.acquire(system_prompt, "Please verify the artifact.") as throttle_ctx:
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path7] - Failed: 10-line rule violation in indexing/llm_indexer.py:
+Line 22: from indexing import rendering
+Line 83: class LlmIndexer:
+Line 115:     ) -> schema.IndexDocument:
+Line 158:                 previous_epoch_str=previous_root_map_content or "",
+Line 169:                 extra_context=extra_ctx,
+Line 181:                 f"Please summarize only the following files: {keys_str}"
+Line 194:         )
+Line 207:             system_prompt=system_prompt,
+Line 246:         input_prefix: str | None = None,
+Line 280:         )
+Line 293:             subdirectory_indexes = {}
+Line 321:                 success = True
+Line 366:                 ): chunk_id
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path8] - Failed: 10-line rule violation in indexing/verification_types.py:
+Line 27:             return dict(self.__dict__)
+Line 78:         default=None,
+Line 102:             "List of human-readable issue descriptions. These are injected "
+Line 113:     )
+Line 130:         issues: List[str],
+Line 156:             ],
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path10] - Failed: 10-line rule violation in indexing/work_unit.py:
+Line 22: _METADATA_FILE_NAME = "work_units.json"
+Line 38:     def increment(self) -> None:
+Line 74: class _FakeCommitShas:
+Line 116:         if "commit_shas" in payload:
+Line 153:             commit_identifier=[],
+Line 178:         if self.last_indexed_info:
+Line 190:             last_indexed_info = LastIndexedInfo(
+Line 201:             last_indexed_info=last_indexed_info,
+Line 251:                 wu.to_dict()
+Line 273:             last_indexed_info=LastIndexedInfo(
+Line 315:             errored_work_units=sorted(
+Line 345: ) -> WorkUnitManifest:
+Line 361:             last_indexed_info=wu.last_indexed_info or manifest.last_indexed_info,
+Line 414:     def get_timestamp(self) -> datetime.datetime:
+Line 449:                 logging.warning(
+Line 472:         except Exception:
+Line 486: @dataclasses.dataclass(frozen=True)
+Line 519:             )
+Line 535:         )
+Line 560:         last_commit_info = max(
+Line 572:         work_units=work_units,
+Line 592:     def from_db_path(
+Line 622:             ],
+Line 634:     def write(self, manifest: WorkUnitManifest) -> None:
+Line 661:             self._add_row_to_mutation(
+Line 673:             commit_id_proto = _FakeCommitIdProto()
+Line 684:                 commit_id_proto,
+Line 731:   w.LastIndexedCommitId,
+Line 757:   AND EXISTS(SELECT 1 FROM UNNEST(@p1) AS prefix
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path11] - Failed: 10-line rule violation in indexing/prompt_templates.py:
+Line 42: Regex Default: Queries are Regular Expressions (RE2 syntax) by default.
+Line 53: Escaping: Use \\ to escape special characters (e.g., \\, \\, (, )).
+Line 65: ( foo OR bar ), to distinguish from regex grouping.
+Line 77: symbol:<regex> / s:<regex>: Search for symbol definitions (classes,
+Line 88: usage:my_var
+Line 99: blame:<user>: Content sections where the last change was by <user>.
+Line 110: Git-on-Borg repos.
+Line 121: acl_workspace:eng
+Line 449: 3. **Usefulness: CRITICAL GOAL** Make the summaries useful. Help a skilled
+Line 510:         custom_sections: Sequence[bundle_pb2.ProjectBundle.CustomSection],
+Line 521:         self._extra_context = extra_context
+Line 535: <INDEX_FILE_NAME>
+Line 597:             task=task,
+Line 664:             prompt_context=self.prompt_context(),
+Line 676:     ) -> str:
+Line 697: <KEY_COMPONENTS_SUMMARY>
+Line 729:         ]
+Line 741:         task = "\n".join(task_instructions)
+Line 811:         self,
+Line 830: <KEY_COMPONENTS_SUMMARY>
+Line 911: 2. Inspect the additional context from the previous research, the key components summary, and the Deep Dive summary.
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path13] - Failed: 10-line rule violation in indexing/reindexing.py:
+Line 127:             errored_work_units=[],
+Line 148:             in_old = path in old_work_units
+Line 160:                 if (
+Line 171:                         old_work_unit_manifest.last_indexed_info.commit_identifier,
+Line 189:                 to_reindex.add(path)
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path15] - Failed: 10-line rule violation in indexing/error_prompt_generator.py:
+Line 38:         )
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path16] - Failed: 10-line rule violation in indexing/generate_bundles.py:
+Line 19: import tempfile
+Line 82:         return None
+Line 113:                 shutil.rmtree(dir_name)
+Line 162:     reindex: bool = False,
+Line 185:     )
+Line 199:             fs_manager=fs_mgr,
+Line 212:         index_state=index_state,
+Line 232:     indexer_orchestrator = orchestrator.Orchestrator(
+Line 243:         bundle_name=bundle.bundle_name,
+Line 279:         for input_dir in self._input_dirs:
+Line 312:         "--input_dir", type=str, required=True, help="Path to the source code to index"
+Line 323:     parser.add_argument(
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path19] - Failed: 10-line rule violation in indexing/orchestrator.py:
+Line 19: from indexing import schema
+Line 50:     GENERAL_FAILURES = _NoOpCounter()
+Line 67:         self._gauges: dict[str, Any] = {}
+Line 97:         except Exception:
+Line 158:     def read(self, path: str) -> str:
+Line 172:             pass
+Line 194:         fs_manager: Any = None,
+Line 238:         self._perform_fs_checkpointing = perform_fs_checkpointing
+Line 311:                     "Epoch %d: Progress file exists, loading progress file.", epoch
+Line 322:                     epoch,
+Line 335:         if not work_units_to_process:
+Line 370:                     len(units_to_process),
+Line 383:                     try:
+Line 417:             )
+Line 428:         )
+Line 456:             artifact_json = result.artifact.model_dump_json(indent=2)
+Line 478:             )
+Line 532:         if plan.paths_to_delete:
+Line 568:             logging.info("Finished root map for epoch %d", epoch)
+Line 587:             ),
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path21] - Failed: 10-line rule violation in indexing/root_map.py:
+Line 95:     epoch: int,
+Line 125:         ]
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path22] - Failed: 10-line rule violation in indexing/state.py:
+Line 348:                     epoch,
+Line 364:                 )
+Line 376:                     path,
+Line 388:                 logging.warning(
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path23] - Failed: 10-line rule violation in indexing/schema.py:
+Line 79:     )
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path24] - Failed: 10-line rule violation in indexing/planner/planner.py:
+Line 37:     from work_unit import WorkUnit
+Line 101:         allowed_silos: frozenset[str] | None = None,
+Line 228:             for directory in all_dirs:
+Line 296:         for path in sorted(dir_stats_map.keys(), key=lambda p: len(p.parts)):
+Line 331:             key=lambda ds: len(ds.path.parts),
+Line 344:             for work_unit in aggregated_work_units
+Line 356:             work_unit_diff = self._index_differ.get_work_units_to_reindex(
+FAILED tests/test_code_standards.py::test_10_line_comment_rule[file_path25] - Failed: 10-line rule violation in indexing/scripts/bundle_verifier.py:
+Line 36:     from google3.pyglib.f1.client import pywrap_client
+Line 76:     if text_format is None or not hasattr(bundle_pb2, "ProjectBundle"):
+Line 109:             f"Bundle {bundle.bundle_name} cannot contain both regular input "
+Line 122:                 f'Bundle {bundle.bundle_name} has input directory "{inp.directory}" '
+Line 135:             f"Bundle {bundle.bundle_name} has too many custom sections "
+Line 158:             errors.append(
+Line 217:         dir_loc = 0
+Line 280:             breakdown.append(f"{directory}: {loc:,}")
+Line 308:     return errors
+========================= 18 failed, 9 passed in 0.08s =========================

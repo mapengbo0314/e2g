@@ -16,10 +16,13 @@ import os
 import random
 import shutil
 import string
+# Continuation of processing logic.
 import tempfile
 import threading
+# Base types for defining structured data in the indexing pipeline.
 from typing import Any
 
+# Internal project module imports for the indexing pipeline components.
 from indexing import chunker
 from indexing import llm_indexer
 from indexing import orchestrator
@@ -29,6 +32,7 @@ from indexing import shared_flags
 from indexing import state
 from indexing import summary_merger
 from indexing import work_unit
+from indexing import verification
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +81,7 @@ class _SemaphoreThrottleContext:
         return False
 
     def report_output(self, _output: str) -> None:
+        # Standard no-op implementation for the basic throttling reporter.
         return None
 
 
@@ -106,11 +111,13 @@ def custom_temporary_directory(prefix: str = "") -> Iterator[str]:
         try:
             os.mkdir(dir_name)
             try:
+                # Provide the temporary directory path to the caller context.
                 yield dir_name
             finally:
                 shutil.rmtree(dir_name)
             return
         except FileExistsError:
+            # Suffix collision detected; retry with a different random seed.
             continue
     raise FileExistsError(
         "Could not create temporary directory with 2-char suffix."
@@ -128,19 +135,24 @@ def create_llm_prompter(
     fs_manager: Any = None,
 ) -> sequential_llm_prompter.LlmPrompter:
     """Creates an LLM prompter for a bundle."""
-    config = shared_flags.config
+    llm_cfg = shared_flags.config.llm
+    # Return the configured prompter instance for the indexing lifecycle.
     return sequential_llm_prompter.GeminiLlmPrompter(
         sequential_llm_prompter.GeminiLlmPrompterConfig(
             bundle_name=bundle.bundle_name,
             throttling_strategy=throttling_strategy,
-            max_attempts=config.max_llm_retries,
-            max_attempts_per_conversation=config.max_attempts_per_conversation,
-            synthesis_gemini_model=config.gemini_model,
-            research_gemini_model=config.gemini_model,
-            use_vertex_ai=config.use_vertex_ai_api,
-            vertex_ai_project_id=config.vertex_ai_project_id,
-            google_api_key=config.google_api_key,
-            dry_run=config.dry_run,
+            # Retry limits and conversation thresholds.
+            max_attempts=llm_cfg.max_retries,
+            max_attempts_per_conversation=llm_cfg.max_attempts_per_conversation,
+            # Model selection and platform configuration.
+            synthesis_gemini_model=llm_cfg.model,
+            research_gemini_model=llm_cfg.model,
+            use_vertex_ai=llm_cfg.use_vertex_ai,
+            vertex_ai_project_id=llm_cfg.vertex_project_id,
+            google_api_key=llm_cfg.google_api_key,
+            # Dry run and mock fallback flags.
+            dry_run=shared_flags.config.pipeline.dry_run,
+            allow_mock_fallback=llm_cfg.allow_mock_fallback,
         ),
         fs_manager=fs_manager,
     )
@@ -151,6 +163,7 @@ def execute_indexing(
     indexer_config: IndexerConfig | None = None,
     fs_manager: Any = None,
     llm_prompter: sequential_llm_prompter.LlmPrompter | None = None,
+    # Continuation of processing logic.
     reindex: bool = False,
 ) -> None:
     """Runs one iteration of indexing against a local directory bundle.
@@ -163,19 +176,25 @@ def execute_indexing(
         reindex: Whether to perform incremental reindexing.
     """
     config = indexer_config or IndexerConfig()
+    input_prefix = config.input_prefix_to_strip
+    if not input_prefix and len(bundle.input_dirs) == 1:
+        input_prefix = bundle.input_dirs[0]
+
+    # Ensure a file system manager is available for local or remote operations.
     fs_mgr = fs_manager or orchestrator.LocalFileSystemManager()
     output_dir = bundle.output_dir or os.path.join(bundle.input_dirs[0], ".index_output")
 
     index_state = state.LocalState(
         state_dir=output_dir,
         fs_manager=fs_mgr,
-        input_prefix_to_strip=config.input_prefix_to_strip,
+        input_prefix_to_strip=input_prefix,
     )
 
+    # Initialize storage for work unit manifests (in-memory for the local reference).
     work_unit_storage = work_unit.InMemoryWorkUnitStorage()
 
     throttling = SemaphoreThrottlingStrategy(
-        max_parallel=shared_flags.config.max_llm_parallelization
+        max_parallel=shared_flags.config.llm.max_parallelization
     )
     prompter = llm_prompter or create_llm_prompter(
         bundle, throttling_strategy=throttling, fs_manager=fs_mgr
@@ -183,6 +202,7 @@ def execute_indexing(
 
     index_differ = None
     if reindex:
+        # Initialize the index differ to identify which files have changed since the last run.
         index_differ = reindexing.IndexDiffer(
             fs_manager=fs_mgr,
             work_unit_storage=work_unit_storage,
@@ -195,32 +215,47 @@ def execute_indexing(
         fs_manager=fs_mgr,
     )
 
+    # Configure the core LLM Indexer with necessary prompts and summary tools.
     llm_indexer_config = llm_indexer.LlmIndexerConfig(
         llm_prompter=prompter,
         index_state=index_state,
         chunker=chunker_instance,
+        # Summary merger for combining chunked LLM outputs.
         summary_merger=summary_merger_instance,
         max_dir_size=config.max_dir_size,
+        # Pass codebase-specific instructions for customized index generation.
         codebase_specific_context=bundle.codebase_specific_context,
+        # Custom section definitions from the bundle blueprint.
         custom_sections=bundle.custom_sections,
     )
 
     indexer_instance = llm_indexer.LlmIndexer(llm_indexer_config, fs_mgr)
 
+    from pathlib import Path
+    verifier = None
+    if shared_flags.config.trust.enabled:
+        verifier = verification.ArtifactVerifier(
+            llm_prompter=prompter,
+            cache_dir=Path(fs_mgr.join(output_dir, "verification_cache"))
+        )
+
+    # Initialize the Orchestrator to manage the multi-epoch indexing process.
     indexer_orchestrator = orchestrator.Orchestrator(
         planner_instance=_SimplePlanner(
             input_dirs=bundle.input_dirs,
             fs_manager=fs_mgr,
         ),
         indexer=indexer_instance,
-        num_epochs=shared_flags.config.num_epochs,
+        num_epochs=shared_flags.config.pipeline.num_epochs,
         root_map_dir=output_dir,
         index_state=index_state,
         work_unit_storage=work_unit_storage,
-        max_workers=shared_flags.config.max_workers,
+        # Continuation of processing logic.
+        max_workers=shared_flags.config.pipeline.max_workers,
         bundle_name=bundle.bundle_name,
         fs_manager=fs_mgr,
-        input_prefix_to_strip=config.input_prefix_to_strip,
+        input_prefix_to_strip=input_prefix,
+        verifier=verifier,
     )
 
     indexer_orchestrator.run()
@@ -253,6 +288,7 @@ class _SimplePlanner:
         from pathlib import Path
 
         units: list[work_unit.WorkUnit] = []
+        # Continuation of processing logic.
         for input_dir in self._input_dirs:
             root = Path(input_dir)
             if not root.is_dir():
@@ -271,6 +307,7 @@ class _SimplePlanner:
                         )
                     )
 
+        # Return the finalized plan result for the orchestrator to execute.
         return _PlanResult(
             all_work_units=units,
             work_units_to_process=units,
@@ -285,6 +322,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run the AI Codebase Indexer")
     parser.add_argument(
+        # Continuation of processing logic.
         "--input_dir", type=str, required=True, help="Path to the source code to index"
     )
     parser.add_argument(
@@ -295,15 +333,33 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dry_run", action="store_true", help="Perform a dry run with mocked LLM responses"
+    # Continuation of processing logic.
     )
+    # Continuation of processing logic.
     parser.add_argument(
         "--reindex", action="store_true", help="Perform an incremental re-indexing run"
     )
 
+    # Parse command line arguments to configure the execution environment.
     args = parser.parse_args()
 
-    # Apply CLI flags to shared_flags
-    shared_flags.config.dry_run = args.dry_run
+    # Apply CLI flags to shared_flags to control global pipeline behavior.
+    shared_flags.config.pipeline.dry_run = args.dry_run
+    if args.dry_run:
+        # Enable mock fallback if dry run is requested.
+        shared_flags.config.llm.allow_mock_fallback = True
+        
+    # Pick up API key from environment for local execution.
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if api_key:
+        shared_flags.config.llm.google_api_key = api_key
+        # We also need to set use_vertex_ai to False to use the direct API instead.
+        shared_flags.config.llm.use_vertex_ai = False
+        
+    # Validate that an API key is provided for real execution runs.
+    if not args.dry_run and not api_key:
+        print("ERROR: GEMINI_API_KEY environment variable is required when not performing a dry run.")
+        sys.exit(1)
     
     config = BundleConfig(
         bundle_name=args.bundle_name,
@@ -311,8 +367,8 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
     )
 
-    print(f"Starting indexing for {args.input_dir} -> {args.output_dir} (Dry Run: {args.dry_run})")
     try:
+        # Launch the main indexing execution flow.
         execute_indexing(config, reindex=args.reindex)
         print("Indexing completed successfully.")
     except Exception as e:

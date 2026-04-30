@@ -20,10 +20,9 @@ from indexing.schema import (
     TestingStrategy,
     VerificationState,
     from_json,
-    sanitize_unicode,
     to_json,
-    to_markdown,
 )
+from indexing.rendering import sanitize_unicode, to_markdown
 from indexing.verification_types import (
     IssueCategory,
     IssueSeverity,

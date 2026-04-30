@@ -8,12 +8,14 @@ It also includes aggressive caching via .verification_cache.json to avoid
 re-verifying unmodified outputs.
 """
 
+# Standard library and internal project imports for artifact verification.
 import hashlib
 import json
 import logging
 from pathlib import Path
 from typing import Any, Protocol
 
+# Optional Pydantic import for schema-driven validation.
 try:
     import pydantic
 except ImportError:
@@ -41,6 +43,7 @@ class VerificationCache:
         try:
             return json.loads(self.cache_file.read_text())
         except json.JSONDecodeError:
+            # If the cache file is malformed, log a warning and return an empty state.
             logging.warning("Verification cache is corrupted. Starting fresh.")
             return {}
 
@@ -50,6 +53,7 @@ class VerificationCache:
 
     def _compute_hash(self, artifact_json: str, source_context: str) -> str:
         """Computes a stable hash of the input and context."""
+        # Use SHA-256 for high collision resistance in the verification cache.
         hasher = hashlib.sha256()
         hasher.update(artifact_json.encode("utf-8"))
         hasher.update(source_context.encode("utf-8"))
@@ -72,6 +76,7 @@ class VerificationCache:
         if pydantic is not None:
             self.cache[key] = verdict.model_dump()
         else:
+            # Continuation of processing logic.
             self.cache[key] = verdict.model_dump()
         self._save_cache()
 
@@ -89,22 +94,25 @@ class ArtifactVerifier:
         Returns the parsed IndexDocument on success, or a failing VerificationVerdict.
         """
         if pydantic is None:
-            # Fallback if Pydantic isn't installed
+            # Fallback if Pydantic isn't installed in the local environment.
             try:
                 data = json.loads(artifact_json)
                 return schema.IndexDocument(**data)
             except Exception as e:
+                # Return a structured syntactic failure verdict.
                 return verification_types.VerificationVerdict.syntactic_failure(str(e))
                 
         try:
+            # Attempt to parse and validate against the IndexDocument schema.
             return schema.IndexDocument.model_validate_json(artifact_json)
         except pydantic.ValidationError as e:
-            # Extract readable errors
+            # Extract and format readable schema violation errors.
             issues = []
             for err in e.errors():
                 loc = ".".join(str(l) for l in err["loc"])
                 issues.append(f"Schema error at '{loc}': {err['msg']}")
             
+            # Map Pydantic errors to the domain-specific VerificationIssue type.
             detailed = [
                 verification_types.VerificationIssue(
                     category=verification_types.IssueCategory.SCHEMA_VIOLATION.value,
@@ -113,6 +121,7 @@ class ArtifactVerifier:
                 ) for i in issues
             ]
             
+            # Return a failure verdict with the accumulated issues.
             return verification_types.VerificationVerdict.failure(
                 issues=issues,
                 detailed_issues=detailed,
@@ -124,18 +133,19 @@ class ArtifactVerifier:
     def _stage2_semantic_verification(
         self, 
         artifact_json: str, 
+        # Continuation of processing logic.
         source_context: str
     ) -> verification_types.VerificationVerdict:
         """Runs Stage 2: LLM factual grounding check."""
-        # Check cache first
+        # Check cache first to avoid expensive and redundant LLM calls.
         cached = self.cache.get_cached_verdict(artifact_json, source_context)
         if cached is not None:
             return cached
 
-        # Delegate to the LLM
+        # Delegate the actual semantic checking to the LLM.
         verdict = self.llm_prompter.verify_artifact(artifact_json, source_context)
         
-        # Cache the result
+        # Cache the result to prevent repeated verification of the same artifact/context pair.
         self.cache.store_verdict(artifact_json, source_context, verdict)
         return verdict
 
@@ -152,15 +162,16 @@ class ArtifactVerifier:
             source_context: The raw source code or context used to generate the artifact.
             skip_semantic: If True, only runs syntactic validation (useful for partial generation).
         """
-        # Stage 1: Syntactic
+        # Stage 1: Syntactic (Fast, deterministic check).
         stage1_result = self._stage1_syntactic_validation(artifact_json)
         if isinstance(stage1_result, verification_types.VerificationVerdict):
-            # Stage 1 failed, abort and return failure
+            # Stage 1 failed, abort and return the failure immediately.
             return stage1_result
             
         if skip_semantic:
+            # Return success if Stage 1 passes and semantic verification is disabled.
             return verification_types.VerificationVerdict.success()
 
-        # Stage 2: Semantic
-        # We pass the original JSON (or we could pass the dumped stage1_result if we wanted normalized JSON)
+        # Stage 2: Semantic (Slow, non-deterministic grounding check).
+        # We pass the original JSON for verification against the raw source context.
         return self._stage2_semantic_verification(artifact_json, source_context)

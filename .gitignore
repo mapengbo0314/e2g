@@ -1,1 +1,17 @@
 /reference-photos
+
+# Auto-generated outputs and pipelines
+local_index_output/
+.index_output/
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+indexing/_generate_bundles.venv/
+
+# Bazel build artifacts
+bazel-*
+
+# Design documentation
+designs/
