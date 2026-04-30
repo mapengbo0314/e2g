@@ -77,7 +77,7 @@ def collect_overviews(
             overview = _extract_markdown_section(content, "Overview")
             if overview:
                 display_path = index_state.get_display_path(path_str)
-                display_path = display_path.removeprefix("//depot/google3/")
+                display_path = display_path.removeprefix("//depot/mono/")
                 collected_overviews.append(f"## {display_path}\n\n{overview}\n")
             elif log_warnings:
                 logging.warning(

@@ -1,0 +1,22 @@
+# proto-file: coresystems/data/excellence/applications/indexing/config/bundle.proto
+# proto-message: ProjectBundle
+
+# Unique name for the rcs bundle
+bundle_name: "rcs"
+
+# Core Java codebase
+input: {
+  directory: "java/com/google/communication/rcs/"
+}
+input: {
+  directory: "javatests/com/google/communication/rcs/"
+}
+
+# APIs
+input: {
+  directory: "communication/rcs/"
+}
+
+# Exclude large test data or noise patterns
+exclude_pattern: ".*/testdata/.*"
+exclude_pattern: ".*\\.rpclog"

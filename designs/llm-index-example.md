@@ -49,16 +49,16 @@ gmsplatform.onboarding.proto.PlatformOnboardingService: The primary RCinterface 
 - KeyRegistry: Used to retrieve MD5 fingerprints and PEM certificates for application signing keys.
 # Configuration and flags
 * onboarding_dry_run
-(java/com/google/gmsplatform/onboarding/common/BoqletModule.java): Global flag to enable dry run mode across onboarding RCs, preventing actual mutations in systems like repository and L-Space. Comments: Default is false.
+(recursive-index/gmsplatform/onboarding/common/BoqletModule.java): Global flag to enable dry run mode across onboarding RCs, preventing actual mutations in systems like repository and L-Space. Comments: Default is false.
 * codemaker_binary_path
-(java/com/google/gmsplatform/onboarding/common/BoqletModule.java): Path to the CodeMaker binary used for template generation.
+(recursive-index/gmsplatform/onboarding/common/BoqletModule.java): Path to the CodeMaker binary used for template generation.
 * mppli_binary_path"
-(java/com/google/gmsplatform/onboarding/service/SetupMobilespecAction.java): Path to the mppc binary used for Mobilespec setup.
+(recursive-index/gmsplatform/onboarding/service/SetupMobilespecAction.java): Path to the mppc binary used for Mobilespec setup.
 * rapid_url_hostname*
-(java/com/google/gmsplatform/onboarding/service/CreatePlaceholderCandidateAction.java):
+(recursive-index/gmsplatform/onboarding/service/CreatePlaceholderCandidateAction.java):
 The hostname used to construct Rapid URLs in responses. Comments: Typically points to rapid.corp.google.com or rapid-qa.corp.google.com.
 * Ispace
-_instance (java/com/google/gmsplatform/onboarding/service/SpaceService.java):
+_instance (recursive-index/gmsplatform/onboarding/service/SpaceService.java):
 Specifies the L-Space instance for artifact paths.
 #Testing Strategy
 Testing is primarily focused on unit tests for Action classes using RpcServiceTester' and the GoogleTestPromiseGraphModule'. These tests extensively use mocks (via Mockito') for external dependencies like "repositoryService, "RapidService, and LSpaceService. A
@@ -176,10 +176,10 @@ Gantry Onboarding Service: Orchestrated to provision project templates and manag
 66
 67
 68
-onboarding_dry_run Java/com/google/gmsplatform/onboarding/common/BogletModule,javal: Global flag to enable dry run mode, preventing actual mutations in external systems 11ke Ps codemaker_binary_path (jaya/com/google/gmsplatform/onboarding/common/BoqletModule.java): Path to the 'codemaker binary used for schematic-based file generation. mppc1_binary_path (Jaya/com/google/gmsplatform/onboarding/service/SetupMobilespecAction.Java): Path to the mpect binary used for Mobilespec ID setup.
+onboarding_dry_run recursive-index/gmsplatform/onboarding/common/BogletModule,javal: Global flag to enable dry run mode, preventing actual mutations in external systems 11ke Ps codemaker_binary_path (jaya/com/google/gmsplatform/onboarding/common/BoqletModule.java): Path to the 'codemaker binary used for schematic-based file generation. mppc1_binary_path (Jaya/com/google/gmsplatform/onboarding/service/SetupMobilespecAction.Java): Path to the mpect binary used for Mobilespec ID setup.
 *
-*rapid_urL_hostname(Java/com/google/gmsplatform/onbgarding/service/CreateRlaceholderCandidateAction.Java); The hostname used to construct Rapid URLs in response messages. Connen
-*Ispace_Instance (Java/com/google/gmsplatform/onboarding/service/LSpaceservice.javal: Specifies the L-Space instance for artifact paths.
+*rapid_urL_hostname(recursive-index/gmsplatform/onbgarding/service/CreateRlaceholderCandidateAction.Java); The hostname used to construct Rapid URLs in response messages. Connen
+*Ispace_Instance (recursive-index/gmsplatform/onboarding/service/LSpaceservice.javal: Specifies the L-Space instance for artifact paths.
 # Testing Strategy
 Testing is centered on unit tests for Action classes Located in javatests/com/google/gl
 73

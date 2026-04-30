@@ -1,4 +1,4 @@
-"""Planner reference for Glimpse indexing.
+"""Planner reference for Recursive-Index indexing.
 
 This file is a local, reference-oriented reconstruction of the planner shown in
 the provided screenshots. It keeps the same core responsibilities:
@@ -85,7 +85,7 @@ class PlannerBase(abc.ABC):
 
 
 class Planner(PlannerBase):
-    """Implementation of the planning logic for Glimpse indexing."""
+    """Implementation of the planning logic for Recursive-Index indexing."""
 
     def __init__(
         self,

@@ -9,28 +9,28 @@ import contextvars
 import logging
 from typing import Any, Callable, ParamSpec, TypeVar
 
-from google3.coresystems.data.excellence.applications.indexing import shared_flags
+from mono.coresystems.data.excellence.applications.indexing import shared_flags
 
 
 _P = ParamSpec("_P")
 _T = TypeVar("_T")
 
-# Global context variable for the Glimpse session ID.
-GLIMPSE_SESSION_ID: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "glimpse_session_id", default=None
+# Global context variable for the Recursive-Index session ID.
+Recursive-Index_SESSION_ID: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "Recursive-Index_session_id", default=None
 )
 
 
 class SessionIdLogFilter(logging.Filter):
     """A logging filter that prepends the session ID to log messages.
 
-    If GLIMPSE_SESSION_ID is set in the current context, this filter prepends
+    If Recursive-Index_SESSION_ID is set in the current context, this filter prepends
     '[Session: <id>]' to the log record's message.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
         """Modifies the log record to include the session ID if available."""
-        session_id = GLIMPSE_SESSION_ID.get()
+        session_id = Recursive-Index_SESSION_ID.get()
         if session_id:
             prefix = f"[Session: {session_id}]"
             if isinstance(record.msg, str) and not record.msg.startswith(prefix):

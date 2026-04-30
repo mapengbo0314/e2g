@@ -1,9 +1,9 @@
 """A unit of work for the indexer, possibly aggregating multiple directories.
 
-This is a local, screenshot-backed reconstruction of the most important parts
-of `work_unit.py`. It keeps the core data model and local storage machinery
-that other reference modules depend on, while intentionally omitting the
-Google-internal Spanner query implementation details.
+This is a screenshot-backed reconstruction of the upstream `work_unit.py`.
+It preserves the main data model plus the storage abstractions that appear in
+the provided screenshots: in-memory, filesystem, shadow/dual-write, and a
+reference-grade Spanner-backed shape.
 """
 
 from __future__ import annotations
@@ -20,6 +20,109 @@ from typing import Any
 
 
 _METADATA_FILE_NAME = "work_units.json"
+
+SECONDARY_READ_FAILURES_METRIC = (
+    "/coresystems/data/alls/gLimpse/indexing/secondary_read_failures"
+)
+SECONDARY_WRITE_FAILURES_METRIC = (
+    "/coresystems/data/alls/gLimpse/indexing/secondary_write_failures"
+)
+READ_DIFFS_METRIC = "/coresystems/data/alls/gLimpse/indexing/read_diffs"
+
+
+class _NoOpCounter:
+    def Increment(self) -> None:
+        return None
+
+    def increment(self) -> None:
+        return None
+
+
+secondary_read_failures = _NoOpCounter()
+secondary_write_failures = _NoOpCounter()
+read_diffs = _NoOpCounter()
+
+
+class _FakeMutation:
+    """Small local stand-in for a Spanner mutation object."""
+
+    def __init__(self) -> None:
+        self.ops: list[dict[str, Any]] = []
+
+    def InsertOrUpdate(
+        self,
+        *,
+        table: str,
+        cols: Sequence[str],
+        vals: Sequence[Any],
+    ) -> None:
+        self.ops.append(
+            {
+                "op": "InsertOrUpdate",
+                "table": table,
+                "cols": list(cols),
+                "vals": list(vals),
+            }
+        )
+
+    def Apply(self) -> None:
+        return None
+
+
+class _FakeCommitShas:
+    def __init__(self) -> None:
+        self.commit_sha: list[str] = []
+
+    def extend(self, values: Sequence[str]) -> None:
+        self.commit_sha.extend(values)
+
+
+class _FakeCommitIdProto:
+    """Local stand-in for the upstream summaries_pb2.CommitId proto."""
+
+    def __init__(self) -> None:
+        self.cl: int | None = None
+        self.commit_shas = _FakeCommitShas()
+
+    def HasField(self, name: str) -> bool:
+        if name == "cl":
+            return self.cl is not None
+        if name == "commit_shas":
+            return bool(self.commit_shas.commit_sha)
+        return False
+
+    def SerializeToString(self) -> bytes:
+        payload = {}
+        if self.cl is not None:
+            payload["cl"] = self.cl
+        if self.commit_shas.commit_sha:
+            payload["commit_shas"] = list(self.commit_shas.commit_sha)
+        return json.dumps(payload, sort_keys=True).encode("utf-8")
+
+    @classmethod
+    def FromString(cls, raw: bytes) -> "_FakeCommitIdProto":
+        proto = cls()
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except Exception:
+            return proto
+        if "cl" in payload:
+            proto.cl = payload["cl"]
+        if "commit_shas" in payload:
+            proto.commit_shas.extend(payload["commit_shas"])
+        return proto
+
+
+class _BaseQuery:
+    """Reference query object used to preserve upstream structure locally."""
+
+    SQL = ""
+
+    def __init__(self, *params: Any) -> None:
+        self.params = params
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(params={self.params!r})"
 
 
 CommitIdentifier = Sequence[str] | int
@@ -92,6 +195,7 @@ class WorkUnit:
 
     def load_files_to_index(
         self,
+        fs_manager: object | None = None,
         prefix: Path | None = None,
     ) -> dict[Path, str]:
         """Loads the files to index from the filesystem."""
@@ -99,17 +203,23 @@ class WorkUnit:
         for file_path in self.files_to_index:
             full_path = prefix / file_path if prefix is not None else file_path
             try:
-                file_contents[file_path] = full_path.read_text(encoding="utf-8")
+                if fs_manager is not None and hasattr(fs_manager, "read"):
+                    file_contents[file_path] = fs_manager.read(str(full_path))
+                else:
+                    file_contents[file_path] = full_path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 file_contents[file_path] = "Non-unicode file."
             except OSError:
+                file_contents[file_path] = "Could not read file."
+            except Exception:
+                logging.exception("Failed reading file for work unit: %s", full_path)
                 file_contents[file_path] = "Could not read file."
         return file_contents
 
 
 @dataclasses.dataclass(frozen=True)
 class WorkUnitManifest:
-    """Tracks the state of a Glimpse indexing run."""
+    """Tracks the state of a Recursive-Index indexing run."""
 
     work_units: Collection[WorkUnit]
     last_indexed_info: LastIndexedInfo
@@ -209,7 +319,7 @@ class ReadOnlyWorkUnitStorage(WorkUnitStorage):
         self._storage = storage
 
     def write(self, manifest: WorkUnitManifest) -> None:
-        pass
+        return None
 
     def read(self) -> WorkUnitManifest:
         return self._storage.read()
@@ -221,7 +331,11 @@ class ReadOnlyWorkUnitStorage(WorkUnitStorage):
 def _normalize_manifest_for_comparison(
     manifest: WorkUnitManifest,
 ) -> WorkUnitManifest:
-    """Normalizes a manifest for comparison."""
+    """Normalizes a manifest for comparison.
+
+    This ensures that work units have their last_indexed_info populated using
+    the manifest-level value when a backend stores inherited values implicitly.
+    """
     new_work_units = [
         dataclasses.replace(
             wu,
@@ -241,6 +355,20 @@ def _normalize_manifest_for_comparison(
         work_units=new_work_units,
         errored_work_units=new_errored_work_units,
     )
+
+
+def _to_comparable_dict(manifest: WorkUnitManifest) -> dict[str, Any]:
+    """Builds a comparison-friendly dict.
+
+    The screenshots show the size-bytes field being removed before diffing in
+    some storage comparisons because not every backend stores it consistently.
+    """
+    manifest_dict = _normalize_manifest_for_comparison(manifest).to_dict()
+    for wu in manifest_dict["work_units"]:
+        wu.pop("size_bytes", None)
+    for wu in manifest_dict["errored_work_units"]:
+        wu.pop("size_bytes", None)
+    return manifest_dict
 
 
 class FsWorkUnitStorage(WorkUnitStorage):
@@ -287,23 +415,12 @@ class ShadowWorkUnitStorage(WorkUnitStorage):
         self._primary = primary
         self._secondary = secondary
 
-    def write(self, manifest: WorkUnitManifest) -> None:
-        self._primary.write(manifest)
-        try:
-            self._secondary.write(manifest)
-        except Exception:
-            logging.exception("WorkUnitStorage: Failed to write to secondary storage.")
-
     def read(self) -> WorkUnitManifest:
         primary_manifest = self._primary.read()
         try:
             secondary_manifest = self._secondary.read()
-            primary_dict = _normalize_manifest_for_comparison(
-                primary_manifest
-            ).to_dict()
-            secondary_dict = _normalize_manifest_for_comparison(
-                secondary_manifest
-            ).to_dict()
+            primary_dict = _to_comparable_dict(primary_manifest)
+            secondary_dict = _to_comparable_dict(secondary_manifest)
 
             if primary_dict != secondary_dict:
                 primary_json = json.dumps(primary_dict, indent=2).splitlines()
@@ -320,8 +437,10 @@ class ShadowWorkUnitStorage(WorkUnitStorage):
                 )
                 for line in diff:
                     logging.warning(line)
+                read_diffs.Increment()
         except Exception:
             logging.exception("WorkUnitStorage: Failed to read from secondary storage.")
+            secondary_read_failures.Increment()
         return primary_manifest
 
     def get_timestamp(self) -> datetime.datetime:
@@ -335,6 +454,317 @@ class ShadowWorkUnitStorage(WorkUnitStorage):
                     primary_timestamp,
                     secondary_timestamp,
                 )
+                read_diffs.Increment()
         except Exception:
             logging.exception("WorkUnitStorage: Failed to read from secondary storage.")
+            secondary_read_failures.Increment()
         return primary_timestamp
+
+    def write(self, manifest: WorkUnitManifest) -> None:
+        self._primary.write(manifest)
+        try:
+            self._secondary.write(manifest)
+        except Exception:
+            logging.exception("WorkUnitStorage: Failed to write to secondary storage.")
+            secondary_write_failures.Increment()
+
+
+@dataclasses.dataclass(frozen=True)
+class WorkUnitRow:
+    """Represents a row from the WorkUnits table."""
+
+    output_path: str
+    success: bool
+    files_to_index: list[str]
+    serialized_commit_id: bytes | None = None
+    last_indexed_commit_timestamp: datetime.datetime | None = None
+
+
+def _update_last_commit_info(
+    current_info: LastIndexedInfo,
+    commit_id_proto: Any,
+    row_timestamp: datetime.datetime | None,
+) -> LastIndexedInfo:
+    """Updates the last indexed commit info based on the most recent timestamp."""
+    if row_timestamp is None:
+        return current_info
+
+    if current_info.is_empty() or row_timestamp > current_info.timestamp:
+        if hasattr(commit_id_proto, "HasField") and commit_id_proto.HasField("cl"):
+            return LastIndexedInfo(
+                commit_identifier=commit_id_proto.cl,
+                timestamp=row_timestamp,
+            )
+        if hasattr(commit_id_proto, "HasField") and commit_id_proto.HasField(
+            "commit_shas"
+        ):
+            return LastIndexedInfo(
+                commit_identifier=list(commit_id_proto.commit_shas.commit_sha),
+                timestamp=row_timestamp,
+            )
+    return current_info
+
+
+def _create_last_indexed_info_from_row(row: WorkUnitRow) -> LastIndexedInfo:
+    """Creates a LastIndexedInfo object from a Spanner-style row."""
+    if row.serialized_commit_id is None:
+        return LastIndexedInfo.empty()
+    commit_id_proto = _FakeCommitIdProto.FromString(row.serialized_commit_id)
+    if commit_id_proto.HasField("cl"):
+        return LastIndexedInfo(
+            commit_identifier=commit_id_proto.cl or 0,
+            timestamp=(
+                row.last_indexed_commit_timestamp
+                or datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+            ),
+        )
+    if commit_id_proto.HasField("commit_shas"):
+        return LastIndexedInfo(
+            commit_identifier=list(commit_id_proto.commit_shas.commit_sha),
+            timestamp=(
+                row.last_indexed_commit_timestamp
+                or datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+            ),
+        )
+    return LastIndexedInfo.empty()
+
+
+def _build_manifest_from_rows(rows: Iterable[WorkUnitRow]) -> WorkUnitManifest:
+    """Processes raw rows into a WorkUnitManifest."""
+    work_units = []
+    errored_work_units = []
+    last_commit_info = LastIndexedInfo.empty()
+
+    for row in rows:
+        row_last_indexed_info = _create_last_indexed_info_from_row(row)
+        work_unit = WorkUnit(
+            output_path=Path(row.output_path),
+            files_to_index={Path(path) for path in row.files_to_index},
+            last_indexed_info=row_last_indexed_info,
+        )
+        last_commit_info = max(
+            [last_commit_info, row_last_indexed_info],
+            key=lambda info: info.timestamp,
+        )
+        if row.success:
+            work_units.append(work_unit)
+        else:
+            errored_work_units.append(work_unit)
+
+    work_units.sort(key=lambda wu: wu.output_path)
+    errored_work_units.sort(key=lambda wu: wu.output_path)
+    return WorkUnitManifest(
+        work_units=work_units,
+        last_indexed_info=last_commit_info,
+        errored_work_units=errored_work_units,
+    )
+
+
+class SpannerWorkUnitStorage(WorkUnitStorage):
+    """Reference-grade shape for persistent storage in Spanner."""
+
+    def __init__(
+        self,
+        db: object,
+        bundle_name: str,
+        read_paths: Sequence[str] | None = None,
+    ):
+        self._db = db
+        self._bundle_name = bundle_name
+        self._read_paths = read_paths
+
+    @classmethod
+    def from_db_path(
+        cls,
+        db_path: str,
+        bundle_name: str,
+        read_paths: Sequence[str] | None = None,
+    ) -> "SpannerWorkUnitStorage":
+        """Initializes a SpannerWorkUnitStorage from a given database path."""
+        return cls(db=db_path, bundle_name=bundle_name, read_paths=read_paths)
+
+    def _add_row_to_mutation(
+        self,
+        mutation: _FakeMutation,
+        path: str,
+        success: bool,
+        commit_id_proto: _FakeCommitIdProto,
+        last_indexed_commit_timestamp: datetime.datetime,
+        files_to_index: list[str],
+    ) -> None:
+        """Adds a single work-unit row to a mutation."""
+        mutation.InsertOrUpdate(
+            table="WorkUnits",
+            cols=[
+                "BundleName",
+                "Path",
+                "Success",
+                "LastIndexedCommitId",
+                "FilesToIndex",
+                "LastIndexedCommitTimestamp",
+                "Status",
+            ],
+            vals=[
+                self._bundle_name,
+                path,
+                success,
+                commit_id_proto.SerializeToString(),
+                files_to_index,
+                last_indexed_commit_timestamp,
+                "ACTIVE",
+            ],
+        )
+
+    def write(self, manifest: WorkUnitManifest) -> None:
+        """Writes the list of work units to Spanner.
+
+        The real implementation batches mutations for active/errored work units,
+        then prunes stale rows using one of the delete queries below.
+        """
+        work_units_to_write = sorted(
+            manifest.work_units, key=lambda wu: str(wu.output_path)
+        )
+        errored_work_units_to_write = sorted(
+            manifest.errored_work_units, key=lambda wu: str(wu.output_path)
+        )
+
+        mutation = _FakeMutation()
+        updated_paths: list[str] = []
+
+        for wu in work_units_to_write:
+            updated_paths.append(str(wu.output_path))
+            info = wu.last_indexed_info or manifest.last_indexed_info
+            commit_id_proto = _FakeCommitIdProto()
+            if info.is_cl_based():
+                commit_id_proto.cl = int(info.commit_identifier)
+            elif info.is_commit_based():
+                commit_id_proto.commit_shas.extend(
+                    list(info.commit_identifier)  # type: ignore[arg-type]
+                )
+            self._add_row_to_mutation(
+                mutation,
+                str(wu.output_path),
+                True,
+                commit_id_proto,
+                info.timestamp,
+                sorted(str(f) for f in wu.files_to_index),
+            )
+
+        for wu in errored_work_units_to_write:
+            updated_paths.append(str(wu.output_path))
+            info = wu.last_indexed_info or manifest.last_indexed_info
+            commit_id_proto = _FakeCommitIdProto()
+            if info.is_cl_based():
+                commit_id_proto.cl = int(info.commit_identifier)
+            elif info.is_commit_based():
+                commit_id_proto.commit_shas.extend(
+                    list(info.commit_identifier)  # type: ignore[arg-type]
+                )
+            self._add_row_to_mutation(
+                mutation,
+                str(wu.output_path),
+                False,
+                commit_id_proto,
+                info.timestamp,
+                sorted(str(f) for f in wu.files_to_index),
+            )
+
+        mutation.Apply()
+        self._delete_stale_rows(updated_paths)
+
+    def read(self) -> WorkUnitManifest:
+        """Reads the list of work units from Spanner."""
+        return _build_manifest_from_rows(self._fetch_rows())
+
+    def _delete_stale_rows(self, updated_paths: Sequence[str]) -> None:
+        """Reference placeholder for stale-row cleanup."""
+        if self._read_paths is not None:
+            query = _DeleteOldWorkUnitsScopedQuery(self._bundle_name, updated_paths, self._read_paths)
+        else:
+            query = _DeleteOldWorkUnitsQuery(self._bundle_name, updated_paths)
+        logging.info("SpannerWorkUnitStorage cleanup query: %r", query)
+
+    def _fetch_rows(self) -> Iterable[WorkUnitRow]:
+        """Fetches WorkUnit rows.
+
+        The real implementation issues one of several Spanner queries depending
+        on whether `read_paths` is set. We return an empty iterable locally.
+        """
+        if self._read_paths is not None:
+            query = _ReadWorkUnitsByPathQuery(self._bundle_name, self._read_paths, "ACTIVE")
+        else:
+            query = _ReadWorkUnitsQuery(self._bundle_name, "ACTIVE")
+        logging.info("SpannerWorkUnitStorage read query: %r", query)
+        return []
+
+    def get_timestamp(self) -> datetime.datetime:
+        """Returns the timestamp from the work unit manifest's last_indexed_info."""
+        query = _ReadLatestTimestampQuery(self._bundle_name, "ACTIVE")
+        logging.info("SpannerWorkUnitStorage timestamp query: %r", query)
+        manifest = self.read()
+        return manifest.last_indexed_info.timestamp
+
+
+class _ReadWorkUnitsQuery(_BaseQuery):
+    SQL = """
+SELECT
+  w.Path,
+  w.Success,
+  w.FilesToIndex,
+  w.LastIndexedCommitId,
+  w.LastIndexedCommitTimestamp
+FROM WorkUnits AS w
+WHERE w.BundleName = @p0 AND w.Status = @p1
+""".strip()
+
+
+class _ReadLatestTimestampQuery(_BaseQuery):
+    SQL = """
+SELECT
+  MAX(w.LastIndexedCommitTimestamp)
+FROM WorkUnits AS w
+WHERE w.BundleName = @p0 AND w.Status = @p1
+""".strip()
+
+
+class _ReadWorkUnitsByPathQuery(_BaseQuery):
+    SQL = """
+SELECT
+  w.Path,
+  w.Success,
+  w.FilesToIndex,
+  w.LastIndexedCommitId,
+  w.LastIndexedCommitTimestamp
+FROM WorkUnits AS w
+WHERE w.BundleName = @p0 AND w.Status = @p2
+  AND EXISTS(SELECT 1 FROM UNNEST(@p1) AS prefix
+             WHERE STARTS_WITH(w.Path, prefix))
+""".strip()
+
+
+class _DeleteOldWorkUnitsQuery(_BaseQuery):
+    SQL = """
+DELETE FROM WorkUnits
+WHERE WorkUnits.BundleName = @p0
+  AND WorkUnits.Path NOT IN UNNEST(@p1)
+""".strip()
+
+
+class _DeleteOldWorkUnitsScopedQuery(_BaseQuery):
+    SQL = """
+DELETE FROM WorkUnits
+WHERE WorkUnits.BundleName = @p0
+  AND WorkUnits.Path NOT IN UNNEST(@p1)
+  AND EXISTS(SELECT 1 FROM UNNEST(@p2) AS prefix
+             WHERE STARTS_WITH(WorkUnits.Path, prefix))
+""".strip()
+
+
+def create_shadow_storage(
+    primary: WorkUnitStorage,
+    secondary: WorkUnitStorage | None = None,
+) -> WorkUnitStorage:
+    """Creates the most appropriate storage wrapper for a local MVP run."""
+    if secondary is None:
+        return primary
+    return ShadowWorkUnitStorage(primary=primary, secondary=secondary)

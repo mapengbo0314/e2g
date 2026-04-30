@@ -1,0 +1,205 @@
+edition = "2024";
+
+package coresystems.data.excellence.applications.indexing.config;
+
+import "coresystems/data/excellence/applications/indexing/config/indexer/indexer_config.proto";
+
+option features.utf8_validation = NONE;
+
+// Screenshot-backed reconstruction of the upstream bundle.proto.
+//
+// This reference file preserves the visible message layout, field names, and
+// comments from the provided photos. If you send the remaining sections later,
+// we can tighten this further and fill in any unseen fields without changing
+// the overall shape.
+
+// A bundle of a group of directories that are indexed together.
+message ProjectBundle {
+  // The name of the bundle. Must be unique across all bundles.
+  // Required.
+  string bundle_name = 1;
+
+  // The root directories for the project. Directories can be overlapping, both
+  // intra or inter-bundle.
+  // If git_input is specified, this field must be empty.
+  // Optional.
+  repeated InputDirectory input = 2;
+
+  // The exclude patterns for the project. Each is a regex; any full file paths
+  // matching will be excluded. Any directory paths matching will be excluded
+  // recursively.
+  // Optional.
+  repeated string exclude_pattern = 5;
+
+  // If specified, this field provides a positive filter on full file paths; any
+  // files not matching any of these patterns will be excluded. If empty, all
+  // files are included (subject to exclude_pattern).
+  // Optional.
+  repeated string include_pattern = 8;
+
+  // Additional approved file extensions for this bundle (e.g. .gcl, .borg).
+  // If set, they will be used in addition to the global approved extensions.
+  // https://google3/coresystems/data/excellence/applications/indexing/indexer/path_filtering_config.py?q=APPROVED_EXTENSIONS
+  // Optional.
+  repeated string additional_extensions = 10;
+
+  // The configuration for the indexer.
+  // Optional.
+  coresystems.data.excellence.applications.indexing.indexerConfig indexer_config = 6;
+
+  // Root directories for the project.
+  //
+  // The root directory is used to find all the files that are to be indexed.
+  //
+  // The set of files to be indexed is determined by collecting files from all
+  // `input.directory` paths recursively, and then filtering them.
+  //
+  // Filtering logic for files:
+  // 1. Files and directories matching any regex in `exclude_pattern` are
+  //    excluded.
+  // 2. If `include_pattern` is non-empty, only files matching at least one
+  //    regex in `include_pattern` are included.
+  // 3. Only files with approved extensions (e.g. .py, .java, .md) are
+  //    included.
+  message InputDirectory {
+    // Directory to be indexed, relative to google3, for example,
+    // "java/com/google/common/flogger".
+    string directory = 1;
+
+    // Optional targeted instructions for the research planners to guide their
+    // exploration and search strategies.
+    //
+    // Best Practices:
+    // 1. Be Specific: Guide the agent's intent rather than blunt force access.
+    //    - Bad: "Ignore files in /deprecated/" (Use exclude_pattern instead).
+    //    - Good: "When searching for usages, focus on consumers in
+    //      /ads/targeting/ to understand primary use cases."
+    // 2. Guide Pattern Recognition:
+    //    - Good: "This directory uses the plugin pattern. Prioritize reading
+    //      classes implementing Plugin."
+    // 3. Force Distant Lookups:
+    //    - Good: "Logic is driven by //cloud/config/security_policy.textproto,
+    //      you MUST read that file."
+    // 4. Keep it Concise: 2-3 sentences maximum to ensure strong adherence
+    //    without draining attention.
+    //
+    // Without degrading attention.
+    string research_guidance = 2;
+  }
+
+  // A custom section to be generated in the index.
+  message CustomSection {
+    // The header title for the section in the final index output.
+    string title = 1;
+
+    // Specific instructions for the Custom Researcher Agent.
+    //
+    // Your prompt is given to a Custom Researcher Agent that will analyze the
+    // files and generate the content for this section.
+    string prompt = 2;
+  }
+
+  // A Git repository to be indexed.
+  message GitRepository {
+    // The owner of the repository (e.g., "google").
+    // Required.
+    string owner = 1;
+
+    // The name of the repository (e.g., "guava").
+    // Required.
+    string name = 2;
+
+    // Required.
+    string repository_url = 3;
+  }
+
+  message GitInput {
+    repeated GitRepository repository_input = 1;
+
+    // Configuration for generating multiple index versions from this bundle
+    // definition, e.g. one version per commit SHA.
+    // This is only compatible with bundles that specify repository_input.
+    message Versioning {
+      // If specified, one index version will be generated for each commit
+      // SHA listed here. All Git repositories in repository_input will be
+      // indexed at that commit SHA if the given version.
+      // If empty and repository_input is present, repositories will be indexed
+      // at their default branch (e.g. HEAD).
+      repeated string commit_shas = 1;
+    }
+
+    Versioning versioning = 2;
+  }
+
+  // If specified, indicates that this bundle indexes Git repositories.
+  // If this field is specified, the input field must be empty.
+  // Optional.
+  //
+  // Glimpse will clone the requested repository into a temporary directory and
+  // then index it in the specified output directory.
+  //
+  // Glimpse is not responsible for licensing checks. The user must ensure they
+  // have the right to:
+  //   (a) clone the repository, and
+  //   (b) store derived data in the specified output directory.
+  // The Glimpse team recommends using a directory like '~/indexes/<repo_name>'
+  // for the output.
+  //
+  // The generated index may contain Google proprietary information and should
+  // not be uploaded to public locations. Contact the Glimpse team if
+  // externalization is required; we know how to ensure Glimpse indexes
+  // definitely do not include proprietary information, but have not done the
+  // work yet.
+  GitInput git_input = 7;
+
+  // Output config for the generated index files.
+  //
+  // If not specified, the generated index files will be written to the default
+  // output directory (located at
+  // /coresystems/data/excellence/applications/indexing/bundles/)
+  // If git_input is specified, custom_output must be used.
+  oneof output_config {
+    // Use this if you'd like to specify a custom output directory for the
+    // generated index files.
+    CustomOutput custom_output = 3;
+
+    // Use this if you'd like to interleave the generated index files with the
+    // given input directories.
+    // This option is NOT compatible with git_input.
+    InterleavedOutput interleaved_output = 4;
+  }
+
+  message CustomOutput {
+    // The entire indexing output will be written to this directory.
+    // If Versioning is used, output for each commit will be written to
+    // output_directory/<commit_sha>/.
+    // Required.
+    string output_directory = 1;
+  }
+
+  message InterleavedOutput {
+    // When interleaving output, the overall rootmap file will be written to
+    // this directory.
+    // Required.
+    string rootmap_output_directory = 1;
+  }
+
+  // Metadata for the project bundle.
+  message Metadata {
+    // The Buganizer component ID.
+    repeated int64 bug_component_ids = 1;
+
+    // A list of Google group names or team IDs owning the bundle.
+    repeated int64 team_ids = 2;
+
+    // A list of manager LDAP usernames.
+    repeated string managers = 3;
+
+    // A list of YAQS tags associated with the bundle.
+    repeated string yaqs_tags = 4;
+  }
+
+  Metadata metadata = 9;
+
+  repeated CustomSection custom_sections = 11;
+}

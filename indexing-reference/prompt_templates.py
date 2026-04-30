@@ -11,8 +11,8 @@ from typing import Final
 
 import pydantic
 
-from google3.coresystems.data.excellence.applications.indexing import schema
-from google3.coresystems.data.excellence.applications.indexing.config import bundle_pb2
+from mono.coresystems.data.excellence.applications.indexing import schema
+from mono.coresystems.data.excellence.applications.indexing.config import bundle_pb2
 
 
 MAX_CODE_SEARCH_QUERIES: Final[int] = 5
@@ -51,7 +51,7 @@ Common Filters (Atoms)
 content:<regex> / c:<regex>: Search within file contents.
 c:MyClass
 file:<regex> / f:<regex>: Search within file paths/names.
-f:google3/my/project/.*\\.py$
+f:mono/my/project/.*\\.py$
 -f:.*test\\.cc$ (Exclude test files)
 lang:<lang> / l:<lang>: Filter by language (e.g., cc, java, py, go).
 See go/cs-lang-reference.
@@ -198,7 +198,7 @@ facts about the codebase.
   * **Google Drive:** Google’s cloud storage service for users, familiar to those outside of Google.
   * **x20:** An internal Google system for sharing large files and datasets, providing native file-level access from Linux desktops.
   * **Managed Storage:** A network storage solution (NPS or CIFS) for services in Google’s corporate datacenters.
-  * **BinFS:** A system for securely distributing verified files from Google’s internal codebase (google3) to Googlers.
+  * **BinFS:** A system for securely distributing verified files from Google’s internal codebase (mono) to Googlers.
 
 * **2. Databases**
   * **Bigtable:** A distributed, NoSQL database designed for handling massive amounts of structured data.
@@ -224,10 +224,10 @@ facts about the codebase.
 * **II. Software Development & Deployment**
 
 * **a. Code Management & Version Control**
-  * **google3:** Google’s massive, unified code repository.
+  * **mono:** Google’s massive, unified code repository.
   * **CodeSearch:** A web-based tool for browsing and searching code.
   * **Cider:** The Cloud IDE.
-  * **Piper:** Google’s internal version control system.
+  * **monorepo:** Google’s internal version control system.
   * **Critique:** Google’s web-based tool for code review.
   * **Fugue:** A distributed version control system similar to Git.
   * **Git:** A widely used distributed version control system.
@@ -284,7 +284,7 @@ facts about the codebase.
   * **Borg Name Service (BNS):** A system mapping logical names like service names to the network addresses of the machines running that service.
   * **Chubby:** A distributed lock service.
   * **RPCs:** A system for defining who is allowed to access your server’s RPCs.
-  * **BCID (Borg Caller ID):** A system that helps ensure that the binaries running in Borg were actually built from the correct source code in Piper.
+  * **BCID (Borg Caller ID):** A system that helps ensure that the binaries running in Borg were actually built from the correct source code in monorepo.
   * **Extensible Stubs:** The library that manages Stubby stubs.
 
 * **B. Server Frameworks**
@@ -618,17 +618,17 @@ Focus on reading other code within the codebase to better understand the directo
 code. Reading known files wastes time and lowers summary quality.
 
 Use workspace-relative paths (e.g., 'foo/bar.py'). To locate files from imports,
-be aware of the following language-specific quirks in google3:
+be aware of the following language-specific quirks in mono:
 
-* **C++:** Include paths are relative to `google3/`; you can use them verbatim.
+* **C++:** Include paths are relative to `mono/`; you can use them verbatim.
   Example: `#include "foo/bar.h"` maps to `foo/bar.h`.
-* **Java:** Imports generally map to paths relative to `google3/java/` or
-  `google3/javatests/`. Example: `import com.google.foo.Bar;` maps to
-  `java/com/google/foo/Bar.java`.
-* **Python:** Absolute imports typically start with `google3.`. Example:
-  `from google3.foo import bar` maps to `foo/bar.py`
-* **Go:** Imports use the `google3/` prefix explicitly. Example:
-  `import "google3/foo/bar"` maps to the package directory `foo/bar/`.
+* **Java:** Imports generally map to paths relative to `mono/java/` or
+  `mono/javatests/`. Example: `import com.google.foo.Bar;` maps to
+  `recursive-index/foo/Bar.java`.
+* **Python:** Absolute imports typically start with `mono.`. Example:
+  `from mono.foo import bar` maps to `foo/bar.py`
+* **Go:** Imports use the `mono/` prefix explicitly. Example:
+  `import "mono/foo/bar"` maps to the package directory `foo/bar/`.
 
 IMPORTANT: format your output as a list of files you want to read.
 """)

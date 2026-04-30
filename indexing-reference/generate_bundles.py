@@ -18,31 +18,31 @@ from absl import flags
 from absl import logging
 from google.genai import types
 
-from google3.coresystems.data.excellence.applications.indexing import bundle_storage
-from google3.coresystems.data.excellence.applications.indexing import chunker
-from google3.coresystems.data.excellence.applications.indexing import github_cloner
-from google3.coresystems.data.excellence.applications.indexing import llm_indexer
-from google3.coresystems.data.excellence.applications.indexing import orchestrator
-from google3.coresystems.data.excellence.applications.indexing import reindexing
-from google3.coresystems.data.excellence.applications.indexing import sequential_llm_prompter
-from google3.coresystems.data.excellence.applications.indexing import shared_flags
-from google3.coresystems.data.excellence.applications.indexing import state
-from google3.coresystems.data.excellence.applications.indexing import summary_merger
-from google3.coresystems.data.excellence.applications.indexing import work_unit
-from google3.coresystems.data.excellence.applications.indexing.change_detection import change_detection_strategy as change_detection_strategy_lib
-from google3.coresystems.data.excellence.applications.indexing.change_detection import git_change_detection_strategy
-from google3.coresystems.data.excellence.applications.indexing.change_detection import piper_change_detection_strategy
-from google3.coresystems.data.excellence.applications.indexing.config import bundle_pb2
-from google3.coresystems.data.excellence.applications.indexing.config import indexer_config as indexer_config_lib
-from google3.coresystems.data.excellence.applications.indexing.filesystem import factory
-from google3.coresystems.data.excellence.applications.indexing.filesystem import file_system_manager_base
-from google3.coresystems.data.excellence.applications.indexing.index_expert import billing_labels
-from google3.coresystems.data.excellence.applications.indexing.index_expert import util as index_expert_util
-from google3.coresystems.data.excellence.applications.indexing.indexer import metrics
-from google3.coresystems.data.excellence.applications.indexing.indexer import path_filtering_config
-from google3.coresystems.data.excellence.applications.indexing.planner import planner as planner_lib
-from google3.coresystems.data.excellence.infra.utils import llm_throttler
-from google3.coresystems.data.excellence.infra.utils import stat_recorder
+from mono.coresystems.data.excellence.applications.indexing import bundle_storage
+from mono.coresystems.data.excellence.applications.indexing import chunker
+from mono.coresystems.data.excellence.applications.indexing import github_cloner
+from mono.coresystems.data.excellence.applications.indexing import llm_indexer
+from mono.coresystems.data.excellence.applications.indexing import orchestrator
+from mono.coresystems.data.excellence.applications.indexing import reindexing
+from mono.coresystems.data.excellence.applications.indexing import sequential_llm_prompter
+from mono.coresystems.data.excellence.applications.indexing import shared_flags
+from mono.coresystems.data.excellence.applications.indexing import state
+from mono.coresystems.data.excellence.applications.indexing import summary_merger
+from mono.coresystems.data.excellence.applications.indexing import work_unit
+from mono.coresystems.data.excellence.applications.indexing.change_detection import change_detection_strategy as change_detection_strategy_lib
+from mono.coresystems.data.excellence.applications.indexing.change_detection import git_change_detection_strategy
+from mono.coresystems.data.excellence.applications.indexing.change_detection import monorepo_change_detection_strategy
+from mono.coresystems.data.excellence.applications.indexing.config import bundle_pb2
+from mono.coresystems.data.excellence.applications.indexing.config import indexer_config as indexer_config_lib
+from mono.coresystems.data.excellence.applications.indexing.filesystem import factory
+from mono.coresystems.data.excellence.applications.indexing.filesystem import file_system_manager_base
+from mono.coresystems.data.excellence.applications.indexing.index_expert import billing_labels
+from mono.coresystems.data.excellence.applications.indexing.index_expert import util as index_expert_util
+from mono.coresystems.data.excellence.applications.indexing.indexer import metrics
+from mono.coresystems.data.excellence.applications.indexing.indexer import path_filtering_config
+from mono.coresystems.data.excellence.applications.indexing.planner import planner as planner_lib
+from mono.coresystems.data.excellence.infra.utils import llm_throttler
+from mono.coresystems.data.excellence.infra.utils import stat_recorder
 
 
 _REINDEX = shared_flags.REINDEX
@@ -142,11 +142,11 @@ def _execute_indexing(
         else:
             cl_string = fs_manager.get_cl_number()
             if cl_string is None or not cl_string.isdigit():
-                cl_number = piper_change_detection_strategy.DEFAULT_CL_NUMBER
+                cl_number = monorepo_change_detection_strategy.DEFAULT_CL_NUMBER
             else:
                 cl_number = int(fs_manager.get_cl_number())
             effective_change_detection_strategy = (
-                piper_change_detection_strategy.PiperChangeDetectionStrategy(
+                monorepo_change_detection_strategy.monorepoChangeDetectionStrategy(
                     cl_number
                 )
             )
@@ -495,7 +495,7 @@ def main(argv: Sequence[str]) -> None:
                             throttling_strategy,
                             fs_manager=fs_manager,
                             generate_content_config=index_expert_util.get_billing_config(
-                                billing_labels.GlimpseBillingLabel.GENERATE_BUNDLES,
+                                billing_labels.Recursive-IndexBillingLabel.GENERATE_BUNDLES,
                             ),
                         ),
                         work_unit_storage=work_unit.FsWorkUnitStorage(

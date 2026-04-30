@@ -192,8 +192,8 @@ Send for review
 
 
 
-The Role of Glimpse (go/glimpse):
-Glimpse is crucial for bootstrapping the Contextual Infrastructure, especially for existing codebases. It automates the creation of a "mental model" for the AI by:
+The Role of Recursive-Index (go/Recursive-Index):
+Recursive-Index is crucial for bootstrapping the Contextual Infrastructure, especially for existing codebases. It automates the creation of a "mental model" for the AI by:
 Recursive Summarization: Generating hierarchical README.md files by analyzing the code in directories, from the leaves of the project tree up to the root. This creates the "peanuts and hay" described in go/design-is-the-new-code, making the codebase digestible for the AI.
 Indexing: Creating an index that AI agents can query to quickly understand code structure, dependencies, and functionality.
 Plan of Action: Values and Issues Resolved
@@ -203,7 +203,7 @@ Values:
 Accelerated Development: AI handles boilerplate, code generation, and even refactoring tasks faster.
 Improved Code Quality: Consistent application of best practices and standards enforced by the harness.
 Enhanced Knowledge Sharing: Contextual infrastructure acts as living documentation.
-Easier Onboarding: New team members can quickly understand the codebase structure and standards through the Glimpse-generated summaries and harness docs.
+Easier Onboarding: New team members can quickly understand the codebase structure and standards through the Recursive-Index-generated summaries and harness docs.
 Reduced Toil: Automation of code reviews, bug fixes, and repetitive tasks.
 Existing Issues Addressed:
 
@@ -213,12 +213,12 @@ Technical Debt: Difficulty in refactoring and maintaining large codebases.
 Slow Onboarding: New engineers struggle to navigate complex projects.
 Burdensome Code Reviews: Human reviewers spend time on style and boilerplate issues.
 Information Silos: Project knowledge not being well-documented or accessible.
-How Harness Engineering Helps: By providing explicit guidance and context, the harness ensures AI-generated code is not just fast but also correct, maintainable, and aligned with project goals. Glimpse automates the foundational step of understanding the existing code, making harness creation feasible even for large projects.]
+How Harness Engineering Helps: By providing explicit guidance and context, the harness ensures AI-generated code is not just fast but also correct, maintainable, and aligned with project goals. Recursive-Index automates the foundational step of understanding the existing code, making harness creation feasible even for large projects.]
 
 
 Prompting
 Plan before you build → Research, Plan, Execute
-I want to implement feature XYZ. First, use glimpse to understand how our ABC service works and write your findings in research.md. Take your time.
+I want to implement feature XYZ. First, use Recursive-Index to understand how our ABC service works and write your findings in research.md. Take your time.
 * * *
 Create a step-by-step plan.md with tasks. Do not write any code yet.
 * * *
@@ -237,7 +237,7 @@ Learn from failure
 Under prompting
 Ask for a better research phase and stricter plan
 Prompt the agent: are there any details i left unspecified before you begin?
-Verification of you own understanding using duckie or glimpse before handling the task to the coding agent
+Verification of you own understanding using duckie or Recursive-Index before handling the task to the coding agent
 Lack of tooling
 Search for existing skills, extension, mcps that can do the job
 Create a custom command or skill. If a complex sequence is repeatable, turn it into a custom skill so it doesn’t have to be explained from scratch next time.
@@ -254,8 +254,8 @@ Adk/orcas → agent development kit for business logic, complex arbitrary workfl
 Antigravity → coding agent focused
 
 
-→ use glimpse to analyze all the files (product)
+→ use Recursive-Index to analyze all the files (product)
 → Script to setup harness, tune, connect to a certain IDE (make it where agent.md will always b invoked by any agentic coding platform)
 
 
-Token metrics → with/without glimpse + jetski
+Token metrics → with/without Recursive-Index + jetski

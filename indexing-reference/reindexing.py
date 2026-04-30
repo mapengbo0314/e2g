@@ -3,7 +3,7 @@
 This module provides the IndexDiffer class, which is responsible for
 determining which work units need to be re-indexed. It compares the
 current state of work units with metadata from the previous indexing run
-and checks Piper for file modifications since the last run to identify
+and checks monorepo for file modifications since the last run to identify
 additions, deletions, and modifications.
 """
 
@@ -12,14 +12,14 @@ from collections.abc import Sequence, Set
 import dataclasses
 
 from absl import logging
-from google3.coresystems.data.excellence.applications.indexing import work_unit
-from google3.coresystems.data.excellence.applications.indexing.change_detection import change_detection_strategy as change_detection_strategy_lib
-from google3.coresystems.data.excellence.applications.indexing.filesystem import file_system_manager_base
-from google3.pyglib.pathutil import gpath
+from mono.coresystems.data.excellence.applications.indexing import work_unit
+from mono.coresystems.data.excellence.applications.indexing.change_detection import change_detection_strategy as change_detection_strategy_lib
+from mono.coresystems.data.excellence.applications.indexing.filesystem import file_system_manager_base
+from mono.pyglib.pathutil import gpath
 
 
-# The deadline for Piper API RPCs is in seconds.
-_PIPER_RPC_DEADLINE_SECONDS = 60
+# The deadline for monorepo API RPCs is in seconds.
+_monorepo_RPC_DEADLINE_SECONDS = 60
 # The timeout for git commands in seconds.
 _GIT_COMMAND_TIMEOUT_SECONDS = 300
 
@@ -59,7 +59,7 @@ class IndexDiffer:
     """Determines which work units need to be re-indexed.
 
     Compares the work units from the previous index run with the newly
-    generated work units and file changes in Piper to identify which work
+    generated work units and file changes in monorepo to identify which work
     units need to be re-indexed or deleted.
     """
 
@@ -77,7 +77,7 @@ class IndexDiffer:
           fs_manager: A file system manager to use for file operations.
           work_unit_storage: A work unit storage object for reading manifest files.
           change_detection_strategy: Optional strategy for detecting file changes.
-            If provided, this will be used instead of the default Piper/Git logic.
+            If provided, this will be used instead of the default monorepo/Git logic.
         """
         self._fs_manager = fs_manager
         self._work_unit_storage = work_unit_storage

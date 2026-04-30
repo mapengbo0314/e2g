@@ -13,21 +13,21 @@ import dataclasses
 
 from absl import logging
 
-from google3.coresystems.data.excellence.applications.indexing import chunker as chunker_lib
-from google3.coresystems.data.excellence.applications.indexing import error_prompt_generator
-from google3.coresystems.data.excellence.applications.indexing import file_utils
-from google3.coresystems.data.excellence.applications.indexing import prompt_templates
-from google3.coresystems.data.excellence.applications.indexing import schema
-from google3.coresystems.data.excellence.applications.indexing import sequential_llm_prompter
-from google3.coresystems.data.excellence.applications.indexing import state
-from google3.coresystems.data.excellence.applications.indexing import summary_merger as summary_merger_lib
-from google3.coresystems.data.excellence.applications.indexing import work_unit as work_unit_lib
-from google3.coresystems.data.excellence.applications.indexing.config import bundle_pb2
-from google3.coresystems.data.excellence.applications.indexing.config.indexer import indexer_config
-from google3.coresystems.data.excellence.applications.indexing.filesystem import file_system_manager_base
-from google3.coresystems.data.excellence.applications.indexing.indexer import path_filtering_config
-from google3.coresystems.data.excellence.infra.utils import stat_recorder
-from google3.pyglib.contrib.gpathlib import gpath
+from mono.coresystems.data.excellence.applications.indexing import chunker as chunker_lib
+from mono.coresystems.data.excellence.applications.indexing import error_prompt_generator
+from mono.coresystems.data.excellence.applications.indexing import file_utils
+from mono.coresystems.data.excellence.applications.indexing import prompt_templates
+from mono.coresystems.data.excellence.applications.indexing import schema
+from mono.coresystems.data.excellence.applications.indexing import sequential_llm_prompter
+from mono.coresystems.data.excellence.applications.indexing import state
+from mono.coresystems.data.excellence.applications.indexing import summary_merger as summary_merger_lib
+from mono.coresystems.data.excellence.applications.indexing import work_unit as work_unit_lib
+from mono.coresystems.data.excellence.applications.indexing.config import bundle_pb2
+from mono.coresystems.data.excellence.applications.indexing.config.indexer import indexer_config
+from mono.coresystems.data.excellence.applications.indexing.filesystem import file_system_manager_base
+from mono.coresystems.data.excellence.applications.indexing.indexer import path_filtering_config
+from mono.coresystems.data.excellence.infra.utils import stat_recorder
+from mono.pyglib.contrib.gpathlib import gpath
 
 
 def get_index_file_name(epoch: int) -> str:
@@ -57,7 +57,7 @@ class LlmIndexerConfig:
       include_search_tool: Whether to include the search tool in the agent
         abilities.
       codebase_specific_context: Additional context to add to the prompt for a
-        specific codebase instead of the default generic Google3 context.
+        specific codebase instead of the default generic mono context.
       filtering_config: Optional configuration for filtering paths.
       custom_sections: Custom sections requested by the user.
     """

@@ -10,18 +10,18 @@ from collections.abc import Sequence
 import concurrent.futures
 import datetime
 
-from google3.coresystems.data.excellence.applications.indexing import file_utils
-from google3.coresystems.data.excellence.applications.indexing import llm_indexer
-from google3.coresystems.data.excellence.applications.indexing import root_map
-from google3.coresystems.data.excellence.applications.indexing import state
-from google3.coresystems.data.excellence.applications.indexing import work_unit as work_unit_lib
-from google3.coresystems.data.excellence.applications.indexing.change_detection import change_detection_strategy as change_detection_strategy_lib
-from google3.coresystems.data.excellence.applications.indexing.filesystem import file_system_manager
-from google3.coresystems.data.excellence.applications.indexing.filesystem import file_system_manager_base
-from google3.coresystems.data.excellence.applications.indexing.indexer import metrics
-from google3.coresystems.data.excellence.applications.indexing.indexer import progress_manager as progress_manager_lib
-from google3.coresystems.data.excellence.applications.indexing.planner import planner as planner_lib
-from google3.coresystems.data.excellence.infra.utils import stat_recorder
+from mono.coresystems.data.excellence.applications.indexing import file_utils
+from mono.coresystems.data.excellence.applications.indexing import llm_indexer
+from mono.coresystems.data.excellence.applications.indexing import root_map
+from mono.coresystems.data.excellence.applications.indexing import state
+from mono.coresystems.data.excellence.applications.indexing import work_unit as work_unit_lib
+from mono.coresystems.data.excellence.applications.indexing.change_detection import change_detection_strategy as change_detection_strategy_lib
+from mono.coresystems.data.excellence.applications.indexing.filesystem import file_system_manager
+from mono.coresystems.data.excellence.applications.indexing.filesystem import file_system_manager_base
+from mono.coresystems.data.excellence.applications.indexing.indexer import metrics
+from mono.coresystems.data.excellence.applications.indexing.indexer import progress_manager as progress_manager_lib
+from mono.coresystems.data.excellence.applications.indexing.planner import planner as planner_lib
+from mono.coresystems.data.excellence.infra.utils import stat_recorder
 
 
 DirectoryStats = file_utils.DirectoryStats
@@ -29,7 +29,7 @@ WorkUnit = work_unit_lib.WorkUnit
 
 # Maximum number of work units to process in a single epoch. This cutoff is to
 # prevent large bundles from taking too long to index. Moreover, we wouldn't
-# be able to check them into Piper anyway.
+# be able to check them into monorepo anyway.
 _MAX_WORK_UNITS_TO_PROCESS = 5000
 
 
