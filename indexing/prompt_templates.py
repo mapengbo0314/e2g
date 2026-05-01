@@ -1029,6 +1029,20 @@ partial summaries. Do not mention the partial summaries in the final summary.
 
 
 def create_verifier_prompt(artifact_json: str, source_context: str) -> str:
+    # Safety cap to avoid exceeding model context limits.  Gemma 4 supports
+    # ~200K tokens; 400K chars is approximately 100K tokens which fits
+    # comfortably.  Only truncates truly massive directories.
+    max_context_chars = 400_000
+    if len(source_context) > max_context_chars:
+        half = max_context_chars // 2
+        truncated_context = (
+            source_context[:half]
+            + f"\n\n... [TRUNCATED {len(source_context) - max_context_chars:,} chars] ...\n\n"
+            + source_context[-half:]
+        )
+    else:
+        truncated_context = source_context
+
     return textwrap.dedent(f"""\
 You are an expert factual verifier for a codebase indexing system.
 Your job is to read the generated artifact JSON and verify that EVERY claim made in it is explicitly supported by the source code context provided.
@@ -1037,9 +1051,10 @@ Rule 1: If the artifact claims a dependency, interface, or component exists, it 
 Rule 2: If the artifact makes a claim about how something works, it MUST be supported by the code or comments in the source context.
 Rule 3: You must NOT verify if the JSON structure is valid. Assume it is syntactically correct. Your job is ONLY semantic factual verification.
 Rule 4: If you find ANY unsupported claims or hallucinated components/dependencies, you must mark `passed` as false and list the specific issues in the `issues` array.
+Rule 5: If the source context was truncated, do NOT fail verification just because a claimed file is not visible. Only fail if a claim directly contradicts what IS visible.
 
 === SOURCE CONTEXT ===
-{source_context}
+{truncated_context}
 
 === GENERATED ARTIFACT ===
 {artifact_json}

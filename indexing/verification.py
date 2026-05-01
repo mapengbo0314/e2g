@@ -97,20 +97,29 @@ class ArtifactVerifier:
             # Fallback if Pydantic isn't installed in the local environment.
             try:
                 data = json.loads(artifact_json)
-                return schema.IndexDocument(**data)
+                doc = schema.IndexDocument(**data)
+                logging.info("[Verifier] Stage 1 PASSED (no-pydantic fallback).")
+                return doc
             except Exception as e:
+                logging.warning("[Verifier] Stage 1 FAILED (syntactic): %s", e)
                 # Return a structured syntactic failure verdict.
                 return verification_types.VerificationVerdict.syntactic_failure(str(e))
                 
         try:
             # Attempt to parse and validate against the IndexDocument schema.
-            return schema.IndexDocument.model_validate_json(artifact_json)
+            doc = schema.IndexDocument.model_validate_json(artifact_json)
+            logging.info("[Verifier] Stage 1 PASSED (Pydantic validation).")
+            return doc
         except pydantic.ValidationError as e:
             # Extract and format readable schema violation errors.
             issues = []
             for err in e.errors():
                 loc = ".".join(str(l) for l in err["loc"])
                 issues.append(f"Schema error at '{loc}': {err['msg']}")
+            logging.warning(
+                "[Verifier] Stage 1 FAILED (%d schema violations): %s",
+                len(issues), "; ".join(issues[:3]),
+            )
             
             # Map Pydantic errors to the domain-specific VerificationIssue type.
             detailed = [
@@ -128,6 +137,7 @@ class ArtifactVerifier:
                 can_retry=True
             )
         except Exception as e:
+            logging.warning("[Verifier] Stage 1 FAILED (unexpected): %s", e)
             return verification_types.VerificationVerdict.syntactic_failure(str(e))
 
     def _stage2_semantic_verification(
@@ -140,10 +150,28 @@ class ArtifactVerifier:
         # Check cache first to avoid expensive and redundant LLM calls.
         cached = self.cache.get_cached_verdict(artifact_json, source_context)
         if cached is not None:
+            logging.info(
+                "[Verifier] Stage 2 cache HIT (passed=%s, confidence=%.2f).",
+                cached.passed, cached.confidence,
+            )
             return cached
 
+        logging.info(
+            "[Verifier] Stage 2 cache MISS, running LLM semantic verification "
+            "(source_context=%d bytes, artifact=%d bytes).",
+            len(source_context), len(artifact_json),
+        )
         # Delegate the actual semantic checking to the LLM.
         verdict = self.llm_prompter.verify_artifact(artifact_json, source_context)
+        logging.info(
+            "[Verifier] Stage 2 LLM verdict: passed=%s, confidence=%.2f, "
+            "issues=%d, decision=%s.",
+            verdict.passed, verdict.confidence,
+            len(verdict.issues), verdict.decision,
+        )
+        if verdict.issues:
+            for i, issue in enumerate(verdict.issues[:5]):
+                logging.info("[Verifier]   issue[%d]: %s", i, issue)
         
         # Cache the result to prevent repeated verification of the same artifact/context pair.
         self.cache.store_verdict(artifact_json, source_context, verdict)
@@ -162,14 +190,22 @@ class ArtifactVerifier:
             source_context: The raw source code or context used to generate the artifact.
             skip_semantic: If True, only runs syntactic validation (useful for partial generation).
         """
+        logging.info(
+            "[Verifier] Starting verification pipeline "
+            "(artifact=%d bytes, context=%d bytes, skip_semantic=%s).",
+            len(artifact_json), len(source_context), skip_semantic,
+        )
+
         # Stage 1: Syntactic (Fast, deterministic check).
         stage1_result = self._stage1_syntactic_validation(artifact_json)
         if isinstance(stage1_result, verification_types.VerificationVerdict):
             # Stage 1 failed, abort and return the failure immediately.
+            logging.warning("[Verifier] Pipeline aborted at Stage 1.")
             return stage1_result
             
         if skip_semantic:
             # Return success if Stage 1 passes and semantic verification is disabled.
+            logging.info("[Verifier] Pipeline complete (semantic skipped).")
             return verification_types.VerificationVerdict.success()
 
         # Stage 2: Semantic (Slow, non-deterministic grounding check).

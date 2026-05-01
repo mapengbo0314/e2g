@@ -287,6 +287,41 @@ class LlmIndexer:
 
         total_size = sum(len(content) for content in directory_contents.values())
 
+        # --- Diagnostic: identify degraded-context directories early ---
+        placeholder_values = {"Could not read file.", "Non-unicode file."}
+        degraded_count = sum(
+            1 for v in directory_contents.values() if v in placeholder_values
+        )
+        if degraded_count > 0:
+            logging.warning(
+                "[LlmIndexer] %s: %d/%d files have degraded context "
+                "(binary/unreadable). LLM may produce unverifiable claims.",
+                work_unit.output_path, degraded_count, num_files,
+            )
+        if degraded_count == num_files and num_files > 0:
+            # Every file is unreadable — LLM cannot produce verifiable claims.
+            # Early-exit to avoid burning retries on an unwinnable verify loop.
+            logging.warning(
+                "[LlmIndexer] %s: ALL %d files unreadable. "
+                "Skipping LLM generation (would always fail verification).",
+                work_unit.output_path, num_files,
+            )
+            return self.WorkUnitGenerationResult(
+                markdown_result=(
+                    f"# {work_unit.output_path}\n\n"
+                    f"This directory contains {num_files} file(s) that could "
+                    f"not be read as text (binary or inaccessible). "
+                    f"No index was generated."
+                ),
+                artifact=None,
+                source_context="",
+                success=True,
+            )
+        logging.info(
+            "[LlmIndexer] %s: %d files, %d bytes total context.",
+            work_unit.output_path, num_files, total_size,
+        )
+
         prefixed_output_path = (
             input_prefix / work_unit.output_path
             if input_prefix
@@ -347,6 +382,13 @@ class LlmIndexer:
             
             # Combine the raw source code into a context string for verification.
             source_ctx = "\n\n".join([f"--- {k} ---\n{v}" for k, v in directory_contents.items()])
+            logging.info(
+                "[LlmIndexer] %s: source_context=%d bytes, artifact=%s, success=%s",
+                work_unit.output_path,
+                len(source_ctx),
+                type(doc).__name__ if doc else "None",
+                success,
+            )
             return self.WorkUnitGenerationResult(
                 markdown_result=markdown_result
                 + self.generate_subcomponent_list_section(

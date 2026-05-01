@@ -296,8 +296,28 @@ class _SimplePlanner:
                 logging.warning("Input dir %s is not a directory, skipping.", input_dir)
                 continue
             for dirpath, dirnames, filenames in os.walk(input_dir):
-                # Skip hidden directories
-                dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+                # Skip hidden directories and directories that only contain
+                # binary or vendored content (these always fail semantic
+                # verification because no readable source context exists).
+                _SKIP_DIRS = {
+                    "__pycache__",
+                    "node_modules",
+                    ".tox",
+                    ".mypy_cache",
+                    ".pytest_cache",
+                    ".ruff_cache",
+                    # Common virtual environment directory names.
+                    "venv",
+                    ".venv",
+                    "env",
+                    ".env",
+                }
+                dirnames[:] = [
+                    d for d in dirnames
+                    if not d.startswith(".")
+                    and d not in _SKIP_DIRS
+                    and not d.endswith(".venv")  # e.g. _generate_bundles.venv
+                ]
                 dp = Path(dirpath)
                 files = [dp / f for f in filenames if not f.startswith(".")]
                 if files:

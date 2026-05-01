@@ -474,18 +474,43 @@ class Orchestrator:
             
             # Serialize the generated artifact for verification and persistence.
             if result.artifact is None:
+                logging.warning(
+                    "[Orchestrator] %s: artifact is None, skipping verification.",
+                    work_unit.output_path,
+                )
                 return result
                 
             artifact_json = result.artifact.model_dump_json(indent=2)
             
             if self._verifier:
+                logging.info(
+                    "[Orchestrator] %s: starting verification "
+                    "(artifact=%d bytes, source_context=%d bytes).",
+                    work_unit.output_path,
+                    len(artifact_json),
+                    len(result.source_context),
+                )
                 # Execute automated verification against the Pydantic schema rules.
                 verdict = self._verifier.verify(artifact_json, result.source_context)
                 
                 if not verdict.passed:
                     # Feed verification issues back to the indexer for self-correction.
                     self._indexer._config.verification_issues = verdict.issues
+                    logging.warning(
+                        "[Orchestrator] %s: VERIFICATION FAILED "
+                        "(confidence=%.2f, decision=%s). Issues:\n%s",
+                        work_unit.output_path,
+                        verdict.confidence,
+                        verdict.decision,
+                        "\n".join(f"  - {issue}" for issue in verdict.issues),
+                    )
                     raise Exception(f"Verification failed: {verdict.issues}")
+                else:
+                    logging.info(
+                        "[Orchestrator] %s: verification PASSED (confidence=%.2f).",
+                        work_unit.output_path,
+                        verdict.confidence,
+                    )
                 
             # Verification passed, clear any previous issues.
             self._indexer._config.verification_issues = []

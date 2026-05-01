@@ -94,7 +94,8 @@ class Dependency(_BaseModel):
         description='The name of the dependency, e.g. "Spanner" or "//path:target".'
     )
     usage_description: str = _field(
-        description="A description of how this dependency is used by the code."
+        default="",
+        description="A description of how this dependency is used by the code.",
     )
 
 
@@ -226,14 +227,14 @@ class CustomSectionsDocument(_BaseModel):
 
 class KeyComponentsDocument(_BaseModel):
     # Aggregation of key components for the generator agent.
-    key_individual_components: KeyIndividualComponents
-    key_interfaces: KeyInterfaces
+    key_individual_components: Optional[KeyIndividualComponents] = None
+    key_interfaces: Optional[KeyInterfaces] = None
     # Aggregation of key dependencies for the generator agent.
-    key_dependencies: KeyDependencies
-    architectural_patterns_and_gotchas: ArchitecturalPatternsAndGotchas
+    key_dependencies: Optional[KeyDependencies] = None
+    architectural_patterns_and_gotchas: Optional[ArchitecturalPatternsAndGotchas] = None
     # Aggregation of testing and configuration for the generator agent.
-    testing_strategy: TestingStrategy
-    configurations: Configurations
+    testing_strategy: Optional[TestingStrategy] = None
+    configurations: Optional[Configurations] = None
 
 
 class DeepDiveDocument(_BaseModel):

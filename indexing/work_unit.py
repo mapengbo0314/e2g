@@ -220,8 +220,22 @@ class WorkUnit:
     ) -> dict[Path, str]:
         """Loads the files to index from the filesystem."""
         file_contents = {}
+        unreadable_count = 0
         for file_path in self.files_to_index:
-            full_path = prefix / file_path if prefix is not None else file_path
+            fp = Path(file_path)
+            if prefix is not None and not fp.is_absolute():
+                # Avoid path doubling: if the file path already starts with
+                # the prefix (e.g. "indexing/schema.py" with prefix "indexing/"),
+                # don't prepend it again.
+                try:
+                    fp.relative_to(prefix)
+                    # file_path already includes the prefix — use it as-is.
+                    full_path = fp
+                except ValueError:
+                    # file_path is relative to the prefix — prepend it.
+                    full_path = prefix / fp
+            else:
+                full_path = fp
             try:
                 if fs_manager is not None and hasattr(fs_manager, "read"):
                     file_contents[file_path] = fs_manager.read(str(full_path))
@@ -229,14 +243,32 @@ class WorkUnit:
                     file_contents[file_path] = full_path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 # Handle non-text files gracefully by providing a placeholder.
+                logging.debug("Non-unicode file skipped: %s", full_path)
                 file_contents[file_path] = "Non-unicode file."
-            except OSError:
+                unreadable_count += 1
+            except OSError as e:
                 # Catch permission or missing file errors at runtime.
+                logging.debug("OS error reading %s: %s", full_path, e)
                 file_contents[file_path] = "Could not read file."
+                unreadable_count += 1
             except Exception:
                 # Log unexpected errors but don't crash the entire work unit.
                 logging.exception("Failed reading file for work unit: %s", full_path)
                 file_contents[file_path] = "Could not read file."
+                unreadable_count += 1
+
+        total = len(file_contents)
+        if unreadable_count > 0:
+            logging.warning(
+                "WorkUnit %s: %d/%d files unreadable (binary or missing). "
+                "Source context will be degraded.",
+                self.output_path, unreadable_count, total,
+            )
+        else:
+            logging.debug(
+                "WorkUnit %s: loaded %d files successfully.",
+                self.output_path, total,
+            )
         return file_contents
 
 
