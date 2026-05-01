@@ -1,0 +1,13 @@
+edition = "2024";
+
+// Configuration for the indexer behavior.
+message indexerConfig {
+  // If true, the indexer will only process files with approved extensions.
+  bool filter_by_extension = 1 [default = true];
+
+  // The maximum size of a file to be indexed in bytes.
+  int64 max_file_size_bytes = 2 [default = 1048576]; // 1MB
+
+  // If true, the indexer will include hidden files.
+  bool include_hidden_files = 3 [default = false];
+}

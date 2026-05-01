@@ -1,4 +1,4 @@
-# proto-file: coresystems/data/excellence/applications/indexing/config/bundle.proto
+# proto-file: indexing/config/bundle.proto
 # proto-message: ProjectBundle
 
 bundle_name: "aadc"

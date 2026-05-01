@@ -432,6 +432,7 @@ class OllamaConversation:
                 model=self.model_name,
                 messages=self.history,
                 format="json",
+                # Continuation of processing logic.
                 options={
                     # Ollama defaults to num_ctx=2048 which silently truncates
                     # large prompts.  Gemma 4 supports 200K tokens; set this
@@ -532,6 +533,7 @@ class GeminiLlmPrompter(LlmPrompter):
         self,
         config: GeminiLlmPrompterConfig,
         fs_manager: object | None,
+        # Continuation of processing logic.
         override_conversation_factory: Callable[[Any], Any] | None = None,
     ):
         """Initializes the GeminiLlmPrompter."""
@@ -545,30 +547,68 @@ class GeminiLlmPrompter(LlmPrompter):
 
     @staticmethod
     def _coerce_for_schema(data: Any, output_schema: type[Any]) -> Any:
-        """Fill in missing required fields with defaults before Pydantic validation.
+        """Fill in missing/null required fields with defaults before Pydantic validation.
 
         This prevents weaker LLMs from burning all retry attempts on trivially
-        fixable schema violations (e.g. missing ``usage_description`` on a
+        fixable schema violations (e.g. ``null`` instead of ``""`` on a
+        required string field, or missing ``usage_description`` on a
         Dependency dict).
         """
         if not isinstance(data, dict):
             return data
 
-        # Coerce known list-of-model fields inside wrapper documents.
-        _LIST_FIELD_MAP = {
-            "key_dependencies": ("dependencies", "Dependency"),
-            "key_individual_components": ("components", "Component"),
-            "key_interfaces": ("interfaces", "Interface"),
-            "configurations": ("configurations", "ConfigurationItem"),
-        }
+        # --- Phase 0: Unwrap 'properties' if the LLM hallucinated it from the schema ---
+        # Weaker LLMs (like Gemma) often wrap their entire response in a 'properties'
+        # key because it's a prominent top-level key in the JSON Schema.
+        if "properties" in data and isinstance(data["properties"], dict):
+            # Only unwrap if 'properties' is the ONLY key, or if none of the expected
+            # top-level keys are present in the root but ARE in 'properties'.
+            expected_keys = set(GeminiLlmPrompter._LIST_FIELD_MAP.keys()) | {"overview", "deep_dive"}
+            if len(data) == 1 or not any(k in data for k in expected_keys):
+                logging.info("[Coercion] Unwrapped 'properties' container from LLM response.")
+                data = data["properties"]
 
-        for wrapper_key, (list_key, model_name) in _LIST_FIELD_MAP.items():
-            wrapper = data.get(wrapper_key)
-            if not isinstance(wrapper, dict):
+        # --- Phase 1: Recursively replace null → "" for all string-typed values ---
+        # Weaker LLMs (especially Ollama/Gemma) frequently output null for
+        # required string fields.  The schema has no intentionally nullable
+        # string fields, so this is always safe.
+        data = GeminiLlmPrompter._deep_replace_nulls(data)
+
+        # --- Phase 2: Patch known missing keys with field-specific defaults ---
+        # Skip coercion for plain dictionaries or when the schema doesn't match.
+        if output_schema is dict:
+            return data
+
+        # Determine which fields the schema actually expects.
+        schema_fields = set()
+        if hasattr(output_schema, "model_fields"):  # Pydantic v2
+            schema_fields = set(output_schema.model_fields.keys())
+        elif hasattr(output_schema, "__fields__"):  # Pydantic v1
+            schema_fields = set(output_schema.__fields__.keys())
+
+        for wrapper_key, (list_key, model_name) in GeminiLlmPrompter._LIST_FIELD_MAP.items():
+            # Only inject if the field is actually expected by the schema.
+            if wrapper_key not in schema_fields:
                 continue
+
+            # If the wrapper is missing or null, inject an empty container.
+            if wrapper_key not in data or data[wrapper_key] is None:
+                data[wrapper_key] = {list_key: []}
+                logging.info("[Coercion] Injected missing mandatory wrapper '%s'.", wrapper_key)
+            
+            wrapper = data[wrapper_key]
+            if not isinstance(wrapper, dict):
+                # If the LLM returned something like "" or "none" for the wrapper,
+                # convert it to an empty dict with the required list key.
+                wrapper = {list_key: []}
+                data[wrapper_key] = wrapper
+                logging.info("[Coercion] Coerced malformed wrapper '%s' to dict.", wrapper_key)
+
+            # Ensure the inner list key is present.
             items = wrapper.get(list_key)
             if not isinstance(items, list):
-                continue
+                wrapper[list_key] = []
+                logging.info("[Coercion] Initialized missing list '%s' in %s.", list_key, wrapper_key)
             defaults = GeminiLlmPrompter._FIELD_DEFAULTS.get(model_name, {})
             for item in items:
                 if isinstance(item, dict):
@@ -576,13 +616,50 @@ class GeminiLlmPrompter(LlmPrompter):
                         if field not in item:
                             item[field] = default_val
                             logging.info(
+                                # Continuation of processing logic.
                                 "[Coercion] Patched missing '%s' on %s "
+                                # Continuation of processing logic.
                                 "(name=%s) with default=%r.",
                                 field, model_name,
                                 item.get("name", "<unknown>"), default_val,
                             )
 
         return data
+
+    _LIST_FIELD_MAP = {
+        "key_dependencies": ("dependencies", "Dependency"),
+        "key_individual_components": ("components", "Component"),
+        "key_interfaces": ("interfaces", "Interface"),
+        "configurations": ("configurations", "ConfigurationItem"),
+    }
+
+    _STRING_KEYS = {
+        "name", "description", "usage_description", "definition_link",
+        "comments", "content", "title", "model_name", "generated_at",
+        "verified_at"
+    }
+
+    # Continuation of processing logic.
+    @staticmethod
+    # Continuation of processing logic.
+    def _deep_replace_nulls(obj: Any) -> Any:
+        """Recursively replace null values with empty strings for string fields.
+
+        This handles the common LLM pattern of outputting
+        `{"content": null}` instead of `{"content": ""}`.
+        """
+        if isinstance(obj, dict):
+            return {
+                k: "" if (v is None and k in GeminiLlmPrompter._STRING_KEYS) else GeminiLlmPrompter._deep_replace_nulls(v)
+                for k, v in obj.items()
+            }
+        if isinstance(obj, list):
+            return [
+                "" if item is None else GeminiLlmPrompter._deep_replace_nulls(item)
+                for item in obj
+            ]
+        # Continuation of processing logic.
+        return obj
 
     def _create_single_conversation(
         self,
@@ -744,7 +821,7 @@ class GeminiLlmPrompter(LlmPrompter):
 
     def _handle_pydantic_validation_error(
         self,
-        e: Exception,
+        e: pydantic.ValidationError,
         directory_path: str,
         error_prompt_generator_instance: Any,
     ) -> str:
@@ -754,17 +831,35 @@ class GeminiLlmPrompter(LlmPrompter):
         logging.exception(
             "LLM call failed for %s due to validation error.", directory_path
         )
-        error_feedback = (
-            "Output validation failed: response was not valid JSON or did not "
-            "match schema."
-        )
-        # Instruct the LLM to fix its own formatting in the next turn.
-        if hasattr(error_prompt_generator_instance, "generate_validation_failure_prompt"):
-            return error_prompt_generator_instance.generate_validation_failure_prompt(
-                directory_path,
-                error_feedback,
+        
+        # Extract detailed field-level errors to help the LLM fix itself.
+        issues = []
+        is_json_invalid = False
+        for err in e.errors():
+            if err.get("type") == "json_invalid":
+                is_json_invalid = True
+            loc = ".".join(str(l) for l in err["loc"])
+            issues.append(f"Schema violation at '{loc}': {err['msg']}")
+            
+        if is_json_invalid:
+            error_feedback = (
+                "Your response was truncated or contains invalid JSON syntax (e.g. EOF while parsing). "
+                "Please ensure you complete the JSON object, close all brackets/quotes, and do NOT "
+                "include schema definitions like '$defs' in your output."
             )
-        return error_prompt_generator.IndexerErrorPromptGenerator().generate_error_prompt(error_feedback)
+        else:
+            error_feedback = (
+                f"Output validation failed with {len(issues)} schema violations. "
+                "Your JSON structure does not match the required Pydantic model."
+            )
+
+        # Instruct the LLM to fix its own formatting in the next turn.
+        if hasattr(error_prompt_generator_instance, "generate_error_prompt"):
+            return error_prompt_generator_instance.generate_error_prompt(
+                error_feedback,
+                issues=issues
+            )
+        return f"{error_feedback}\n\nIssues:\n" + "\n".join(issues)
 
     def _handle_json_decoding_error(
         self,
@@ -840,6 +935,10 @@ class GeminiLlmPrompter(LlmPrompter):
                     # Send the prompt and capture the raw string response.
                     llm_response_json = conversation.prompt(user_prompt)
                     throttler_ctx.report_output(llm_response_json)
+                    
+                    if isinstance(llm_response_json, str):
+                        preview = llm_response_json[:50] + "..." if len(llm_response_json) > 50 else llm_response_json
+                        logging.info("Received response from %s. Preview: %r", agent_name, preview)
 
                 # Attempt to parse and validate the response against the expected schema.
                 parsed_output = conversation.get_state(agent_name)
@@ -1021,6 +1120,9 @@ class GeminiLlmPrompter(LlmPrompter):
                 return schema.IndexDocument.model_validate(parsed)
             return parsed
 
+        # Initialize research context tracking to avoid verification false-positives.
+        self.last_research_context = ""
+
         # --- STEP 1: Research Phase (Code Search) ---
         # Agent plans and executes search queries to find relevant code snippets.
         if self._config.include_search_tool:
@@ -1036,6 +1138,7 @@ class GeminiLlmPrompter(LlmPrompter):
                 # Continuation of processing logic.
                 epoch=system_prompt.epoch(),
             )
+            self.last_research_context += f"=== CODE SEARCH OUTPUT ===\n{code_search_output_str}\n\n"
         # Case when code search is intentionally bypassed.
         else:
             code_search_output_str = "Code search is not enabled for this agent."
@@ -1056,6 +1159,7 @@ class GeminiLlmPrompter(LlmPrompter):
             model_type="research",
             epoch=system_prompt.epoch(),
         )
+        self.last_research_context += f"=== READ FILES OUTPUT ===\n{read_files_output_str}\n\n"
         # Use research data to identify key components and patterns.
 
         # --- STEP 3: Synthesis Phase (Key Components) ---
@@ -1150,10 +1254,12 @@ class GeminiLlmPrompter(LlmPrompter):
         # Run automated quality checks on the generated artifact.
         if verifier:
             logging.info("Verifying artifact for %s", directory_path)
-            # Use the provided directory contents as the ground truth for verification.
+            # Use the provided directory contents as the ground truth for verification,
+            # augmented with any research context gathered during the process.
             source_context = getattr(system_prompt, "_directory_contents", "No source context available.")
+            full_context = source_context + "\n\n" + self.last_research_context
             artifact_json = artifact.model_dump_json(indent=2)
-            verdict = verifier.verify(artifact_json, source_context)
+            verdict = verifier.verify(artifact_json, full_context)
             # Log verification issues for manual review or future self-healing loops.
             if not verdict.passed:
                 logging.warning("Verification failed for %s: %s", directory_path, verdict.issues)
@@ -1236,9 +1342,11 @@ class GeminiLlmPrompter(LlmPrompter):
                 response = conv.prompt("Please verify the artifact.")
                 throttle_ctx.report_output(response)
                 
+                preview = (response[:50] + "...") if isinstance(response, str) and len(response) > 50 else response
                 logging.info(
-                    "[VerifyArtifact] raw response length=%d bytes.",
+                    "[VerifyArtifact] raw response length=%d bytes. Preview: %r",
                     len(response) if response else 0,
+                    preview
                 )
 
                 # Handle empty or whitespace-only responses from the LLM.
@@ -1277,6 +1385,38 @@ class GeminiLlmPrompter(LlmPrompter):
 
                 try:
                     data = json.loads(cleaned)
+                    # --- Coercion for VerificationVerdict ---
+                    # Weaker LLMs (like Gemma via Ollama) often confuse the 'issues' (List[str])
+                    # and 'detailed_issues' (List[VerificationIssue]) fields, or return
+                    # non-primitive types for boolean/float fields.
+                    if isinstance(data, dict):
+                        if "issues" in data and isinstance(data["issues"], list):
+                            new_issues = []
+                            detailed = data.get("detailed_issues")
+                            if not isinstance(detailed, list):
+                                detailed = []
+                            
+                            for item in data["issues"]:
+                                if isinstance(item, dict):
+                                    desc = item.get("description", str(item))
+                                    new_issues.append(desc)
+                                    # If it looks like a structured issue, ensure it's in detailed_issues
+                                    if "category" in item and item not in detailed:
+                                        detailed.append(item)
+                                else:
+                                    new_issues.append(str(item))
+                            data["issues"] = new_issues
+                            data["detailed_issues"] = detailed
+
+                        if "passed" in data and not isinstance(data["passed"], bool):
+                            data["passed"] = str(data["passed"]).lower() == "true"
+                        
+                        if "confidence" in data and not isinstance(data["confidence"], (int, float)):
+                            try:
+                                data["confidence"] = float(data["confidence"])
+                            except (ValueError, TypeError):
+                                data["confidence"] = 1.0
+
                     return verification_types.VerificationVerdict(**data)
                 except (json.JSONDecodeError, TypeError):
                     pass

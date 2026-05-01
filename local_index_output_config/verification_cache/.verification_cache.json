@@ -1,0 +1,9 @@
+{
+  "dfe9181e44e79bee0031ca7fdcc37d8b313b1590544562cb061f6dd90e45d245": {
+    "passed": true,
+    "confidence": 1.0,
+    "issues": [],
+    "detailed_issues": [],
+    "decision": "publish"
+  }
+}

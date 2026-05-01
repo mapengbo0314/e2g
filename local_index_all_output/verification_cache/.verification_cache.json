@@ -1,0 +1,90 @@
+{
+  "c8d676271c67ec9493b3bb7968a7f0501c14fe7c975d4257549320edcb203625": {
+    "passed": false,
+    "confidence": 1.0,
+    "issues": [
+      "The artifact claims a dependency on `google3.pyglib.f1.client.pywrap_client` in `key_dependencies`, but the source context only shows an import try/except block for `pywrap_client` in `bundle_verifier.py`, which handles the import, rather than explicitly claiming this specific symbol as a dependency in the artifact structure."
+    ],
+    "detailed_issues": [
+      {
+        "category": "Dependency",
+        "severity": "Warning",
+        "description": "The artifact lists `google3.pyglib.f1.client.pywrap_client` as a dependency, but the source code context only shows an import block for `pywrap_client` which handles import failures, not an explicit dependency claim in the artifact structure.",
+        "section": "key_dependencies"
+      },
+      {
+        "category": "Dependency",
+        "severity": "Warning",
+        "description": "The artifact claims a dependency on `google3.pyglib.f1.client.pywrap_client` in `key_dependencies`, but the source context only shows an import try/except block for `pywrap_client` in `bundle_verifier.py`, which handles the import, rather than explicitly claiming this specific symbol as a dependency in the artifact structure.",
+        "section": "key_dependencies"
+      }
+    ],
+    "decision": "retry"
+  },
+  "daed991f63309d95849d5af4ab8064971559cbab2896742243eb779681d3d434": {
+    "passed": true,
+    "confidence": 1.0,
+    "issues": [],
+    "detailed_issues": [],
+    "decision": "publish"
+  },
+  "61f15027ccfde27875a1be42df792fb559400f3d521acb20b09b1a2aa6d5d819": {
+    "passed": false,
+    "confidence": 1.0,
+    "issues": [
+      "The artifact claims the existence of a dependency/command `blaze build //coresystems/data/excellence/applications/indexing/index_expert:main`, which is referenced in the `key_dependencies`. While the shell script `ask_glimpse.sh` executes this command, the source context does not explicitly define or establish the existence of this specific Blaze target or the necessary build environment setup for verification against the code structure."
+    ],
+    "detailed_issues": [
+      {
+        "category": "Dependency",
+        "severity": "Error",
+        "description": "The artifact claims a dependency on `blaze build //coresystems/data/excellence/applications/indexing/index_expert:main` in `key_dependencies`. The source context shows that `ask_glimpse.sh` executes this command, but the context does not explicitly confirm the existence of the target or the build context itself.",
+        "section": "key_dependencies"
+      },
+      {
+        "category": "Dependency",
+        "severity": "Error",
+        "description": "The artifact claims the existence of a dependency/command `blaze build //coresystems/data/excellence/applications/indexing/index_expert:main`, which is referenced in the `key_dependencies`. While the shell script `ask_glimpse.sh` executes this command, the source context does not explicitly define or establish the existence of this specific Blaze target or the necessary build environment setup for verification against the code structure.",
+        "section": "key_dependencies"
+      }
+    ],
+    "decision": "fail"
+  },
+  "3fb057556ce65f7e53a850e794fff9e345733cfd5cba8488f35f5d28f0425f59": {
+    "passed": true,
+    "confidence": 1.0,
+    "issues": [],
+    "detailed_issues": [],
+    "decision": "publish"
+  },
+  "287ff6f47034bf89d5ac444f40e63bbf1b19b9b0bcc5d4247cb9de7429778bf8": {
+    "passed": true,
+    "confidence": 1.0,
+    "issues": [],
+    "detailed_issues": [],
+    "decision": "publish"
+  },
+  "b825030d44482aa1d5efd9c69c38370730c59065133d0b6ab2537b83b1e88446": {
+    "passed": false,
+    "confidence": 1.0,
+    "issues": [
+      "The artifact claims an execution flow involving `blaze build //coresystems/data/excellence/applications/indexing/index_expert:main` and running the resulting binary at `blaze-bin/coresystems/data/excellence/applications/indexing/index_expert/main`. The source context does not explicitly define the existence or nature of the 'Blaze' build system or the 'blaze-bin' directory structure, although the script directly references these commands and paths.",
+      "The artifact describes the script executing `blaze build` and then running the resulting executable. This implies the existence of a Go build toolchain (Blaze) and its associated output paths, which are not defined in the provided source context."
+    ],
+    "detailed_issues": [
+      {
+        "category": "Dependency",
+        "severity": "Error",
+        "description": "The artifact claims an execution flow involving `blaze build //coresystems/data/excellence/applications/indexing/index_expert:main` and running the resulting binary at `blaze-bin/coresystems/data/excellence/applications/indexing/index_expert/main`. The source context does not explicitly define the existence or nature of the 'Blaze' build system or the 'blaze-bin' directory structure, although the script directly references these commands and paths.",
+        "section": "overview"
+      },
+      {
+        "category": "Dependency",
+        "severity": "Error",
+        "description": "The artifact describes the script executing `blaze build` and then running the resulting executable. This implies the existence of a Go build toolchain (Blaze) and its associated output paths, which are not defined in the provided source context.",
+        "section": "deep_dive"
+      }
+    ],
+    "decision": "publish"
+  }
+}

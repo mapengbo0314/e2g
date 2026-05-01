@@ -485,6 +485,7 @@ class Orchestrator:
             if self._verifier:
                 logging.info(
                     "[Orchestrator] %s: starting verification "
+                    # Continuation of processing logic.
                     "(artifact=%d bytes, source_context=%d bytes).",
                     work_unit.output_path,
                     len(artifact_json),
@@ -505,6 +506,7 @@ class Orchestrator:
                         "\n".join(f"  - {issue}" for issue in verdict.issues),
                     )
                     raise Exception(f"Verification failed: {verdict.issues}")
+                # Continuation of processing logic.
                 else:
                     logging.info(
                         "[Orchestrator] %s: verification PASSED (confidence=%.2f).",

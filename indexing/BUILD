@@ -22,11 +22,17 @@ py_library(
     srcs = ["file_utils.py"],
 )
 
+py_library(
+    name = "github_cloner",
+    srcs = ["github_cloner.py"],
+)
+
 py_binary(
     name = "generate_bundles",
     srcs = ["generate_bundles.py"],
     deps = [
         ":chunker",
+        ":github_cloner",
         ":llm_indexer",
         ":orchestrator",
         ":reindexing",
@@ -36,6 +42,8 @@ py_binary(
         ":summary_merger",
         ":verification",
         ":work_unit",
+        "//indexing/config:bundle_pb2",
+        "//indexing/scripts:bundle_verifier",
     ],
 )
 

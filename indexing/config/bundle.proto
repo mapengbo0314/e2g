@@ -1,8 +1,6 @@
 edition = "2024";
 
-package coresystems.data.excellence.applications.indexing.config;
-
-import "coresystems/data/excellence/applications/indexing/config/indexer/indexer_config.proto";
+import "indexing/config/indexer/indexer_config.proto";
 
 option features.utf8_validation = NONE;
 
@@ -39,13 +37,13 @@ message ProjectBundle {
 
   // Additional approved file extensions for this bundle (e.g. .gcl, .borg).
   // If set, they will be used in addition to the global approved extensions.
-  // https://google3/coresystems/data/excellence/applications/indexing/indexer/path_filtering_config.py?q=APPROVED_EXTENSIONS
+  // https://github.com/pengbolicious/e-2-g/blob/main/indexing/indexer/path_filtering_config.py?q=APPROVED_EXTENSIONS
   // Optional.
   repeated string additional_extensions = 10;
 
   // The configuration for the indexer.
   // Optional.
-  coresystems.data.excellence.applications.indexing.indexerConfig indexer_config = 6;
+  indexerConfig indexer_config = 6;
 
   // Root directories for the project.
   //
@@ -156,7 +154,7 @@ message ProjectBundle {
   //
   // If not specified, the generated index files will be written to the default
   // output directory (located at
-  // /coresystems/data/excellence/applications/indexing/bundles/)
+  // indexing/bundles/)
   // If git_input is specified, custom_output must be used.
   oneof output_config {
     // Use this if you'd like to specify a custom output directory for the

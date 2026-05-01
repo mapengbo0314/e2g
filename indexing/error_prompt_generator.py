@@ -20,23 +20,37 @@ class IndexerErrorPromptGenerator:
         )
         
         if issues:
-            prompt += "=== VERIFICATION ISSUES ===\n"
+            # Check if any issues look like schema violations (syntactic)
+            is_schema_failure = any("Schema violation" in str(i) or "Syntactic" in str(i) for i in issues)
+            
+            if is_schema_failure:
+                prompt += "=== SCHEMA / SYNTACTIC ISSUES ===\n"
+                prompt += "Your JSON structure is invalid or missing required nested objects.\n"
+            else:
+                prompt += "=== VERIFICATION / SEMANTIC ISSUES ===\n"
+            
             for idx, issue in enumerate(issues, 1):
                 if isinstance(issue, dict):
-                    # Structured issue reporting
                     category = issue.get("category", "General")
                     msg = issue.get("message", str(issue))
                     prompt += f"{idx}. [{category}] {msg}\n"
                 else:
                     prompt += f"{idx}. {issue}\n"
-            # Add spacing after the list of verification issues.
             prompt += "\n"
             
         prompt += f"=== CONTEXTUAL ERROR ===\n{error_message}\n\n"
-        # Conclude the prompt with an explicit directive for grounded re-generation.
-        prompt += (
-            "Please try again. Focus on the 'VERIFICATION ISSUES' above. "
-            "Ensure every claim is grounded in the provided source code.\n"
-        )
+        
+        # Conclude with a clear directive.
+        if issues and is_schema_failure:
+            prompt += (
+                "Please fix the structural issues first. Ensure all wrapper objects like "
+                "'key_dependencies' are present even if their internal lists are empty. "
+                "Do NOT include a top-level 'properties' key.\n"
+            )
+        else:
+            prompt += (
+                "Please try again. Focus on fixing the reported issues. "
+                "Ensure every claim is grounded in the provided source code.\n"
+            )
         
         return prompt

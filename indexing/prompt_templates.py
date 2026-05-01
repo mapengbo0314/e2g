@@ -497,12 +497,16 @@ Provide only a summary of the directory and its contents. Follow the
 schema below exactly. Do not include any other information. Do not respond
 multiple times. Do not ask clarifying questions.
 
+Output ONLY the JSON data. Do NOT include the "$defs" or "definitions"
+section in your output. Only output the actual field values.
+
 {schema_str}
 
 Avoid these common failure modes:
 - Return a single object, not a list of objects.
 - Do not include markdown formatting (like ```json ... ```) around the JSON.
 - Do not add explanatory text before or after the JSON.
+- DO NOT INCLUDE THE SCHEMA DEFINITIONS ($defs) IN YOUR RESPONSE.
 """).format(schema_str=schema_str)
 
 
@@ -546,14 +550,27 @@ class IndexerPrompt(abc.ABC):
 
     def prompt_context(self) -> str:
         return textwrap.dedent("""\
+Current directory:
+<DIRECTORY_PATH>
+{directory_path}
+</DIRECTORY_PATH>
+
+Immediate directory contents:
+<DIRECTORY_CONTENTS>
+{directory_contents}
+</DIRECTORY_CONTENTS>
+
 Summaries of immediate subdirectories from this epoch:
 <SUBDIRECTORY_INDEXES>
 {subdirectory_indexes}
 </SUBDIRECTORY_INDEXES>
 
-# Continuation of processing logic.
+Previous epoch state (if any):
+<PREVIOUS_EPOCH_STATE>
+{previous_epoch_str}
+</PREVIOUS_EPOCH_STATE>
+
 The index file name pattern for other directories is:
-# Continuation of processing logic.
 <INDEX_FILE_NAME>
 {index_file_name}
 </INDEX_FILE_NAME>
@@ -565,6 +582,7 @@ The index file name pattern for other directories is:
             subdirectory_indexes=self._subdirectory_indexes,
             index_file_name=self._index_file_name,
         )
+
 
     def epoch(self) -> int:
         """Returns the epoch of the prompt."""
@@ -1052,6 +1070,8 @@ Rule 2: If the artifact makes a claim about how something works, it MUST be supp
 Rule 3: You must NOT verify if the JSON structure is valid. Assume it is syntactically correct. Your job is ONLY semantic factual verification.
 Rule 4: If you find ANY unsupported claims or hallucinated components/dependencies, you must mark `passed` as false and list the specific issues in the `issues` array.
 Rule 5: If the source context was truncated, do NOT fail verification just because a claimed file is not visible. Only fail if a claim directly contradicts what IS visible.
+Rule 6: The artifact follows a fixed schema including sections like 'key_dependencies', 'configurations', and 'architectural_patterns'. Do not fail verification because these sections exist; only fail if the specific items or claims within them are not grounded in the source or research context.
+Rule 7: The provided source context includes both the immediate directory contents and 'RESEARCH CONTEXT' gathered from across the codebase. Use both as valid grounds for verification.
 
 === SOURCE CONTEXT ===
 {truncated_context}

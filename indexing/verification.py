@@ -115,7 +115,7 @@ class ArtifactVerifier:
             issues = []
             for err in e.errors():
                 loc = ".".join(str(l) for l in err["loc"])
-                issues.append(f"Schema error at '{loc}': {err['msg']}")
+                issues.append(f"Schema violation at '{loc}': {err['msg']}")
             logging.warning(
                 "[Verifier] Stage 1 FAILED (%d schema violations): %s",
                 len(issues), "; ".join(issues[:3]),
@@ -142,6 +142,7 @@ class ArtifactVerifier:
 
     def _stage2_semantic_verification(
         self, 
+        # Continuation of processing logic.
         artifact_json: str, 
         # Continuation of processing logic.
         source_context: str
@@ -159,6 +160,7 @@ class ArtifactVerifier:
         logging.info(
             "[Verifier] Stage 2 cache MISS, running LLM semantic verification "
             "(source_context=%d bytes, artifact=%d bytes).",
+            # Continuation of processing logic.
             len(source_context), len(artifact_json),
         )
         # Delegate the actual semantic checking to the LLM.

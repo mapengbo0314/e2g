@@ -32,9 +32,23 @@ export OPENAI_API_KEY="your_api_key_here"
 export ANTHROPIC_API_KEY="your_api_key_here"
 
 # For Ollama (Local)
-# No API key required, but ensure the Ollama daemon is running locally with the desired model installed.
-# e.g., ollama run llama3
+# No API key required, but ensure the Ollama daemon is running locally.
+# We recommend models like gemma2 or llama3 for best performance.
+# e.g., ollama pull gemma4:e2b
 ```
+
+## 3. Advanced Features & Robustness
+
+The local indexing pipeline includes several "Self-Healing" features to handle the inconsistencies of local LLMs:
+
+### A. Auto-Repair & Coercion
+If an LLM (like Gemma) returns an empty object or forgets mandatory JSON wrapper keys (e.g., `key_dependencies`), the system will automatically **coerce** the data by injecting the missing empty structures. This prevents validation failures and unnecessary retries.
+
+### B. Truncated JSON Handling
+If a response is cut off (EOF while parsing), the prompter detects this and provides targeted feedback to the LLM to "finish your JSON response" in the next turn, rather than failing the entire file.
+
+### C. Schema Integrity
+The pipeline now explicitly instructs models to exclude `$defs` or "definitions" from their output, preventing them from hallucinating schema metadata and hitting context window limits.
 
 ## 3. Running the Pipeline
 
@@ -66,13 +80,34 @@ bazel run //indexing:generate_bundles -- \
 
 ### B. Performing a Full Indexing Run
 
-Once you are confident the paths are correctly resolved, you can remove the `--dry_run` flag and specify your provider to allow the LLM Prompter to do the heavy lifting:
+Once you are confident the paths are correctly resolved, you can remove the `--dry_run` flag and specify your provider and model:
 
+**Option 1: Local Directory Indexing**
 ```bash
-PYTHONPATH=. python indexing/generate_bundles.py \
+./.venv/bin/python -m indexing.generate_bundles \
     --input_dir="./src" \
     --output_dir="./local_index_output" \
-    --llm_provider=openai
+    --llm_provider=ollama \
+    --model_name=gemma4:e2b
+```
+
+**Option 2: GitHub Repository Indexing (New)**
+The system can now automatically clone, index, and cleanup remote repositories:
+```bash
+./.venv/bin/python -m indexing.generate_bundles \
+    --repo_url="https://github.com/user/repo.git" \
+    --output_dir="./github_index_output" \
+    --llm_provider=ollama \
+    --model_name=gemma4:e2b
+```
+
+**Option 3: Bazel Execution**
+```bash
+bazel run //indexing:generate_bundles -- \
+    --repo_url="https://github.com/user/repo.git" \
+    --output_dir="./github_index_output" \
+    --llm_provider=ollama \
+    --model_name=gemma4:e2b
 ```
 
 ## 4. Running the Engineering Standards Audit

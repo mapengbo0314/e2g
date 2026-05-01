@@ -2,6 +2,7 @@
 
 # Auto-generated outputs and pipelines
 local_index_output/
+github_index_output/
 .index_output/
 __pycache__/
 *.pyc

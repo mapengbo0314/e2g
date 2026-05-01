@@ -15,29 +15,24 @@ import os
 import re
 from typing import Any
 
-# Optional dependency imports with local fallback support.
+# Local dependency imports for bundle verification.
 try:
-    from google3.coresystems.data.excellence.applications.indexing.config import bundle_pb2
+    from indexing.config import bundle_pb2
 except ImportError:
-    # Local reference fallback for environments without proto bindings.
-    bundle_pb2 = Any  # type: ignore[assignment]
+    # Fallback for when running from within the scripts directory or similar.
+    try:
+        import bundle_pb2  # type: ignore
+    except ImportError:
+        bundle_pb2 = Any  # type: ignore[assignment]
 
 try:
-    from google3.net.proto2.python.public import text_format
-except ImportError:  # pragma: no cover
+    from indexing.utils import text_format
+except ImportError:
     text_format = None  # type: ignore[assignment]
 
-try:
-    from google3.pyglib import resources
-except ImportError:  # pragma: no cover
-    resources = None  # type: ignore[assignment]
-
-try:
-    # Continuation of processing logic.
-    from google3.pyglib.f1.client import pywrap_client
-except ImportError:  # pragma: no cover
-    # Handle environment where Vertex AI client is not available.
-    pywrap_client = None  # type: ignore[assignment]
+# Stubs for Google-internal libraries.
+resources = None
+pywrap_client = None
 
 
 FILE_LOC_QUERY = """

@@ -23,13 +23,9 @@ from typing import Any
 _METADATA_FILE_NAME = "work_units.json"
 
 # Metric paths for tracking indexing health and storage parity.
-SECONDARY_READ_FAILURES_METRIC = (
-    "/coresystems/data/alls/gLimpse/indexing/secondary_read_failures"
-)
-SECONDARY_WRITE_FAILURES_METRIC = (
-    "/coresystems/data/alls/gLimpse/indexing/secondary_write_failures"
-)
-READ_DIFFS_METRIC = "/coresystems/data/alls/gLimpse/indexing/read_diffs"
+SECONDARY_READ_FAILURES_METRIC = "/glimpse/indexing/secondary_read_failures"
+SECONDARY_WRITE_FAILURES_METRIC = "/glimpse/indexing/secondary_write_failures"
+READ_DIFFS_METRIC = "/glimpse/indexing/read_diffs"
 
 
 class _NoOpCounter:
@@ -264,6 +260,7 @@ class WorkUnit:
                 "Source context will be degraded.",
                 self.output_path, unreadable_count, total,
             )
+        # Continuation of processing logic.
         else:
             logging.debug(
                 "WorkUnit %s: loaded %d files successfully.",

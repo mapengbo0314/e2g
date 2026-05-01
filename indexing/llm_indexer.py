@@ -188,19 +188,20 @@ class LlmIndexer:
                 f"Please summarize only the following files: {keys_str}"
             )
 
-        if getattr(self._config, "verification_issues", None):
-            epg = getattr(error_prompt_generator, 'IndexerErrorPromptGenerator', None)
-            # Continuation of processing logic.
-            if epg:
-                # Continuation of processing logic.
-                user_prompt_template += "\n\n" + epg().generate_error_prompt(
-                    "Verification failed for previous attempt.",
-                    self._config.verification_issues
-                )
-
+        # First, format the template with the directory path.
         initial_user_prompt = user_prompt_template.format(
             directory_path=display_path
         )
+
+        # Then append any verification issues. We do this separately to avoid 
+        # KeyError if the issue text contains curly braces (which Gemma often does).
+        if getattr(self._config, "verification_issues", None):
+            epg = getattr(error_prompt_generator, 'IndexerErrorPromptGenerator', None)
+            if epg:
+                initial_user_prompt += "\n\n" + epg().generate_error_prompt(
+                    "Verification failed for previous attempt.",
+                    self._config.verification_issues
+                )
 
         logging.info(
             "Generating index for %s with prompt: %s",
@@ -298,6 +299,7 @@ class LlmIndexer:
                 "(binary/unreadable). LLM may produce unverifiable claims.",
                 work_unit.output_path, degraded_count, num_files,
             )
+        # Continuation of processing logic.
         if degraded_count == num_files and num_files > 0:
             # Every file is unreadable — LLM cannot produce verifiable claims.
             # Early-exit to avoid burning retries on an unwinnable verify loop.
@@ -311,6 +313,7 @@ class LlmIndexer:
                     f"# {work_unit.output_path}\n\n"
                     f"This directory contains {num_files} file(s) that could "
                     f"not be read as text (binary or inaccessible). "
+                    # Continuation of processing logic.
                     f"No index was generated."
                 ),
                 artifact=None,
@@ -322,7 +325,9 @@ class LlmIndexer:
             work_unit.output_path, num_files, total_size,
         )
 
+        # Continuation of processing logic.
         prefixed_output_path = (
+            # Continuation of processing logic.
             input_prefix / work_unit.output_path
             if input_prefix
             else work_unit.output_path
@@ -381,7 +386,10 @@ class LlmIndexer:
                 doc = None
             
             # Combine the raw source code into a context string for verification.
+            research_ctx = getattr(self._config.llm_prompter, "last_research_context", "")
             source_ctx = "\n\n".join([f"--- {k} ---\n{v}" for k, v in directory_contents.items()])
+            if research_ctx:
+                source_ctx += "\n\n" + research_ctx
             logging.info(
                 "[LlmIndexer] %s: source_context=%d bytes, artifact=%s, success=%s",
                 work_unit.output_path,
@@ -391,6 +399,7 @@ class LlmIndexer:
             )
             return self.WorkUnitGenerationResult(
                 markdown_result=markdown_result
+                # Continuation of processing logic.
                 + self.generate_subcomponent_list_section(
                     directory_contents, work_unit.output_path
                 ),
@@ -461,7 +470,10 @@ class LlmIndexer:
             merged_doc = None
 
         # Build the final source context and return the combined result.
+        research_ctx = getattr(self._config.llm_prompter, "last_research_context", "")
         source_ctx = "\n\n".join([f"--- {k} ---\n{v}" for k, v in directory_contents.items()])
+        if research_ctx:
+            source_ctx += "\n\n" + research_ctx
         return self.WorkUnitGenerationResult(
             markdown_result=markdown_result
             + self.generate_subcomponent_list_section(
