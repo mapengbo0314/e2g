@@ -133,7 +133,6 @@ class IndexDiffer:
         )
 
     def _diff_work_units(
-        # Continuation of processing logic.
         self,
         old_work_unit_manifest: work_unit.WorkUnitManifest,
         new_work_units: dict[Path, work_unit.WorkUnit],
@@ -171,7 +170,6 @@ class IndexDiffer:
                 ):
                     to_reindex.add(path)
                 elif in_old_errored:
-                    # Continuation of processing logic.
                     to_reindex.add(path)
                 # If the previous verification failed, we must re-process the unit.
                 elif old_work_units[path].last_indexed_info and old_work_units[path].last_indexed_info.verification_state == "FAILED":

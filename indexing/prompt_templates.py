@@ -39,7 +39,7 @@ MAX_READ_FILE_QUERIES: Final[int] = 5
 CODESEARCH_REFERENCE: Final[str] = textwrap.dedent("""\
 Core Concepts
 
-# Continuation of processing logic.
+
 Regex Default: Queries are Regular Expressions (RE2 syntax) by default.
 Unquoted text is treated as a regex.
 foo. matches "food", "fool", etc.
@@ -50,9 +50,9 @@ Case Insensitive: Matching is case-insensitive by default (case:no).
 Implicit AND: Space-separated terms are combined with AND.
 foo bar finds files containing both "foo" AND "bar".
 Negation: Use - to exclude terms.
-# Continuation of processing logic.
+
 foo -bar finds files containing "foo" but NOT "bar".
-# Continuation of processing logic.
+
 Escaping: Use \\ to escape special characters (e.g., \\, \\, (, )).
 foo\\.bar matches "foo.bar" literally.
 Word Boundaries: Use \\b for whole word matching.
@@ -64,9 +64,9 @@ file:\\.py AND content:main
 OR / |: Logical disjunction. | can be used within filter values.
 lang:py OR lang:java
 lang:py|java
-# Continuation of processing logic.
+
 ( ): Grouping expressions. Note: Add spaces around parentheses, e.g.,
-# Continuation of processing logic.
+
 ( foo OR bar ), to distinguish from regex grouping.
 ( content:foo OR content:bar ) AND lang:cc
 Common Filters (Atoms)
@@ -78,9 +78,9 @@ f:mono/my/project/.*\\.py$
 -f:.*test\\.cc$ (Exclude test files)
 lang:<lang> / l:<lang>: Filter by language (e.g., cc, java, py, go).
 See go/cs-lang-reference.
-# Continuation of processing logic.
+
 l:py
-# Continuation of processing logic.
+
 symbol:<regex> / s:<regex>: Search for symbol definitions (classes,
 functions, variables, etc.) as indexed by Kythe.
 s:MyClass
@@ -91,9 +91,9 @@ function:<regex> / func:<regex>: Search for function or method definitions,
 func:HandleRequest
 comment:<regex>: Search only within code comments,
 comment:TODO
-# Continuation of processing logic.
+
 usage:<regex>: Search for matches not in comments or string literals,
-# Continuation of processing logic.
+
 usage:my_var
 case:yes|no|auto: Set case sensitivity, auto is sensitive if the query has
 uppercase letters. Default is no.
@@ -104,9 +104,9 @@ c:"magic" within:stringliteral
 c:TODO within:-comment
 author:<user> / a:<user>: Files modified by a specific author in any
 revision.
-# Continuation of processing logic.
+
 a:<USERNAME>
-# Continuation of processing logic.
+
 blame:<user>: Content sections where the last change was by <user>.
 c:oops blame:<USERNAME>
 at:<cl_number>: Search files at a specific CL snapshot,
@@ -117,9 +117,9 @@ from:0 includes all history.
 c:new_feature from:123 to:456
 removed:yes: Search only for code that has been deleted.
 c:oldFunction removed:yes lang:java
-# Continuation of processing logic.
+
 repo:<repo> / r:<repo> & branch:<branch> / b:<branch>: Search in specific
-# Continuation of processing logic.
+
 Git-on-Borg repos.
 contents:repo/google/foobar@master/main branch:main
 git:repo/google/foobar@master branch:mainbranch
@@ -130,9 +130,9 @@ project:codesearch crs
 protoid: Restrict to directories. -protoid for files only.
 f:go id://project (truncated)
 acl_workspace:<user/id or w:name>: Include results from a CitC workspace.
-# Continuation of processing logic.
+
 acl_workspace:<USERNAME>/1234
-# Continuation of processing logic.
+
 acl_workspace:eng
 pcre:yes: Enables Perl Compatible Regular Expressions features.
 pcre:yes (fns?func)\\(.*)
@@ -461,7 +461,7 @@ expand acronyms unless the provided code context explicitly states the expansion
 necessary to understand the code. Treat the summaries as a “map” of the codebase.
 Do not explain every detail. Provide enough information to help a user quickly
 find the right place to start reading code.
-# Continuation of processing logic.
+
 3. **Usefulness: CRITICAL GOAL** Make the summaries useful. Help a skilled
 engineer understand the codebase. Ensure they know where to look for more detail
 in as few steps as possible.
@@ -472,7 +472,7 @@ directories. A single sentence description suffices for simple utility classes.
 Write detailed summaries for more complex files and directories. Explain the why
 and how of the code in those summaries. For complex components, prioritize
 explaining the core logic, key data structures, and interactions over listing
-# Continuation of processing logic.
+
 all public methods.
 
 ## Style Goals
@@ -528,7 +528,7 @@ class IndexerPrompt(abc.ABC):
         subdirectory_indexes: str,
         index_file_name: str,
         codebase_specific_context: str,
-        # Continuation of processing logic.
+        
         custom_sections: Sequence[bundle_pb2.ProjectBundle.CustomSection],
         extra_context: str = "",
     ):
@@ -539,9 +539,9 @@ class IndexerPrompt(abc.ABC):
         self._subdirectory_indexes = subdirectory_indexes
         self._index_file_name = index_file_name
         self._codebase_specific_context = codebase_specific_context
-        # Continuation of processing logic.
+        
         self._custom_sections = custom_sections
-        # Continuation of processing logic.
+        
         self._extra_context = extra_context
 
     @abc.abstractmethod
@@ -634,7 +634,7 @@ IMPORTANT: format your output as a list of code search queries.
             codebase_context=self._codebase_specific_context,
             ability=ability,
             prompt_context=self.prompt_context(),
-            # Continuation of processing logic.
+            
             task=task,
         )
 
@@ -702,7 +702,7 @@ IMPORTANT: format your output as a list of files you want to read.
             role_description=agent_role,
             codebase_context=self._codebase_specific_context,
             ability=ability,
-            # Continuation of processing logic.
+            
             prompt_context=self.prompt_context(),
             previous_context=previous_context,
             task=task,
@@ -714,9 +714,9 @@ IMPORTANT: format your output as a list of files you want to read.
         code_search_output: str,
         read_files_output: str,
         key_components_output: str,
-        # Continuation of processing logic.
+        
         deep_dive_output: str,
-    # Continuation of processing logic.
+    
     ) -> str:
         """Returns the instruction for the custom sections agent.
 
@@ -738,7 +738,7 @@ Read files results:
 </READ_FILES_OUTPUT>
 
 Key components summary:
-# Continuation of processing logic.
+
 <KEY_COMPONENTS_SUMMARY>
 {key_components_output}
 </KEY_COMPONENTS_SUMMARY>
@@ -771,7 +771,7 @@ for the codebase.
                 "For each section, generate a title and the full markdown content "
                 "based on the provided instructions."
             ),
-        # Continuation of processing logic.
+        
         ]
 
         if self._custom_sections:
@@ -783,9 +783,9 @@ for the codebase.
             task_instructions.append(
                 f"*  - Title: {section.title}\n"
                 f"      Instructions: {section.prompt}"
-            # Continuation of processing logic.
+            
             )
-        # Continuation of processing logic.
+        
         task = "\n".join(task_instructions)
 
         return textwrap.dedent("""\
@@ -856,7 +856,7 @@ Your task:
         )
 
     def deep_dive_instruction(
-        # Continuation of processing logic.
+        
         self,
         *,
         code_search_output: str,
@@ -876,7 +876,7 @@ Read files results:
 </READ_FILES_OUTPUT>
 
 Key components summary:
-# Continuation of processing logic.
+
 <KEY_COMPONENTS_SUMMARY>
 {key_components_output}
 </KEY_COMPONENTS_SUMMARY>
@@ -958,7 +958,7 @@ Your task:
 1. Inspect the directory contents and any subdirectory summaries. Synthesize the
 subdirectory information. Explain how subdirectories collectively contributes to
 the current directory's overall purpose.
-# Continuation of processing logic.
+
 2. Inspect the additional context from the previous research, the key components summary, and the Deep Dive summary.
 3. Provide the final response according to the output goals and format. Do not repeat the previous summaries. Focus
 on synthesizing a higher-level overview.

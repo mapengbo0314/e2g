@@ -61,7 +61,6 @@ def render_section(section: schema.Section) -> Optional[str]:
             else None
         )
     
-    # Continuation of processing logic.
     if isinstance(section, schema.TestingStrategy):
         return f"# Testing Strategy\n\n{section.content}" if section.content else None
     
@@ -80,7 +79,6 @@ def render_section(section: schema.Section) -> Optional[str]:
         return f"# Configuration and flags\n\n{items}"
     
     if isinstance(section, schema.CustomSectionData):
-        # Continuation of processing logic.
         return f"# {section.title}\n\n{section.content}" if section.content else None
     
     return None
@@ -114,6 +112,5 @@ def to_markdown(doc: schema.IndexDocument) -> str:
         if md:
             output.append(md.strip())
 
-    # Continuation of processing logic.
     result = "\n\n".join(output)
     return sanitize_unicode(result)

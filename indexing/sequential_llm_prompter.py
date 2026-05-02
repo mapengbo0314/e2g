@@ -32,25 +32,25 @@ except ImportError:
     genai = None
 
 try:
-    # Continuation of processing logic.
+    
     import pydantic
 except ImportError:  # pragma: no cover
     pydantic = None
 
 try:
-    # Continuation of processing logic.
+    
     import openai
 except ImportError:
     openai = None
 
 try:
-    # Continuation of processing logic.
+    
     import anthropic
 except ImportError:
     anthropic = None
 
 try:
-    # Continuation of processing logic.
+    
     import ollama
 except ImportError:
     ollama = None
@@ -74,7 +74,7 @@ except ImportError:
 
 try:
     from indexing import verification_types
-# Continuation of processing logic.
+
 except ImportError:
     import verification_types
 
@@ -110,7 +110,8 @@ class _SimpleThrottleContext:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
-        # Continuation of processing logic.
+        # Standard exit logic for the context manager. We do not suppress
+        # exceptions here as they are handled by the higher-level retry loop.
         return False
 
     def report_output(self, _output: str) -> None:
@@ -156,7 +157,7 @@ class LlmPrompter(abc.ABC):
         """Returns a summary of the root map content."""
 
     @abc.abstractmethod
-    def verify_artifact(self, artifact_json: str, source_context: str) -> verification_types.VerificationVerdict:
+    def verify_artifact(self, artifact_json: str, source_context: str, is_merger_mode: bool = False) -> verification_types.VerificationVerdict:
         """Runs the verifier prompt and returns a structured verdict."""
 
 
@@ -174,7 +175,7 @@ class GeminiLlmPrompterConfig:
     api_key: str | None = None
     dry_run: bool = False
     dry_run_map: dict[str, str] | None = None
-    # Continuation of processing logic.
+    
     max_attempts: int = 3
     delay_on_failure_max_seconds: int = 10
     max_attempts_per_conversation: int = 3
@@ -212,7 +213,7 @@ class _SimpleConversation:
                 overview=schema.Overview(
                     content=f"Auto-generated overview for prompt: {user_prompt}"
                 ),
-                # Continuation of processing logic.
+                # Initialize required list sections to empty to satisfy Pydantic.
                 key_individual_components=schema.KeyIndividualComponents(
                     components=[]
                 ),
@@ -228,7 +229,7 @@ class _SimpleConversation:
                 architectural_patterns_and_gotchas=schema.ArchitecturalPatternsAndGotchas(
                     content=""
                 ),
-                # Continuation of processing logic.
+                
                 testing_strategy=schema.TestingStrategy(content=""),
                 configurations=schema.Configurations(configurations=[]),
             )
@@ -243,7 +244,7 @@ class _SimpleConversation:
             )
         if self.output_schema_type is schema.CustomSectionsDocument:
             return schema.CustomSectionsDocument(custom_sections=[])
-        # Continuation of processing logic.
+        
         if hasattr(self.output_schema_type, "__name__") and self.output_schema_type.__name__ == "VerificationVerdict":
             return self.output_schema_type(passed=True, issues=[])
         # Default fallback to an empty instance of the schema type.
@@ -315,7 +316,7 @@ class OpenAiConversation:
         if openai is None:
             raise ImportError("openai library not found. Install openai.")
         self.client = openai.Client(api_key=api_key)
-        # Continuation of processing logic.
+        
         self.model_name = model_name
         self.system_prompt = system_prompt
         self.output_schema_type = output_schema_type
@@ -339,7 +340,7 @@ class OpenAiConversation:
 
     def prompt(self, user_prompt: str) -> str:
         self.history.append({"role": "user", "content": user_prompt})
-        # Continuation of processing logic.
+        
         response = self.client.chat.completions.create(
             model=self.model_name,
             messages=self.history,
@@ -372,7 +373,7 @@ class AnthropicConversation:
         if anthropic is None:
             raise ImportError("anthropic library not found. Install anthropic.")
         self.client = anthropic.Anthropic(api_key=api_key)
-        # Continuation of processing logic.
+        
         self.model_name = model_name
         self.system_prompt = system_prompt + "\n\nYou must respond strictly in JSON format." if system_prompt else "You must respond strictly in JSON format."
         self.output_schema_type = output_schema_type
@@ -381,7 +382,7 @@ class AnthropicConversation:
 
     def prompt(self, user_prompt: str) -> str:
         self.history.append({"role": "user", "content": user_prompt})
-        # Continuation of processing logic.
+        
         response = self.client.messages.create(
             model=self.model_name,
             system=self.system_prompt,
@@ -414,25 +415,28 @@ class OllamaConversation:
         if ollama is None:
             raise ImportError("ollama library not found. Install ollama.")
         self.model_name = model_name
-        # Continuation of processing logic.
+        
         self.output_schema_type = output_schema_type
         self.history = [{"role": "system", "content": system_prompt}] if system_prompt else []
         self._last_response: Any = None
 
     def prompt(self, user_prompt: str) -> str:
+        # Append the new user message to the conversation history.
         self.history.append({"role": "user", "content": user_prompt})
-        # Continuation of processing logic.
+        
+        # Log basic stats about the prompt size to monitor context usage.
         total_chars = sum(len(m["content"]) for m in self.history)
         logging.info(
             "[Ollama] Sending %d messages (%d chars total) to %s",
             len(self.history), total_chars, self.model_name,
         )
         try:
+            # Execute the request against the local Ollama API.
             response = ollama.chat(
                 model=self.model_name,
                 messages=self.history,
                 format="json",
-                # Continuation of processing logic.
+                # Pass model-specific configuration options.
                 options={
                     # Ollama defaults to num_ctx=2048 which silently truncates
                     # large prompts.  Gemma 4 supports 200K tokens; set this
@@ -474,7 +478,7 @@ class DryRunConversation:
         self.system_prompt = system_prompt
         self.agent_name = agent_name
         self.output_schema_type = output_schema_type
-        # Continuation of processing logic.
+        
         self.dry_run_map = dry_run_map or {}
         # Tracking the simulated state of the conversation.
         self.state: Any = None
@@ -514,7 +518,7 @@ class DryRunConversation:
         return json.dumps(mock_obj, indent=2, default=str)
 
 
-# Continuation of processing logic.
+
 class GeminiLlmPrompter(LlmPrompter):
     """LLM prompter for Gemini with multi-stage agent support."""
 
@@ -533,7 +537,7 @@ class GeminiLlmPrompter(LlmPrompter):
         self,
         config: GeminiLlmPrompterConfig,
         fs_manager: object | None,
-        # Continuation of processing logic.
+        
         override_conversation_factory: Callable[[Any], Any] | None = None,
     ):
         """Initializes the GeminiLlmPrompter."""
@@ -574,18 +578,48 @@ class GeminiLlmPrompter(LlmPrompter):
         # string fields, so this is always safe.
         data = GeminiLlmPrompter._deep_replace_nulls(data)
 
-        # --- Phase 2: Patch known missing keys with field-specific defaults ---
-        # Skip coercion for plain dictionaries or when the schema doesn't match.
-        if output_schema is dict:
-            return data
-
-        # Determine which fields the schema actually expects.
+        # Determine which fields the schema actually expects and which are required.
         schema_fields = set()
+        required_fields = set()
         if hasattr(output_schema, "model_fields"):  # Pydantic v2
             schema_fields = set(output_schema.model_fields.keys())
+            # For Pydantic v2, we check if the field has a default value.
+            try:
+                from pydantic_core import PydanticUndefined
+                for name, field in output_schema.model_fields.items():
+                    if field.default is PydanticUndefined and field.default_factory is None:
+                        required_fields.add(name)
+            except ImportError:
+                # If we can't get the sentinel, we'll leave required_fields empty
+                # and skip the greedy remapping phase.
+                pass
         elif hasattr(output_schema, "__fields__"):  # Pydantic v1
             schema_fields = set(output_schema.__fields__.keys())
+            for name, field in output_schema.__fields__.items():
+                if getattr(field, "required", False):
+                    required_fields.add(name)
 
+        # --- Phase 0.5: Remap Document-level Wrappers ---
+        # Weaker models often mix up 'overview' and 'deep_dive' wrapper keys.
+        # Handle remapping for DeepDiveDocument (where deep_dive is required).
+        if "deep_dive" in required_fields and "deep_dive" not in data and "overview" in data:
+            logging.info("[Coercion] Remapped 'overview' to 'deep_dive' for DeepDiveDocument.")
+            data["deep_dive"] = data.pop("overview")
+        # Handle remapping for OverviewDocument (where overview is required).
+        elif "overview" in required_fields and "overview" not in data and "deep_dive" in data:
+            logging.info("[Coercion] Remapped 'deep_dive' to 'overview' for OverviewDocument.")
+            data["overview"] = data.pop("deep_dive")
+
+        # --- Phase 0.6: Wrap 'unwrapped' content ---
+        # If the LLM returned the inner fields at the root instead of inside the wrapper.
+        if "deep_dive" in required_fields and "deep_dive" not in data and "content" in data:
+            logging.info("[Coercion] Wrapped root 'content' into 'deep_dive'.")
+            data = {"deep_dive": data}
+        elif "overview" in required_fields and "overview" not in data and "content" in data:
+            logging.info("[Coercion] Wrapped root 'content' into 'overview'.")
+            data = {"overview": data}
+
+        # --- Phase 2: Patch known missing keys with field-specific defaults ---
         for wrapper_key, (list_key, model_name) in GeminiLlmPrompter._LIST_FIELD_MAP.items():
             # Only inject if the field is actually expected by the schema.
             if wrapper_key not in schema_fields:
@@ -616,9 +650,9 @@ class GeminiLlmPrompter(LlmPrompter):
                         if field not in item:
                             item[field] = default_val
                             logging.info(
-                                # Continuation of processing logic.
+                                
                                 "[Coercion] Patched missing '%s' on %s "
-                                # Continuation of processing logic.
+                                
                                 "(name=%s) with default=%r.",
                                 field, model_name,
                                 item.get("name", "<unknown>"), default_val,
@@ -639,9 +673,9 @@ class GeminiLlmPrompter(LlmPrompter):
         "verified_at"
     }
 
-    # Continuation of processing logic.
+    
     @staticmethod
-    # Continuation of processing logic.
+    
     def _deep_replace_nulls(obj: Any) -> Any:
         """Recursively replace null values with empty strings for string fields.
 
@@ -658,13 +692,13 @@ class GeminiLlmPrompter(LlmPrompter):
                 "" if item is None else GeminiLlmPrompter._deep_replace_nulls(item)
                 for item in obj
             ]
-        # Continuation of processing logic.
+        
         return obj
 
     def _create_single_conversation(
         self,
         system_prompt: str,
-        # Continuation of processing logic.
+        
         agent_name: str,
         output_schema_type: type[Any],
         model_type: str = "research",
@@ -722,7 +756,7 @@ class GeminiLlmPrompter(LlmPrompter):
 
         elif self._config.provider == "openai":
             if self._config.api_key:
-                # Continuation of processing logic.
+                
                 try:
                     return OpenAiConversation(
                         system_prompt=system_prompt,
@@ -736,7 +770,7 @@ class GeminiLlmPrompter(LlmPrompter):
         # Check if the requested provider is Anthropic.
         elif self._config.provider == "anthropic":
             if self._config.api_key:
-                # Continuation of processing logic.
+                
                 try:
                     return AnthropicConversation(
                         system_prompt=system_prompt,
@@ -748,7 +782,7 @@ class GeminiLlmPrompter(LlmPrompter):
                     logging.warning("Failed to initialize Anthropic conversation: %s", e)
 
         elif self._config.provider == "ollama":
-            # Continuation of processing logic.
+            
             try:
                 return OllamaConversation(
                     system_prompt=system_prompt,
@@ -780,7 +814,7 @@ class GeminiLlmPrompter(LlmPrompter):
         e: Exception,
         directory_path: str,
         conversation: Any,
-        # Continuation of processing logic.
+        
         error_prompt_generator_instance: Any,
         attempt: int = 1,
     ) -> str:
@@ -865,7 +899,7 @@ class GeminiLlmPrompter(LlmPrompter):
         self,
         e: Exception,
         directory_path: str,
-        # Continuation of processing logic.
+        
         error_prompt_generator_instance: Any,
     ) -> str:
         """Handles JSON decoding errors from the LLM call."""
@@ -888,7 +922,7 @@ class GeminiLlmPrompter(LlmPrompter):
         self,
         directory_path: str,
         initial_user_prompt: str,
-        # Continuation of processing logic.
+        
         agent_name: str,
         error_prompt_generator_instance: Any,
         conversation_factory: Callable[[], Any],
@@ -970,8 +1004,8 @@ class GeminiLlmPrompter(LlmPrompter):
                         "validation_error",
                         "UNKNOWN",
                     )
+                    # Extract detailed error information for the LLM's self-healing loop.
                     user_prompt = self._handle_pydantic_validation_error(
-                        # Continuation of processing logic.
                         e,
                         directory_path,
                         error_prompt_generator_instance,
@@ -988,7 +1022,7 @@ class GeminiLlmPrompter(LlmPrompter):
                     user_prompt = self._handle_json_decoding_error(
                         e,
                         directory_path,
-                        # Continuation of processing logic.
+                        
                         error_prompt_generator_instance,
                     )
                     continue
@@ -1003,7 +1037,7 @@ class GeminiLlmPrompter(LlmPrompter):
                     e,
                     directory_path,
                     conversation,
-                    # Continuation of processing logic.
+                    
                     error_prompt_generator_instance,
                     attempt=attempt,
                 )
@@ -1022,7 +1056,7 @@ class GeminiLlmPrompter(LlmPrompter):
         initial_user_prompt: str,
         agent_name: str,
         error_prompt_generator_instance: Any,
-        # Continuation of processing logic.
+        
         instruction: str,
         output_schema_type: Any,
         model_type: str,
@@ -1042,7 +1076,7 @@ class GeminiLlmPrompter(LlmPrompter):
                 agent_name=agent_name,
                 output_schema_type=output_schema_type,
                 model_type=model_type,
-                # Continuation of processing logic.
+                
                 epoch=epoch,
             ),
             # Instruction and schema definition for the agent.
@@ -1063,7 +1097,7 @@ class GeminiLlmPrompter(LlmPrompter):
 
     def _run_custom_sections_agent(
         self,
-        # Continuation of processing logic.
+        
         directory_path: str,
         initial_user_prompt: str,
         system_prompt: Any,
@@ -1097,7 +1131,7 @@ class GeminiLlmPrompter(LlmPrompter):
             model_type="synthesis",
             epoch=system_prompt.epoch(),
         )
-        # Continuation of processing logic.
+        
         # Return the extracted custom sections from the synthesis doc.
         return section_doc.custom_sections
 
@@ -1135,7 +1169,7 @@ class GeminiLlmPrompter(LlmPrompter):
                 instruction=code_search_instruction,
                 output_schema_type=dict,
                 model_type="research",
-                # Continuation of processing logic.
+                # Track the epoch to ensure temporal consistency in multi-pass indexing.
                 epoch=system_prompt.epoch(),
             )
             self.last_research_context += f"=== CODE SEARCH OUTPUT ===\n{code_search_output_str}\n\n"
@@ -1155,7 +1189,7 @@ class GeminiLlmPrompter(LlmPrompter):
             error_prompt_generator_instance=error_prompt_generator_instance,
             instruction=read_files_instruction,
             output_schema_type=dict,
-            # Continuation of processing logic.
+            # Execute on research-optimized models for faster iteration.
             model_type="research",
             epoch=system_prompt.epoch(),
         )
@@ -1174,7 +1208,7 @@ class GeminiLlmPrompter(LlmPrompter):
             agent_name="key_components_agent",
             error_prompt_generator_instance=error_prompt_generator_instance,
             instruction=key_components_instruction,
-            # Continuation of processing logic.
+            # Synthesis steps require more reasoning capacity; use larger models.
             output_schema_type=schema.KeyComponentsDocument,
             model_type="synthesis",
             epoch=system_prompt.epoch(),
@@ -1193,7 +1227,7 @@ class GeminiLlmPrompter(LlmPrompter):
             initial_user_prompt=initial_user_prompt,
             agent_name="deep_dive_agent",
             error_prompt_generator_instance=error_prompt_generator_instance,
-            # Continuation of processing logic.
+            # Generate the detailed technical deep dive for core logic.
             instruction=deep_dive_instruction,
             output_schema_type=schema.DeepDiveDocument,
             model_type="synthesis",
@@ -1213,7 +1247,7 @@ class GeminiLlmPrompter(LlmPrompter):
             directory_path=directory_path,
             initial_user_prompt=initial_user_prompt,
             agent_name="overview_agent",
-            # Continuation of processing logic.
+            # Consolidate all previous findings into a human-readable overview.
             error_prompt_generator_instance=error_prompt_generator_instance,
             instruction=overview_instruction,
             output_schema_type=schema.OverviewDocument,
@@ -1247,7 +1281,8 @@ class GeminiLlmPrompter(LlmPrompter):
             testing_strategy=key_components_doc.testing_strategy,
             configurations=key_components_doc.configurations,
             custom_sections=custom_sections_results,
-        # Continuation of processing logic.
+            # Record the generation metadata for traceability.
+            generated_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         )
 
         # --- STEP 8: Verification Phase ---
@@ -1291,7 +1326,6 @@ class GeminiLlmPrompter(LlmPrompter):
         return self._execute_single_prompt(
             directory_path=directory_path,
             initial_user_prompt=initial_user_prompt,
-            # Continuation of processing logic.
             agent_name="merging_agent",
             error_prompt_generator_instance=error_prompt_generator_instance,
             conversation_factory=lambda: self._create_single_conversation(
@@ -1302,10 +1336,9 @@ class GeminiLlmPrompter(LlmPrompter):
             ),
             stringified_system_prompt=system_prompt,
             output_schema=schema.IndexDocument,
-        # Continuation of processing logic.
         )
 
-    # Continuation of processing logic.
+    
     def prompt_for_root_map_summary(self, root_map_content: str) -> str:
         """Returns a summary of the root map content."""
         # Return a truncated preview of the root map as a placeholder summary.
@@ -1314,7 +1347,7 @@ class GeminiLlmPrompter(LlmPrompter):
             f"{root_map_content[:500]}..."
         )
 
-    def verify_artifact(self, artifact_json: str, source_context: str) -> verification_types.VerificationVerdict:
+    def verify_artifact(self, artifact_json: str, source_context: str, is_merger_mode: bool = False) -> verification_types.VerificationVerdict:
         """Runs the verifier prompt and returns a structured verdict."""
         system_prompt = prompt_templates.create_verifier_prompt(artifact_json, source_context)
         
@@ -1337,7 +1370,7 @@ class GeminiLlmPrompter(LlmPrompter):
         )
         
         try:
-            # Continuation of processing logic.
+            
             with self._throttler.acquire(system_prompt, "Please verify the artifact.") as throttle_ctx:
                 response = conv.prompt("Please verify the artifact.")
                 throttle_ctx.report_output(response)
@@ -1365,20 +1398,24 @@ class GeminiLlmPrompter(LlmPrompter):
                 try:
                     # Parse as pydantic object for strict validation.
                     parsed = verification_types.VerificationVerdict.model_validate_json(response)
+                    parsed.verification_model = self._config.synthesis_gemini_model
                     return parsed
                 except Exception:
                     pass
 
                 # Ollama often wraps JSON in markdown fences: ```json {...} ```
-                # Strip them and retry.
+                # We need to strip them and retry parsing.
                 import re
                 cleaned = response.strip()
-                # Remove ```json ... ``` or ``` ... ``` wrappers
+                
+                # First, attempt to match standard markdown json fences.
+                # The DOTALL flag ensures we capture multi-line JSON structures.
                 fence_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', cleaned, re.DOTALL)
                 if fence_match:
                     cleaned = fence_match.group(1)
                 else:
-                    # Try to extract any JSON object from the response
+                    # If there are no fences, fallback to extracting any raw JSON-like 
+                    # object structure found anywhere within the response body.
                     obj_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', cleaned, re.DOTALL)
                     if obj_match:
                         cleaned = obj_match.group(0)
@@ -1417,7 +1454,9 @@ class GeminiLlmPrompter(LlmPrompter):
                             except (ValueError, TypeError):
                                 data["confidence"] = 1.0
 
-                    return verification_types.VerificationVerdict(**data)
+                    verdict = verification_types.VerificationVerdict(**data)
+                    verdict.verification_model = self._config.synthesis_gemini_model
+                    return verdict
                 except (json.JSONDecodeError, TypeError):
                     pass
 

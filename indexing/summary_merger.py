@@ -15,6 +15,8 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Protocol
+import tenacity
+import httpx
 
 from indexing import prompt_templates
 from indexing import schema
@@ -117,12 +119,20 @@ class SummaryMerger:
         self._filtering_config = filtering_config
         self._stats = _StatsRecorder()
 
-    def merge(self, docs: list[Any], directory_path: str) -> Any:
+    @tenacity.retry(
+        retry=tenacity.retry_if_exception_type((httpx.TimeoutException, httpx.ConnectError)),
+        wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
+        stop=tenacity.stop_after_attempt(3),
+        before_sleep=tenacity.before_sleep_log(logging.getLogger(__name__), logging.WARNING),
+        reraise=True
+    )
+    def merge(self, docs: list[Any], directory_path: str, error_prompt: str = "") -> Any:
         """Merges multiple markdown indexes into one using an LLM.
 
         Args:
             docs: The list of markdown indexes to merge.
             directory_path: The path to the directory being indexed.
+            error_prompt: Optional verification error prompt to pass to the LLM.
 
         Returns:
             The merged markdown index.
@@ -162,6 +172,8 @@ class SummaryMerger:
         initial_user_prompt = USER_PROMPT_TEMPLATE_MERGE.format(
             directory_path=directory_path
         )
+        if error_prompt:
+            initial_user_prompt += "\n\n" + error_prompt
 
         logging.info(
             "Merging index for %s with prompt: %s",

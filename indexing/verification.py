@@ -27,29 +27,37 @@ from indexing import verification_types
 
 class LlmPrompterProtocol(Protocol):
     """Protocol for LLM prompting needed by verification."""
-    def verify_artifact(self, artifact_json: str, source_context: str) -> verification_types.VerificationVerdict: ...
+    def verify_artifact(self, artifact_json: str, source_context: str, is_merger_mode: bool = False) -> verification_types.VerificationVerdict: ...
 
 
 class VerificationCache:
     """Aggressive caching mechanism to bypass re-verification for unmodified chunks."""
 
     def __init__(self, cache_file: Path) -> None:
+        if cache_file.suffix == '.json':
+            cache_file = cache_file.with_suffix('.jsonl')
         self.cache_file = cache_file
+        import threading
+        self._lock = threading.Lock()
         self.cache: dict[str, dict[str, Any]] = self._load_cache()
 
     def _load_cache(self) -> dict[str, dict[str, Any]]:
+        cache = {}
         if not self.cache_file.exists():
-            return {}
+            return cache
         try:
-            return json.loads(self.cache_file.read_text())
-        except json.JSONDecodeError:
-            # If the cache file is malformed, log a warning and return an empty state.
+            with open(self.cache_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if not line.strip(): continue
+                    try:
+                        data = json.loads(line)
+                        cache[data['key']] = data['verdict']
+                    except Exception:
+                        pass
+            return cache
+        except Exception:
             logging.warning("Verification cache is corrupted. Starting fresh.")
             return {}
-
-    def _save_cache(self) -> None:
-        self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-        self.cache_file.write_text(json.dumps(self.cache, indent=2))
 
     def _compute_hash(self, artifact_json: str, source_context: str) -> str:
         """Computes a stable hash of the input and context."""
@@ -73,12 +81,12 @@ class VerificationCache:
 
     def store_verdict(self, artifact_json: str, source_context: str, verdict: verification_types.VerificationVerdict) -> None:
         key = self._compute_hash(artifact_json, source_context)
-        if pydantic is not None:
-            self.cache[key] = verdict.model_dump()
-        else:
-            # Continuation of processing logic.
-            self.cache[key] = verdict.model_dump()
-        self._save_cache()
+        dumped = verdict.model_dump() if pydantic is not None else verdict.model_dump()
+        with self._lock:
+            self.cache[key] = dumped
+            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.cache_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps({"key": key, "verdict": dumped}) + "\n")
 
 
 class ArtifactVerifier:
@@ -142,10 +150,9 @@ class ArtifactVerifier:
 
     def _stage2_semantic_verification(
         self, 
-        # Continuation of processing logic.
         artifact_json: str, 
-        # Continuation of processing logic.
-        source_context: str
+        source_context: str,
+        is_merger_mode: bool = False
     ) -> verification_types.VerificationVerdict:
         """Runs Stage 2: LLM factual grounding check."""
         # Check cache first to avoid expensive and redundant LLM calls.
@@ -160,11 +167,10 @@ class ArtifactVerifier:
         logging.info(
             "[Verifier] Stage 2 cache MISS, running LLM semantic verification "
             "(source_context=%d bytes, artifact=%d bytes).",
-            # Continuation of processing logic.
             len(source_context), len(artifact_json),
         )
         # Delegate the actual semantic checking to the LLM.
-        verdict = self.llm_prompter.verify_artifact(artifact_json, source_context)
+        verdict = self.llm_prompter.verify_artifact(artifact_json, source_context, is_merger_mode=is_merger_mode)
         logging.info(
             "[Verifier] Stage 2 LLM verdict: passed=%s, confidence=%.2f, "
             "issues=%d, decision=%s.",
@@ -183,7 +189,8 @@ class ArtifactVerifier:
         self, 
         artifact_json: str, 
         source_context: str,
-        skip_semantic: bool = False
+        skip_semantic: bool = False,
+        is_merger_mode: bool = False
     ) -> verification_types.VerificationVerdict:
         """Executes the full verification pipeline.
         
@@ -212,4 +219,4 @@ class ArtifactVerifier:
 
         # Stage 2: Semantic (Slow, non-deterministic grounding check).
         # We pass the original JSON for verification against the raw source context.
-        return self._stage2_semantic_verification(artifact_json, source_context)
+        return self._stage2_semantic_verification(artifact_json, source_context, is_merger_mode)

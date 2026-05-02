@@ -19,13 +19,18 @@ from indexing import chunker as chunker_lib
 from indexing import error_prompt_generator
 from indexing import file_utils
 from indexing import prompt_templates
-# Continuation of processing logic.
 from indexing import rendering
 from indexing import schema
 from indexing import sequential_llm_prompter
 from indexing import state
 from indexing import summary_merger as summary_merger_lib
 from indexing import work_unit as work_unit_lib
+
+class VerificationFailedError(Exception):
+    def __init__(self, message: str, result: Any, issues: list[str]):
+        super().__init__(message)
+        self.result = result
+        self.issues = issues
 
 
 class _SimpleStatsRecorder:
@@ -81,7 +86,6 @@ class LlmIndexerConfig:
     custom_sections: Sequence[Any] | None = None
 
 
-# Continuation of processing logic.
 class LlmIndexer:
     """Class to generate an index for a directory using an LLM."""
 
@@ -114,29 +118,112 @@ class LlmIndexer:
         subdirectory_indexes: dict[str, str],
         existing_index: str,
         is_partial: bool,
-    # Continuation of processing logic.
+        verifier: Any | None = None,
     ) -> schema.IndexDocument:
-        """Generates an index for a chunk of files in a directory.
+        """Generates an index for a chunk of files in a directory."""
+        import time
+        max_attempts = 3
+        current_issues = []
+        previous_artifact = ""
 
-        Args:
-          directory_path: The path to the directory to index.
-          epoch: The current indexing epoch.
-          previous_root_map_content: The content of the root map from the previous
-            epoch.
-          directory_contents_chunk: A dictionary of file names to their contents for
-            the current chunk.
-          subdirectory_indexes: A dictionary of subdirectory names to their content
-            from the current epoch.
-          existing_index: The existing index for the directory.
-          is_partial: Whether this is a partial index for a chunk of the directory.
+        for attempt in range(max_attempts):
+            try:
+                logging.info("Generating index for %s (epoch %d) attempt %d", directory_path, epoch, attempt + 1)
 
-        Returns:
-          The generated index content for the current chunk.
+                display_path = self._config.index_state.get_display_path(str(directory_path))
+                str_directory_contents = {str(k): v for k, v in directory_contents_chunk.items()}
+                extra_ctx = ""
+                if existing_index:
+                    extra_ctx += f"existing_index:\n{existing_index}\n"
 
-        Raises:
-          RuntimeError: If the LLM output fails validation after max_retries.
-        """
-        logging.info("Generating index for %s (epoch %d)", directory_path, epoch)
+                if epoch > 0:
+                    system_prompt = prompt_templates.IndexImproverPrompt(
+                        directory_path=str(display_path),
+                        epoch=epoch,
+                        directory_contents=repr(str_directory_contents),
+                        subdirectory_indexes=repr(subdirectory_indexes),
+                        extra_context=extra_ctx,
+                        previous_epoch_str=previous_root_map_content or "",
+                        index_file_name=get_index_file_name(epoch),
+                        codebase_specific_context=self._config.codebase_specific_context,
+                        custom_sections=self._config.custom_sections,
+                    )
+                else:
+                    system_prompt = prompt_templates.InitialIndexerPrompt(
+                        directory_path=str(display_path),
+                        epoch=epoch,
+                        directory_contents=repr(str_directory_contents),
+                        subdirectory_indexes=repr(subdirectory_indexes),
+                        extra_context=extra_ctx,
+                        previous_epoch_str=previous_root_map_content or "",
+                        index_file_name=get_index_file_name(epoch),
+                        codebase_specific_context=self._config.codebase_specific_context,
+                        custom_sections=self._config.custom_sections,
+                    )
+
+                user_prompt_template = USER_PROMPT_TEMPLATE
+                if is_partial:
+                    user_prompt_template += PARTIAL_SUMMARY_PROMPT_ADDITION
+                    keys_str = [str(k) for k in directory_contents_chunk.keys()]
+                    user_prompt_template += f"Please summarize only the following files: {keys_str}"
+
+                initial_user_prompt = user_prompt_template.format(directory_path=display_path)
+
+                issues_to_use = current_issues or getattr(self._config, "verification_issues", None)
+                if issues_to_use:
+                    epg = getattr(error_prompt_generator, 'IndexerErrorPromptGenerator', None)
+                    if epg:
+                        error_msg = "Verification failed for previous attempt."
+                        if previous_artifact:
+                            error_msg += f"\nRejected Output:\n{previous_artifact}"
+                        initial_user_prompt += "\n\n" + epg().generate_error_prompt(error_msg, issues_to_use)
+
+                epg = getattr(error_prompt_generator, 'IndexerErrorPromptGenerator', None)
+                epg_instance = epg() if epg else error_prompt_generator
+                
+                artifact_chunk = self._config.llm_prompter.prompt_for_indexing(
+                    directory_path=str(directory_path),
+                    initial_user_prompt=initial_user_prompt,
+                    system_prompt=system_prompt,
+                    error_prompt_generator_instance=epg_instance,
+                )
+
+                if verifier:
+                    source_context = "\n\n".join([f"--- {k} ---\n{v}" for k, v in directory_contents_chunk.items()])
+                    verdict = verifier.verify(artifact_chunk.model_dump_json(), source_context)
+                    if not verdict.passed:
+                        raise VerificationFailedError("Chunk failed", result=artifact_chunk, issues=verdict.issues)
+                    
+                    artifact_chunk.verification_state = schema.VerificationState(
+                        verified=True, confidence=1.0, issues=[],
+                        is_empty_bypass=getattr(verdict, 'is_empty_bypass', False)
+                    )
+                return artifact_chunk
+                
+            except Exception as ve:
+                if isinstance(ve, VerificationFailedError):
+                    current_issues = ve.issues
+                    result = getattr(ve, "result", None)
+                    previous_artifact = result.model_dump_json() if hasattr(result, 'model_dump_json') else ""
+                else:
+                    logging.warning(f"Transient infrastructure error: {ve}")
+                    result = None
+                
+                if attempt == max_attempts - 1:
+                    logging.error("Chunk failed after all retries. Proceeding with 'Best Effort'.")
+                    if not hasattr(result, 'model_dump_json'):
+                        import indexing.schema as schema
+                        result = schema.IndexDocument(
+                            overview=schema.Overview(content="Processing failed due to unrecoverable error.")
+                        )
+                    
+                    result.verification_state = schema.VerificationState(
+                        verified=False, confidence=0.0, issues=current_issues,
+                        is_empty_bypass=False
+                    )
+                    return result
+                
+                time.sleep(2 ** attempt)
 
         # Canonicalize the directory path for display in prompts
         display_path = self._config.index_state.get_display_path(
@@ -163,7 +250,6 @@ class LlmIndexer:
                 index_file_name=get_index_file_name(epoch),
                 codebase_specific_context=self._config.codebase_specific_context,
                 custom_sections=self._config.custom_sections,
-            # Continuation of processing logic.
             )
         else:
             # Generate the baseline index using the InitialIndexerPrompt for the first epoch.
@@ -177,7 +263,6 @@ class LlmIndexer:
                 index_file_name=get_index_file_name(epoch),
                 codebase_specific_context=self._config.codebase_specific_context,
                 custom_sections=self._config.custom_sections,
-            # Continuation of processing logic.
             )
 
         user_prompt_template = USER_PROMPT_TEMPLATE
@@ -206,9 +291,7 @@ class LlmIndexer:
         logging.info(
             "Generating index for %s with prompt: %s",
             directory_path,
-            # Continuation of processing logic.
             initial_user_prompt,
-        # Continuation of processing logic.
         )
 
         epg = getattr(error_prompt_generator, 'IndexerErrorPromptGenerator', None)
@@ -220,10 +303,77 @@ class LlmIndexer:
             error_prompt_generator_instance=epg_instance,
         )
 
+    def _merge_with_retries(self, chunk_docs, work_unit, verifier) -> schema.IndexDocument:
+        import time
+        max_attempts = 3
+        current_issues = []
+        previous_artifact = ""
+
+        for attempt in range(max_attempts):
+            try:
+                error_prompt = ""
+                if current_issues:
+                    error_msg = f"Merger verification failed.\nRejected Output:\n{previous_artifact}\nIssues:\n{current_issues}"
+                    error_prompt = error_msg
+                
+                merged_doc = self._config.summary_merger.merge(
+                    chunk_docs, str(work_unit.output_path), error_prompt=error_prompt
+                )
+                
+                if verifier:
+                    from indexing import rendering
+                    chunk_context = ""
+                    for doc in chunk_docs:
+                        doc_md = rendering.to_markdown(doc)
+                        if len(chunk_context) + len(doc_md) > 24000:
+                            chunk_context += f"\n\n...[Truncated due to context limits]..."
+                            break
+                        chunk_context += f"\n\n{doc_md}"
+
+                    verdict = verifier.verify(merged_doc.model_dump_json(), chunk_context, is_merger_mode=True)
+                    if not verdict.passed:
+                        raise VerificationFailedError("Merger failed", result=merged_doc, issues=verdict.issues)
+                    
+                    merged_doc.verification_state = schema.VerificationState(
+                        verified=True, confidence=1.0, issues=[],
+                        is_empty_bypass=getattr(verdict, 'is_empty_bypass', False)
+                    )
+                return merged_doc
+                
+            except Exception as ve:
+                # Handle verification failures by extracting issues and the previous
+                # artifact state to feed back into the error prompt.
+                if isinstance(ve, VerificationFailedError):
+                    current_issues = ve.issues
+                    result = getattr(ve, "result", None)
+                    previous_artifact = result.model_dump_json() if hasattr(result, 'model_dump_json') else ""
+                else:
+                    # Log unexpected infrastructure errors (e.g. timeout, connection dropped)
+                    # and leave result as None to trigger the fallback path below.
+                    logging.warning(f"Transient infrastructure error in Merger: {ve}")
+                    result = None
+                
+                # If we've exhausted all retries, synthesize a best-effort failure artifact
+                # to prevent the pipeline from crashing completely.
+                if attempt == max_attempts - 1:
+                    if not hasattr(result, 'model_dump_json'):
+                        import indexing.schema as schema
+                        result = schema.IndexDocument(
+                            overview=schema.Overview(content="Merge failed due to unrecoverable error.")
+                        )
+                        
+                    # Force the verification state to reflect the failure so it can be re-run
+                    # in future epochs or flagged for manual review.
+                    result.verification_state = schema.VerificationState(
+                        verified=False, confidence=0.0, issues=current_issues,
+                        is_empty_bypass=False
+                    )
+                    return result
+                
+                time.sleep(2 ** attempt)
+
     def generate_subcomponent_list_section(
-        # Continuation of processing logic.
         self,
-        # Continuation of processing logic.
         directory_contents: dict[Path, str],
         output_path: Path,
     ) -> str:
@@ -257,7 +407,6 @@ class LlmIndexer:
         epoch: int,
         previous_root_map_content: str = "",
         max_chunk_parallelization: int | None = None,
-        # Continuation of processing logic.
         input_prefix: str | None = None,
         verifier: Any | None = None,
     ) -> WorkUnitGenerationResult:
@@ -285,8 +434,23 @@ class LlmIndexer:
 
         num_files = len(directory_contents)
         self._stats.increment_counter("files.processed", num_files)
-
         total_size = sum(len(content) for content in directory_contents.values())
+
+        if num_files == 0:
+            logging.info(f"Directory {work_unit.output_path} is completely empty. Bypassing LLM.")
+            empty_state = schema.VerificationState(
+                verified=True, confidence=1.0, issues=[], is_empty_bypass=True
+            )
+            empty_artifact = schema.IndexDocument(
+                overview=schema.Overview(content="Empty directory"),
+                verification_state=empty_state
+            )
+            return self.WorkUnitGenerationResult(
+                markdown_result=f"# {work_unit.output_path}\n\nEmpty directory.\n",
+                artifact=empty_artifact,
+                source_context="",
+                success=True,
+            )
 
         # --- Diagnostic: identify degraded-context directories early ---
         placeholder_values = {"Could not read file.", "Non-unicode file."}
@@ -299,7 +463,6 @@ class LlmIndexer:
                 "(binary/unreadable). LLM may produce unverifiable claims.",
                 work_unit.output_path, degraded_count, num_files,
             )
-        # Continuation of processing logic.
         if degraded_count == num_files and num_files > 0:
             # Every file is unreadable — LLM cannot produce verifiable claims.
             # Early-exit to avoid burning retries on an unwinnable verify loop.
@@ -313,7 +476,6 @@ class LlmIndexer:
                     f"# {work_unit.output_path}\n\n"
                     f"This directory contains {num_files} file(s) that could "
                     f"not be read as text (binary or inaccessible). "
-                    # Continuation of processing logic.
                     f"No index was generated."
                 ),
                 artifact=None,
@@ -325,13 +487,10 @@ class LlmIndexer:
             work_unit.output_path, num_files, total_size,
         )
 
-        # Continuation of processing logic.
         prefixed_output_path = (
-            # Continuation of processing logic.
             input_prefix / work_unit.output_path
             if input_prefix
             else work_unit.output_path
-        # Continuation of processing logic.
         )
         # Determine the absolute path in the workspace for state operations.
         # Get the subdirectory indexes for the current epoch.
@@ -345,7 +504,6 @@ class LlmIndexer:
                 filtering_config=self._config.filtering_config,
             )
         else:
-            # Continuation of processing logic.
             subdirectory_indexes = {}
 
         if epoch > 0 and self._config.index_state.exist_summary(
@@ -372,6 +530,7 @@ class LlmIndexer:
                     is_partial=False,
                     subdirectory_indexes=subdirectory_indexes,
                     existing_index=existing_index,
+                    verifier=verifier,
                 )
                 # Convert the generated Pydantic artifact to its markdown representation.
                 markdown_result = rendering.to_markdown(doc)
@@ -399,7 +558,6 @@ class LlmIndexer:
             )
             return self.WorkUnitGenerationResult(
                 markdown_result=markdown_result
-                # Continuation of processing logic.
                 + self.generate_subcomponent_list_section(
                     directory_contents, work_unit.output_path
                 ),
@@ -413,7 +571,7 @@ class LlmIndexer:
             directory_contents, self._config.max_dir_size
         )
 
-        print(f"Processing {len(chunks)} chunks for {work_unit.output_path}")
+        logging.info(f"Processing {len(chunks)} chunks for {work_unit.output_path}")
 
         # Process each chunk and collect the generated indexes.
         chunk_docs: list[schema.IndexDocument | None] = [None] * len(chunks)
@@ -421,8 +579,11 @@ class LlmIndexer:
             max_workers=max_chunk_parallelization
         ) as executor:
             # Dispatch indexing tasks to the thread pool for each directory chunk.
-            future_to_chunk_id = {
-                executor.submit(
+            future_to_chunk_id = {}
+            for chunk_id, chunk in enumerate(chunks):
+                # Submit a separate thread task for each chunk to process
+                # the directory's split contents concurrently, maintaining isolation.
+                future = executor.submit(
                     self._generate_index_for_chunk,
                     directory_path=work_unit.output_path,
                     epoch=epoch,
@@ -431,23 +592,21 @@ class LlmIndexer:
                     subdirectory_indexes=subdirectory_indexes,
                     existing_index=existing_index,
                     is_partial=True,
-                # Continuation of processing logic.
-                ): chunk_id
-                for chunk_id, chunk in enumerate(chunks)
-            }
-
+                    verifier=verifier,
+                )
+                future_to_chunk_id[future] = chunk_id
             for future in concurrent.futures.as_completed(future_to_chunk_id):
                 chunk_id = future_to_chunk_id[future]
                 try:
                     # Capture the LLM response for each chunk.
                     chunk_docs[chunk_id] = future.result()
-                    print(
+                    logging.info(
                         f"Finished processing chunk {chunk_id} (out of {len(chunks)}) for"
                         f" {work_unit.output_path}"
                     )
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     # Handle individual chunk failures without aborting the entire unit.
-                    print(
+                    logging.error(
                         f"Failed processing chunk {chunk_id} for"
                         f" {work_unit.output_path}: {e}"
                     )
@@ -457,9 +616,7 @@ class LlmIndexer:
 
         try:
             # Re-synthesize the partial chunk summaries into a final coherent directory index.
-            merged_doc = self._config.summary_merger.merge(
-                chunk_docs, str(work_unit.output_path)
-            )
+            merged_doc = self._merge_with_retries(chunk_docs, work_unit, verifier)
             markdown_result = rendering.to_markdown(merged_doc)
             success = True
         except Exception as e:  # pylint: disable=broad-exception-caught

@@ -99,7 +99,6 @@ class Planner(PlannerBase):
         index_differ: IndexDifferProtocol | None = None,
         bundle_name: str | None = None,
         input_prefix_to_strip: str | Path | None = None,
-        # Continuation of processing logic.
         allowed_silos: frozenset[str] | None = None,
     ) -> None:
         """Initializes the planner."""
@@ -334,7 +333,6 @@ class Planner(PlannerBase):
 
         sorted_unique_dirs = sorted(
             unique_dirs.values(),
-            # Continuation of processing logic.
             key=lambda ds: len(ds.path.parts),
             reverse=True,
         )
@@ -347,9 +345,7 @@ class Planner(PlannerBase):
         )
 
         canonicalized_work_units = [
-            # Continuation of processing logic.
             self._canonicalize_work_unit(work_unit)
-            # Continuation of processing logic.
             for work_unit in aggregated_work_units
         ]
         logging.info(

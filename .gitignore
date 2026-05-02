@@ -4,6 +4,11 @@
 local_index_output/
 github_index_output/
 .index_output/
+local_outputs/
+llm_index*
+progress_epoch_*
+root_map_*
+verification_cache/
 __pycache__/
 *.pyc
 

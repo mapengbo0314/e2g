@@ -70,7 +70,6 @@ def parse_config(config_path: str) -> Any:
         except (OSError, FileNotFoundError) as exc:
             raise ValueError(f"Config file not found: {config_path}") from exc
 
-    # Continuation of processing logic.
     if text_format is None or not hasattr(bundle_pb2, "ProjectBundle"):
         raise ValueError(
             "Proto parsing is unavailable in the local reference environment."
@@ -122,7 +121,6 @@ def validate_bundle(bundle: Any) -> list[str]:
             errors.append(
                 f'Bundle {bundle.bundle_name} has input directory "{inp.directory}" '
                 "that starts with '//'. Please provide a relative google3 path."
-            # Continuation of processing logic.
             )
 
         if len(inp.research_guidance) > 1000:
@@ -135,9 +133,7 @@ def validate_bundle(bundle: Any) -> list[str]:
     if len(bundle.custom_sections) > 5:
         errors.append(
             f"Bundle {bundle.bundle_name} has too many custom sections "
-            # Continuation of processing logic.
             f"({len(bundle.custom_sections)}). Maximum allowed is 5."
-        # Continuation of processing logic.
         )
 
     # Iterate through each custom section to ensure valid configuration.
@@ -159,7 +155,6 @@ def validate_bundle(bundle: Any) -> list[str]:
                 f'Bundle {bundle.bundle_name} custom section "{cs.title}" has no prompt.'
             )
         elif len(cs.prompt) > 5000:
-            # Continuation of processing logic.
             errors.append(
                 f'Bundle {bundle.bundle_name} custom section "{cs.title}" prompt '
                 f"exceeds the limit of 5000 characters (current length: "
@@ -173,7 +168,6 @@ def check_bundle_size(
     bundle: Any,
     client: Any,
     max_loc: int = 10_000_000,
-# Continuation of processing logic.
 ) -> tuple[int | None, list[str]]:
     """Checks the estimated size of the bundle using F1.
 
@@ -220,7 +214,6 @@ def check_bundle_size(
                 }
             )
 
-        # Continuation of processing logic.
         dir_loc = 0
         try:
             iterator = getattr(response, "GetResultsIterator", lambda: None)()
@@ -285,7 +278,6 @@ def check_bundle_size(
         for directory, loc in heapq.nlargest(
             50, dir_locs.items(), key=lambda item: item[1]
         ):
-            # Continuation of processing logic.
             breakdown.append(f"{directory}: {loc:,}")
         # Report the top 50 largest directories to help with bundle optimization.
         failure_msg += "\nTop directories by LoC:\n" + "\n".join(breakdown)
@@ -314,5 +306,4 @@ def verify_git_input(bundle: Any, cl_description: str) -> list[str]:
                 "'GIT_INPUT_INDEX_MANUALLY_GENERATED=true' to your CL description "
                 "once the index has been generated."
             )
-    # Continuation of processing logic.
     return errors

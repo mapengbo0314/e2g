@@ -24,7 +24,6 @@ if pydantic is None:  # pragma: no cover
                 setattr(self, key, value)
 
         def model_dump(self):
-            # Continuation of processing logic.
             return dict(self.__dict__)
 
     def _field(default=None, default_factory=None, description: str = ""):
@@ -76,7 +75,6 @@ class VerificationIssue(_BaseModel):
         description="Human-readable description of the issue."
     )
     section: Optional[str] = _field(
-        # Continuation of processing logic.
         default=None,
         description="The schema section where the issue was found (e.g., 'overview', 'key_dependencies')."
     )
@@ -101,7 +99,6 @@ class VerificationVerdict(_BaseModel):
     issues: List[str] = _field(
         default_factory=list,
         description=(
-            # Continuation of processing logic.
             "List of human-readable issue descriptions. These are injected "
             "directly into retry prompts so the LLM knows exactly why it failed."
         ),
@@ -112,9 +109,11 @@ class VerificationVerdict(_BaseModel):
     )
     decision: str = _field(
         default="publish",
-        # Continuation of processing logic.
         description="The publication decision: 'publish', 'retry', or 'fail'.",
-    # Continuation of processing logic.
+    )
+    verification_model: Optional[str] = _field(
+        default=None,
+        description="The model used for verification.",
     )
 
     @classmethod
@@ -132,7 +131,6 @@ class VerificationVerdict(_BaseModel):
     @classmethod
     def failure(
         cls,
-        # Continuation of processing logic.
         issues: List[str],
         detailed_issues: Optional[List[VerificationIssue]] = None,
         can_retry: bool = True,
@@ -159,7 +157,6 @@ class VerificationVerdict(_BaseModel):
                     severity=IssueSeverity.CRITICAL.value,
                     description=error_message,
                 )
-            # Continuation of processing logic.
             ],
             decision=PublicationDecision.RETRY.value,
         )

@@ -243,11 +243,29 @@ class DeepDiveDocument(_BaseModel):
     # Wrapper for the core deep dive section.
     deep_dive: DeepDive
 
+    # Optional fields to capture 'leaky' LLM responses from weaker models.
+    overview: Optional[Overview] = None
+    key_individual_components: Optional[KeyIndividualComponents] = None
+    key_interfaces: Optional[KeyInterfaces] = None
+    key_dependencies: Optional[KeyDependencies] = None
+    architectural_patterns_and_gotchas: Optional[ArchitecturalPatternsAndGotchas] = None
+    testing_strategy: Optional[TestingStrategy] = None
+    configurations: Optional[Configurations] = None
+
 
 class OverviewDocument(_BaseModel):
     """Output of the Overview agent."""
 
     overview: Overview
+
+    # Optional fields to capture 'leaky' LLM responses.
+    deep_dive: Optional[DeepDive] = None
+    key_individual_components: Optional[KeyIndividualComponents] = None
+    key_interfaces: Optional[KeyInterfaces] = None
+    key_dependencies: Optional[KeyDependencies] = None
+    architectural_patterns_and_gotchas: Optional[ArchitecturalPatternsAndGotchas] = None
+    testing_strategy: Optional[TestingStrategy] = None
+    configurations: Optional[Configurations] = None
 
 
 # ---------------------------------------------------------------------------
@@ -307,6 +325,10 @@ class VerificationState(_BaseModel):
     issues: List[str] = _field(
         default_factory=list,
         description="Issues found during verification (empty if passed).",
+    )
+    is_empty_bypass: bool = _field(
+        default=False,
+        description="True if this index bypassed LLM generation because the directory was empty.",
     )
 
 

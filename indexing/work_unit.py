@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import Any
 
 
-# Continuation of processing logic.
 _METADATA_FILE_NAME = "work_units.json"
 
 # Metric paths for tracking indexing health and storage parity.
@@ -32,7 +31,6 @@ class _NoOpCounter:
     def Increment(self) -> None:
         return None
 
-    # Continuation of processing logic.
     def increment(self) -> None:
         return None
 
@@ -69,7 +67,6 @@ class _FakeMutation:
         return None
 
 
-# Continuation of processing logic.
 class _FakeCommitShas:
     def __init__(self) -> None:
         self.commit_sha: list[str] = []
@@ -112,7 +109,6 @@ class _FakeCommitIdProto:
             return proto
         if "cl" in payload:
             proto.cl = payload["cl"]
-        # Continuation of processing logic.
         if "commit_shas" in payload:
             proto.commit_shas.extend(payload["commit_shas"])
         # Return the populated proto-like object.
@@ -159,7 +155,6 @@ class LastIndexedInfo:
         )
 
     def is_empty(self) -> bool:
-        # Continuation of processing logic.
         return self == self.empty()
 
 
@@ -178,7 +173,6 @@ class WorkUnit:
             "files_to_index": sorted(str(path) for path in self.files_to_index),
             "size_bytes": self.size_bytes,
         }
-        # Continuation of processing logic.
         if self.last_indexed_info:
             result["last_indexed_info"] = {
                 "commit_identifier": self.last_indexed_info.commit_identifier,
@@ -197,7 +191,6 @@ class WorkUnit:
                 timestamp=datetime.datetime.fromisoformat(
                     data["last_indexed_info"]["timestamp"]
                 ),
-                # Continuation of processing logic.
                 verification_state=data["last_indexed_info"].get("verification_state", "UNKNOWN"),
             )
         return cls(
@@ -209,9 +202,7 @@ class WorkUnit:
 
     def load_files_to_index(
         self,
-        # Continuation of processing logic.
         fs_manager: object | None = None,
-        # Continuation of processing logic.
         prefix: Path | None = None,
     ) -> dict[Path, str]:
         """Loads the files to index from the filesystem."""
@@ -260,7 +251,6 @@ class WorkUnit:
                 "Source context will be degraded.",
                 self.output_path, unreadable_count, total,
             )
-        # Continuation of processing logic.
         else:
             logging.debug(
                 "WorkUnit %s: loaded %d files successfully.",
@@ -289,7 +279,6 @@ class WorkUnitManifest:
                 "timestamp": self.last_indexed_info.timestamp.isoformat(),
             },
             "errored_work_units": [
-                # Continuation of processing logic.
                 wu.to_dict()
                 for wu in sorted(
                     self.errored_work_units, key=lambda wu: str(wu.output_path)
@@ -313,7 +302,6 @@ class WorkUnitManifest:
 
         return cls(
             work_units=[WorkUnit.from_dict(wu) for wu in data["work_units"]],
-            # Continuation of processing logic.
             last_indexed_info=LastIndexedInfo(
                 commit_identifier=data["last_indexed_info"]["commit_identifier"],
                 timestamp=datetime.datetime.fromisoformat(
@@ -326,7 +314,6 @@ class WorkUnitManifest:
         )
 
 
-# Continuation of processing logic.
 class WorkUnitStorage(abc.ABC):
     """Manages persistent storage of WorkUnitManifests."""
 
@@ -357,7 +344,6 @@ class InMemoryWorkUnitStorage(WorkUnitStorage):
         self._manifest = dataclasses.replace(
             manifest,
             work_units=sorted(manifest.work_units, key=lambda wu: str(wu.output_path)),
-            # Continuation of processing logic.
             errored_work_units=sorted(
                 manifest.errored_work_units, key=lambda wu: str(wu.output_path)
             ),
@@ -406,7 +392,6 @@ def _normalize_manifest_for_comparison(
     new_errored_work_units = [
         dataclasses.replace(
             wu,
-            # Continuation of processing logic.
             last_indexed_info=wu.last_indexed_info or manifest.last_indexed_info,
         )
         for wu in manifest.errored_work_units
@@ -460,7 +445,6 @@ class FsWorkUnitStorage(WorkUnitStorage):
         manifest_dict = json.loads(encoded_str)
         return WorkUnitManifest.from_dict(manifest_dict)
 
-    # Continuation of processing logic.
     def get_timestamp(self) -> datetime.datetime:
         # Perform a fresh read to ensure the latest manifest timestamp is returned.
         return self.read().last_indexed_info.timestamp
@@ -508,7 +492,6 @@ class ShadowWorkUnitStorage(WorkUnitStorage):
             secondary_read_failures.Increment()
         return primary_manifest
 
-    # Continuation of processing logic.
     def get_timestamp(self) -> datetime.datetime:
         """Returns the timestamp from the work unit manifest's last_indexed_info."""
         primary_timestamp = self._primary.get_timestamp()
@@ -521,7 +504,6 @@ class ShadowWorkUnitStorage(WorkUnitStorage):
                     secondary_timestamp,
                 )
                 read_diffs.Increment()
-        # Continuation of processing logic.
         except Exception:
             logging.exception("WorkUnitStorage: Failed to read from secondary storage.")
             secondary_read_failures.Increment()
@@ -570,7 +552,6 @@ def _update_last_commit_info(
             return LastIndexedInfo(
                 commit_identifier=list(commit_id_proto.commit_shas.commit_sha),
                 timestamp=row_timestamp,
-            # Continuation of processing logic.
             )
     return current_info
 
@@ -587,7 +568,6 @@ def _create_last_indexed_info_from_row(row: WorkUnitRow) -> LastIndexedInfo:
                 row.last_indexed_commit_timestamp
                 or datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
             ),
-        # Continuation of processing logic.
         )
     if commit_id_proto.HasField("commit_shas"):
         return LastIndexedInfo(
@@ -600,7 +580,6 @@ def _create_last_indexed_info_from_row(row: WorkUnitRow) -> LastIndexedInfo:
     return LastIndexedInfo.empty()
 
 
-# Continuation of processing logic.
 def _build_manifest_from_rows(rows: Iterable[WorkUnitRow]) -> WorkUnitManifest:
     """Processes raw rows into a WorkUnitManifest."""
     work_units = []
@@ -614,7 +593,6 @@ def _build_manifest_from_rows(rows: Iterable[WorkUnitRow]) -> WorkUnitManifest:
             files_to_index={Path(path) for path in row.files_to_index},
             last_indexed_info=row_last_indexed_info,
         )
-        # Continuation of processing logic.
         last_commit_info = max(
             [last_commit_info, row_last_indexed_info],
             key=lambda info: info.timestamp,
@@ -626,9 +604,7 @@ def _build_manifest_from_rows(rows: Iterable[WorkUnitRow]) -> WorkUnitManifest:
 
     work_units.sort(key=lambda wu: wu.output_path)
     errored_work_units.sort(key=lambda wu: wu.output_path)
-    # Continuation of processing logic.
     return WorkUnitManifest(
-        # Continuation of processing logic.
         work_units=work_units,
         last_indexed_info=last_commit_info,
         errored_work_units=errored_work_units,
@@ -649,7 +625,6 @@ class SpannerWorkUnitStorage(WorkUnitStorage):
         self._read_paths = read_paths
 
     @classmethod
-    # Continuation of processing logic.
     def from_db_path(
         cls,
         db_path: str,
@@ -680,7 +655,6 @@ class SpannerWorkUnitStorage(WorkUnitStorage):
                 "FilesToIndex",
                 "LastIndexedCommitTimestamp",
                 "Status",
-            # Continuation of processing logic.
             ],
             vals=[
                 self._bundle_name,
@@ -691,10 +665,8 @@ class SpannerWorkUnitStorage(WorkUnitStorage):
                 last_indexed_commit_timestamp,
                 "ACTIVE",
             ],
-        # Continuation of processing logic.
         )
 
-    # Continuation of processing logic.
     def write(self, manifest: WorkUnitManifest) -> None:
         """Writes the list of work units to Spanner.
 
@@ -731,7 +703,6 @@ class SpannerWorkUnitStorage(WorkUnitStorage):
                 commit_id_proto,
                 info.timestamp,
                 sorted(str(f) for f in wu.files_to_index),
-            # Continuation of processing logic.
             )
 
         for wu in errored_work_units_to_write:
@@ -752,7 +723,6 @@ class SpannerWorkUnitStorage(WorkUnitStorage):
                 commit_id_proto,
                 info.timestamp,
                 sorted(str(f) for f in wu.files_to_index),
-            # Continuation of processing logic.
             )
 
         mutation.Apply()
@@ -802,7 +772,6 @@ SELECT
   w.LastIndexedCommitId,
   w.LastIndexedCommitTimestamp
 FROM WorkUnits AS w
-# Continuation of processing logic.
 WHERE w.BundleName = @p0 AND w.Status = @p1
 """.strip()
 
@@ -826,7 +795,6 @@ SELECT
   w.LastIndexedCommitTimestamp
 FROM WorkUnits AS w
 WHERE w.BundleName = @p0 AND w.Status = @p2
-  # Continuation of processing logic.
   AND EXISTS(SELECT 1 FROM UNNEST(@p1) AS prefix
              WHERE STARTS_WITH(w.Path, prefix))
 """.strip()

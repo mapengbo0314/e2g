@@ -19,6 +19,7 @@ class IndexerErrorPromptGenerator:
             "You MUST fix the following errors in your next response. Do not hallucinate claims.\n\n"
         )
         
+        is_schema_failure = False
         if issues:
             # Check if any issues look like schema violations (syntactic)
             is_schema_failure = any("Schema violation" in str(i) or "Syntactic" in str(i) for i in issues)

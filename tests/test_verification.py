@@ -15,7 +15,7 @@ class FakeLlmPrompter:
         self.verdict = verdict
         self.calls = 0
 
-    def verify_artifact(self, artifact_json: str, source_context: str) -> verification_types.VerificationVerdict:
+    def verify_artifact(self, artifact_json: str, source_context: str, is_merger_mode: bool = False) -> verification_types.VerificationVerdict:
         self.calls += 1
         return self.verdict
 

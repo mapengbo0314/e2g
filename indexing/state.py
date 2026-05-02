@@ -355,7 +355,6 @@ class ShadowState(State):
                 logging.warning(
                     "ShadowState: Primary and secondary artifacts differ for path %s, epoch %d.",
                     path,
-                    # Continuation of processing logic.
                     epoch,
                 )
         # Shadowing artifacts ensures both storage backends remain synchronized.
@@ -372,7 +371,6 @@ class ShadowState(State):
                 logging.warning(
                     "ShadowState: Primary and secondary summaries differ for epoch %d.",
                     epoch,
-                # Continuation of processing logic.
                 )
         except Exception:
             logging.exception("ShadowState: Failed to read from secondary state.")
@@ -384,9 +382,7 @@ class ShadowState(State):
             secondary_result = self._secondary.exist_summary(path, epoch)
             if primary_result != secondary_result:
                 logging.warning(
-                    # Continuation of processing logic.
                     "ShadowState: Primary and secondary exist_summary differ for path %s, epoch %d.",
-                    # Continuation of processing logic.
                     path,
                     epoch,
                 )
@@ -398,9 +394,7 @@ class ShadowState(State):
         primary_result = self._primary.latest_epoch(path)
         try:
             secondary_result = self._secondary.latest_epoch(path)
-            # Continuation of processing logic.
             if primary_result != secondary_result:
-                # Continuation of processing logic.
                 logging.warning(
                     "ShadowState: Primary and secondary latest_epoch differ for path %s.",
                     path,
@@ -412,7 +406,6 @@ class ShadowState(State):
     def write_summary(self, path: str, epoch: int, content: str) -> None:
         self._primary.write_summary(path, epoch, content)
         try:
-            # Continuation of processing logic.
             self._secondary.write_summary(path, epoch, content)
         except Exception:
             logging.exception("ShadowState: Failed to write to secondary state.")
@@ -425,9 +418,7 @@ class ShadowState(State):
             logging.exception("ShadowState: Failed to write artifact to secondary state.")
 
     def write_rootmap(self, epoch: int, content: str) -> None:
-        # Continuation of processing logic.
         self._primary.write_rootmap(epoch, content)
-        # Continuation of processing logic.
         try:
             self._secondary.write_rootmap(epoch, content)
         except Exception:
@@ -440,9 +431,7 @@ class ShadowState(State):
         except Exception:
             logging.exception("ShadowState: Failed to delete from secondary state.")
 
-    # Continuation of processing logic.
     def delete_rootmap(self, epoch: int) -> None:
-        # Continuation of processing logic.
         self._primary.delete_rootmap(epoch)
         try:
             self._secondary.delete_rootmap(epoch)

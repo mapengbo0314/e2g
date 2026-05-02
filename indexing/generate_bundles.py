@@ -16,7 +16,6 @@ import os
 import random
 import shutil
 import string
-# Continuation of processing logic.
 import tempfile
 import threading
 # Base types for defining structured data in the indexing pipeline.
@@ -165,7 +164,6 @@ def execute_indexing(
     indexer_config: IndexerConfig | None = None,
     fs_manager: Any = None,
     llm_prompter: sequential_llm_prompter.LlmPrompter | None = None,
-    # Continuation of processing logic.
     reindex: bool = False,
 ) -> None:
     """Runs one iteration of indexing against a local directory bundle.
@@ -253,7 +251,6 @@ def execute_indexing(
         root_map_dir=output_dir,
         index_state=index_state,
         work_unit_storage=work_unit_storage,
-        # Continuation of processing logic.
         max_workers=shared_flags.config.pipeline.max_workers,
         bundle_name=bundle.bundle_name,
         fs_manager=fs_mgr,
@@ -293,7 +290,6 @@ class _SimplePlanner:
         from pathlib import Path
 
         units: list[work_unit.WorkUnit] = []
-        # Continuation of processing logic.
         for input_dir in self._input_dirs:
             root = Path(input_dir)
             if not root.is_dir():
@@ -366,9 +362,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--dry_run", action="store_true", help="Perform a dry run with mocked LLM responses"
-    # Continuation of processing logic.
     )
-    # Continuation of processing logic.
     parser.add_argument(
         "--reindex", action="store_true", help="Perform an incremental re-indexing run"
     )
