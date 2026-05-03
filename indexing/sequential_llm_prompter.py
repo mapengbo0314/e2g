@@ -173,7 +173,7 @@ class GeminiLlmPrompterConfig:
     """Configuration for the LLM prompter."""
 
     bundle_name: str
-    throttling_strategy: Any
+    throttling_strategy: Any = None
     indexer_type: str = "REGULAR"
     research_gemini_model: str = "gemini-1.5-flash"
     synthesis_gemini_model: str = "gemini-1.5-flash"
@@ -257,6 +257,8 @@ class _SimpleConversation:
             return self.output_schema_type(passed=True, issues=[])
         # Default fallback to an empty instance of the schema type.
         if self.output_schema_type is None:
+            if self.agent_name in ("reviewer", "verifier"):
+                return {"passed": True, "issues": [], "review_findings": []}
             return f"Mock response for {self.agent_name}: {user_prompt[:50]}..."
         return self.output_schema_type()
 

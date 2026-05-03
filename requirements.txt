@@ -6,3 +6,4 @@ tenacity==8.2.3
 openai
 anthropic
 ollama
+langgraph

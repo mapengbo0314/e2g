@@ -27,6 +27,10 @@ def acquire_lock(workspace_root: str):
         sys.exit(1)
 
 def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
     parser = argparse.ArgumentParser(description="Unified AI Harness CLI")
     parser.add_argument("--prompt", type=str, help="The user prompt to execute.")
     parser.add_argument("--thread-id", type=str, default="default", help="The LangGraph thread ID to resume or start.")
@@ -34,7 +38,7 @@ def main():
     parser.add_argument("--mcp", action="store_true", help="Run the MCP stdio server instead of the agent graph.")
     args = parser.parse_args()
 
-    lock_fd = acquire_lock(".harness.lock")
+    lock_fd = acquire_lock(".")
 
     try:
         if args.mcp:

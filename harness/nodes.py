@@ -70,7 +70,7 @@ class HarnessNodes:
 
     def adversarial_verifier_node(self, state: HarnessState) -> Dict[str, Any]:
         """Adversarial Verifier node: Audits the architect's plan (Goldfish Protocol)."""
-        response = self._call_llm("adversarial_verifier", state)
+        response = self._call_llm("adversary", state)
         # Check for flaws. Mocking "low" risk.
         return {
             "logical_flaws": [],
@@ -95,8 +95,11 @@ class HarnessNodes:
         review_findings = []
         try:
             parsed = json.loads(response)
-            passed = parsed.get("passed", False)
-            review_findings = parsed.get("review_findings", [])
+            if isinstance(parsed, dict):
+                passed = parsed.get("passed", False)
+                review_findings = parsed.get("review_findings", [])
+            else:
+                review_findings = [{"issue": "Reviewer response was not a JSON object."}]
         except json.JSONDecodeError:
             review_findings = [{"issue": "Failed to parse reviewer response as JSON."}]
             
@@ -123,8 +126,11 @@ class HarnessNodes:
         issues = []
         try:
             parsed = json.loads(response)
-            passed = parsed.get("passed", False)
-            issues = parsed.get("issues", [])
+            if isinstance(parsed, dict):
+                passed = parsed.get("passed", False)
+                issues = parsed.get("issues", [])
+            else:
+                issues = ["Verifier response was not a JSON object."]
         except json.JSONDecodeError:
             issues = ["Failed to parse verifier response as JSON."]
             
