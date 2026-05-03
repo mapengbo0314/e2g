@@ -26,14 +26,14 @@ Focus: Co-design and grounding.
 -   **Detail**: [phase_1_design_discussion.md](file:///Users/pengbolicious/pengbo-apps/e-2-g/_agents/rules/phases/phase_1_design_discussion.md)
 
 ### Phase 2: Writing the Design Doc
-Focus: Establishing the "Source of Truth".
--   **Step**: Section-by-section generation (Problem, Plan, Alternatives, Detailed Implementation).
+Focus: Establishing the "Source of Truth" with embedded readiness assertions.
+-   **Step**: Section-by-section generation (Problem, Plan, Alternatives, Detailed Implementation, **Sphinch Marks**).
 -   **Roles**: Architect, Technical Writer.
 -   **Detail**: [phase_2_design_doc.md](file:///Users/pengbolicious/pengbo-apps/e-2-g/_agents/rules/phases/phase_2_design_doc.md)
 
 ### Phase 3: The "Goldfish" Review Protocol
-Focus: Hallucination-free verification via "clean slate" memory.
--   **Step**: Comprehension Test, Critic Review, Implementation Readiness.
+Focus: Convergent verification via sphinch mark pass/fail checks (replaces open-ended critique).
+-   **Step**: Comprehension Test, **Sphinch Mark Verification**, Implementation Readiness.
 -   **Roles**: Goldfish (Fresh Agent), Adversarial Verifier.
 -   **Detail**: [phase_3_goldfish_protocol.md](file:///Users/pengbolicious/pengbo-apps/e-2-g/_agents/rules/phases/phase_3_goldfish_protocol.md)
 
