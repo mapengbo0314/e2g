@@ -34,58 +34,29 @@ WorkUnit = work_unit_lib.WorkUnit
 _MAX_WORK_UNITS_TO_PROCESS = 5000
 
 
-# ---------- Minimal stubs for removed upstream deps ----------
+# Cleaned Observability for Antigravity
+class Observer:
+    """Minimal interface for tracking metrics and progress."""
+    def __init__(self):
+        self.counters = collections.defaultdict(int)
+    def increment(self, name: str, value: int = 1):
+        self.counters[name] += value
+    def increment_counter(self, name: str, value: int = 1):
+        """Compatibility alias for orchestrator calls."""
+        self.counters[name] += value
+    def reset_counter(self, name: str):
+        self.counters[name] = 0
+    def set_gauge(self, name: str, value: Any):
+        pass
 
-class _NoOpCounter:
-    def increment(self, *args: Any, **kwargs: Any) -> None:
-        return None
+_observer = Observer()
 
-    def Increment(self, *args: Any, **kwargs: Any) -> None:  # noqa: N802
-        return None
-
-    def Set(self, *args: Any, **kwargs: Any) -> None:  # noqa: N802
-        return None
-
-
-class _Metrics:
-    WORK_UNITS_PROCESSED = _NoOpCounter()
-    GENERAL_FAILURE = _NoOpCounter()
-    GENERAL_FAILURES = _NoOpCounter()
-    WORK_UNITS_TO_PROCESS = _NoOpCounter()
-
-    # Define status enumerations for pipeline monitoring.
-    class Status:
-        SUCCESS = type("Status", (), {"value": "SUCCESS"})()
-        FAILURE = type("Status", (), {"value": "FAILURE"})()
-
-    class IndexerType:
-        REGULAR = type("IndexerType", (), {"value": "REGULAR"})()
-
-
-metrics = _Metrics()
-
-
-class _SimpleStatsRecorder:
-    def __init__(self) -> None:
-        self._counters: dict[str, int] = {}
-        self._gauges: dict[str, Any] = {}
-
-    def increment_counter(self, name: str, value: int = 1) -> None:
-        self._counters[name] = self._counters.get(name, 0) + value
-
-    def reset_counter(self, name: str) -> None:
-        self._counters[name] = 0
-
-    # Gauge operations for tracking current state values.
-    def set_gauge(self, name: str, value: Any) -> None:
-        self._gauges[name] = value
-
-
-_stats_instance = _SimpleStatsRecorder()
-
+# Unified observability alias
+metrics = _observer
+_stats_instance = _observer
 
 class _SimpleProgressManager:
-    """Stand-in for the upstream ProgressManager."""
+    """Manages epoch-level progress persistence with fcntl locking."""
 
     def __init__(self, root_map_dir: str, fs_manager: Any) -> None:
         self._root_map_dir = root_map_dir
@@ -94,9 +65,11 @@ class _SimpleProgressManager:
         self._lock = threading.Lock()
 
     def get_progress_file(self, epoch: int) -> str:
+        """Returns the path to the progress log for the given epoch."""
         return f"{self._root_map_dir}/progress_epoch_{epoch}.jsonl"
 
     def read_progress(self, epoch: int) -> dict[str, str]:
+        """Reads completed work units from the JSONL log with shared locking."""
         import json, os, fcntl
         path = self.get_progress_file(epoch)
         progress = {}
@@ -104,6 +77,7 @@ class _SimpleProgressManager:
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
                     try:
+                        # Shared lock allows concurrent readers but blocks writers.
                         fcntl.flock(f, fcntl.LOCK_SH)
                         for line in f:
                             if not line.strip(): continue
@@ -117,6 +91,7 @@ class _SimpleProgressManager:
         return progress
 
     def write_progress(self, epoch: int, data: dict[str, str]) -> None:
+        """Initializes or overwrites the progress log with exclusive locking."""
         import json, os, fcntl
         path = self.get_progress_file(epoch)
         with self._lock:
@@ -129,11 +104,12 @@ class _SimpleProgressManager:
                     fcntl.flock(f, fcntl.LOCK_UN)
 
     def mark_work_unit_completed(self, output_path: str, epoch: int) -> None:
+        """Appends a completion record to the log. Triggers compaction if log > 1MB."""
         import json, os, fcntl
         path = self.get_progress_file(epoch)
         with self._lock:
-            # Check if we should compact before appending
-            if os.path.exists(path) and os.path.getsize(path) > 1024 * 1024: # 1MB
+            # Compact log to prevent O(N^2) growth from redundant appends.
+            if os.path.exists(path) and os.path.getsize(path) > 1024 * 1024:
                  self._compact_jsonl(epoch)
 
             with open(path, "a", encoding="utf-8") as f:
@@ -277,7 +253,7 @@ class Orchestrator:
         self._generate_root_map = generate_root_map
         self._perform_fs_checkpointing = perform_fs_checkpointing
         # Set the default indexer type if not provided by the caller.
-        self._indexer_type = indexer_type or metrics.IndexerType.REGULAR
+        self._indexer_type = indexer_type or "REGULAR"
 
         # Standardize the root map directory path.
         self._root_map_dir = self._fs_manager.normpath(root_map_dir)
@@ -301,92 +277,91 @@ class Orchestrator:
     def _run_epoch(
         self, work_units: Sequence[WorkUnit], epoch: int
     ) -> dict[str, bool]:
-        """Runs a single indexing epoch, aggregating small directories.
-
-        The indexing process is iterative. In each epoch, the orchestrator:
-        1. Determines which work units require indexing or reindexing based on file
-           changes, if reindexing is enabled.
-        2. Processes work units in parallel, starting from the deepest directories
-           and moving upwards.
-        3. For each work unit, it calls an LlmIndexer to generate an index file.
-        4. After processing all work units in an epoch, it regenerates the root
-           map, which summarizes the indexes generated in that epoch.
-
-        Args:
-            work_units: A sequence of WorkUnits objects to be processed in this epoch.
-            epoch: the current epoch number (0-indexed).
-
-        Returns:
-            A dictionary of work unit paths to whether the work unit was processed
-            successfully.
-        """
+        """Runs a single indexing epoch, parallelizing by directory depth."""
+        
+        # 1. Update epoch-level observability gauges.
         _stats_instance.set_gauge(
             f"{self._bundle_name}.current_epoch", f"{epoch + 1}/{self._num_epochs}"
         )
-        _stats_instance.reset_counter(f"{self._bundle_name}.epoch.dirs.processed")
-        _stats_instance.reset_counter(
-            f"{self._bundle_name}.epoch.work_units.processed"
-        )
+        
+        # 2. Filter out work units that were completed in previous runs of this epoch
+        # or are skipped due to incremental indexing (IndexDiffer).
+        work_units_to_process = self._get_effective_work_units(work_units, epoch)
+        
+        if not work_units_to_process:
+            logging.info("Epoch %d: No work units to index.", epoch)
+            return {}
 
-        # Process all work units and take care of progress tracker later.
+        # 3. Group units by depth so we index bottom-up (leaves before roots).
+        work_units_by_depth = self._group_by_depth(work_units_to_process)
+        sorted_depths = sorted(work_units_by_depth.keys(), reverse=True)
+        
+        results: dict[str, bool] = {}
+
+        # 4. Execute processing in a thread pool, bounded by directory depth layers.
+        # This layer-by-layer execution ensures parents have child summaries available.
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self._max_workers
+        ) as executor:
+            for depth in sorted_depths:
+                layer_results = self._execute_depth_layer(
+                    executor, work_units_by_depth[depth], epoch
+                )
+                results.update(layer_results)
+
+        return results
+
+    def _get_effective_work_units(self, work_units: Sequence[WorkUnit], epoch: int) -> list[WorkUnit]:
+        """Filters work units based on change detection and checkpointed progress."""
         initial_count = len(work_units)
         work_units_to_process = list(work_units)
 
-        # If reindexing is enabled, we determine which directories actually need an update.
+        # Apply Incremental Indexing (IndexDiffer) if strategy is provided.
         if self._change_detection_strategy and epoch == 0:
             differ = reindexing.IndexDiffer(
                 fs_manager=self._fs_manager,
                 work_unit_storage=self._work_unit_storage,
                 change_detection_strategy=self._change_detection_strategy
             )
-            # Filter work units based on content changes since the last recorded commit.
             diff = differ.get_work_units_to_reindex(work_units)
             work_units_to_process = list(diff.to_reindex)
             logging.info(
                 "Epoch %d: Incremental indexing filtered %d -> %d work units.",
-                epoch, len(work_units), len(work_units_to_process)
+                epoch, initial_count, len(work_units_to_process)
             )
 
-        if self._perform_fs_checkpointing:
-            progress_file = self._progress_manager.get_progress_file(epoch)
-            if self._fs_manager.exists(progress_file):
-                logging.info(
-                    "Epoch %d: Progress file exists, loading progress file.", epoch
-                )
-                epoch_progress = self._progress_manager.read_progress(epoch)
-                # Filter out work units that were successfully processed in a previous interrupted run.
-                work_units_to_process = [
-                    wu for wu in work_units_to_process
-                    if epoch_progress.get(str(wu.output_path)) != "COMPLETED"
-                ]
-                _stats_instance.increment_counter(
-                    f"{self._bundle_name}.epoch.work_units.processed",
-                    initial_count - len(work_units_to_process),
-                )
-            else:
-                # Initialize a fresh progress tracker for the current epoch.
-                epoch_progress_to_write = {
-                    str(wu.output_path): "PENDING" for wu in work_units_to_process
-                }
-                self._progress_manager.write_progress(epoch, epoch_progress_to_write)
+        if not self._perform_fs_checkpointing:
+            return work_units_to_process
 
-        _stats_instance.set_gauge(
-            f"{self._bundle_name}.epoch.work_units.total", len(work_units)
-        )
+        progress_file = self._progress_manager.get_progress_file(epoch)
+        if self._fs_manager.exists(progress_file):
+            logging.info("Epoch %d: Loading checkpointed progress.", epoch)
+            epoch_progress = self._progress_manager.read_progress(epoch)
+            
+            # Final filter: skip COMPLETED paths from previous interruptions.
+            work_units_to_process = [
+                wu for wu in work_units_to_process
+                if epoch_progress.get(str(wu.output_path)) != "COMPLETED"
+            ]
+            _stats_instance.increment(
+                f"{self._bundle_name}.epoch.work_units.processed",
+                initial_count - len(work_units_to_process),
+            )
+        else:
+            # Initialize fresh progress log.
+            epoch_progress_to_write = {
+                str(wu.output_path): "PENDING" for wu in work_units_to_process
+            }
+            self._progress_manager.write_progress(epoch, epoch_progress_to_write)
 
-        if not work_units_to_process:
-            logging.info("Epoch %d: No work units to index.", epoch)
-            return {}
+        _stats_instance.set_gauge(f"{self._bundle_name}.epoch.work_units.total", len(work_units))
+        return work_units_to_process
 
-        logging.info(
-            "Epoch %d: Found %d work units to process.",
-            epoch,
-            len(work_units_to_process),
-        )
-
-        # Group work units by path depth to process deepest first.
+    def _group_by_depth(self, work_units: Sequence[WorkUnit]) -> dict[int, list[WorkUnit]]:
+        """Calculates path depth and groups work units for ordered execution."""
         work_units_by_depth: dict[int, list[WorkUnit]] = collections.defaultdict(list)
-        for wu in work_units_to_process:
+        for wu in work_units:
+            # We normalize the path and count segments to determine tree depth.
             depth = len([
                 part
                 for part in self._fs_manager.normpath(str(wu.output_path)).split(
@@ -395,52 +370,38 @@ class Orchestrator:
                 if part and part != "."
             ])
             work_units_by_depth[depth].append(wu)
+        return work_units_by_depth
 
-        # Sort depths in reverse (descending) order to ensure subdirectories are indexed 
-        # before their parent directories, providing context for parent summaries.
-        sorted_depths = sorted(work_units_by_depth.keys(), reverse=True)
+    def _execute_depth_layer(
+        self, 
+        executor: concurrent.futures.ThreadPoolExecutor, 
+        units: list[WorkUnit], 
+        epoch: int
+    ) -> dict[str, bool]:
+        """Executes a single horizontal slice of the directory tree in parallel."""
+        logging.info("Epoch %d: Processing %d units at layer.", epoch, len(units))
+        
+        futures: dict[str, concurrent.futures.Future[bool]] = {
+            str(wu.output_path): executor.submit(self._process_work_unit, wu, epoch)
+            for wu in units
+        }
+
         results: dict[str, bool] = {}
+        exceptions_raised: list[Exception] = []
+        
+        for work_unit_path, future in futures.items():
+            try:
+                results[work_unit_path] = future.result()
+            except Exception as e:
+                # Critical Fail-Fast: if any unit in the layer fails, we abort the epoch.
+                logging.error("Layer Failure at %s: %s", work_unit_path, e)
+                exceptions_raised.append(e)
+                for f in futures.values():
+                    f.cancel()
 
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self._max_workers
-        ) as executor:
-            for depth in sorted_depths:
-                units_to_process = work_units_by_depth[depth]
-                logging.info(
-                    "Epoch %d: Processing %d work units of depth %d.",
-                    epoch,
-                    len(units_to_process),
-                    depth,
-                )
-
-                futures: dict[str, concurrent.futures.Future[bool]] = {
-                    str(wu.output_path): executor.submit(
-                        self._process_work_unit, wu, epoch
-                    )
-                    for wu in units_to_process
-                }
-
-                exceptions_raised: list[Exception] = []
-                for work_unit_path, future in futures.items():
-                    try:
-                        # Collect result and update the local results map.
-                        results[work_unit_path] = future.result()
-                    except Exception as e:
-                        # Fail-Fast: Log error and cancel all pending futures for this epoch.
-                        logging.error(
-                            "Error processing %s in epoch %d: %s",
-                            work_unit_path,
-                            epoch,
-                            e,
-                        )
-                        exceptions_raised.append(e)
-                        for f in futures.values():
-                            f.cancel()
-
-                # If any worker failed, re-raise the first exception to stop the pipeline.
-                if exceptions_raised:
-                    raise exceptions_raised[0]
-
+        if exceptions_raised:
+            raise exceptions_raised[0]
+            
         return results
 
     def _process_work_unit(self, work_unit: WorkUnit, epoch: int) -> bool:

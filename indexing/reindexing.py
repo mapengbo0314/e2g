@@ -160,21 +160,26 @@ class IndexDiffer:
             elif in_old and not in_new:
                 to_delete.add(path)
                 # If a directory is removed, we must re-index its parent to update the summary.
+                # This ensures that the parent's conceptual map remains accurate.
                 parent = Path(self._fs_manager.dirname(str(path)))
                 if parent != path:
                     to_reindex.add(parent)
             elif in_old and in_new:
+                # Compare the set of files within the work unit to detect internal changes.
                 if (
                     old_work_units[path].files_to_index
                     != new_work_units[path].files_to_index
                 ):
                     to_reindex.add(path)
                 elif in_old_errored:
+                    # Always re-attempt units that failed in the previous run.
                     to_reindex.add(path)
                 # If the previous verification failed, we must re-process the unit.
+                # This catches semantic errors that Pydantic might have missed.
                 elif old_work_units[path].last_indexed_info and old_work_units[path].last_indexed_info.verification_state == "FAILED":
                     to_reindex.add(path)
                 else:
+                    # Delegate to the change detection strategy for content-based checks.
                     if self._change_detection_strategy.work_unit_needs_reindexing(
                         old_work_unit_manifest.last_indexed_info.commit_identifier,
                         new_work_units[path],
@@ -182,16 +187,19 @@ class IndexDiffer:
                         to_reindex.add(path)
 
         # Propagate changes up the tree.
+        # We process paths in reverse order of length (deepest first).
         sorted_new_paths = sorted(
             list(new_work_units.keys()), key=lambda p: len(str(p)), reverse=True
         )
 
+        # Construct a map of parents to their direct child work units.
         children_map: dict[Path, list[Path]] = collections.defaultdict(list)
         for path in new_work_units:
             parent = Path(self._fs_manager.dirname(str(path)))
             if parent != path:
                 children_map[parent].append(path)
 
+        # If any child is re-indexed, the parent must also be re-indexed to refresh its summary.
         for path in sorted_new_paths:
             # Re-index a directory if any of its children (files or subdirs) are scheduled for update.
             if any(child in to_reindex for child in children_map.get(path, [])):

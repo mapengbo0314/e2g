@@ -110,18 +110,30 @@ class VerificationCache:
     def _compact_cache(self, cache: dict[str, dict[str, Any]]) -> None:
         """Rewrites the JSONL cache with deduplicated entries.
         
-        Uses atomic tempfile rename to ensure crash safety.
+        Uses atomic tempfile rename to ensure crash safety and fcntl.LOCK_EX
+        to synchronize with concurrent processes.
         """
         import tempfile
         import os
+        import fcntl
         
         dir_name = str(self.cache_file.parent)
         try:
             fd, temp_path = tempfile.mkstemp(dir=dir_name, text=True)
             with os.fdopen(fd, "w", encoding="utf-8") as f:
-                for key, verdict in cache.items():
-                    f.write(json.dumps({"key": key, "verdict": verdict}) + "\n")
-            os.replace(temp_path, str(self.cache_file))
+                # Acquire exclusive lock on the ACTUAL cache file during compaction
+                # to prevent other processes from appending while we're rewriting.
+                if self.cache_file.exists():
+                    with open(self.cache_file, "a") as lock_file:
+                        fcntl.flock(lock_file, fcntl.LOCK_EX)
+                        for key, verdict in cache.items():
+                            f.write(json.dumps({"key": key, "verdict": verdict}) + "\n")
+                        os.replace(temp_path, str(self.cache_file))
+                        # Lock is released when lock_file is closed.
+                else:
+                    for key, verdict in cache.items():
+                        f.write(json.dumps({"key": key, "verdict": verdict}) + "\n")
+                    os.replace(temp_path, str(self.cache_file))
         except Exception as e:
             logging.warning(f"Cache compaction failed: {e}")
             try:

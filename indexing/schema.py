@@ -234,46 +234,84 @@ class CustomSectionsDocument(_BaseModel):
 
 
 class KeyComponentsDocument(_BaseModel):
-    # Aggregation of key components for the generator agent.
-    key_individual_components: Optional[KeyIndividualComponents] = None
-    key_interfaces: Optional[KeyInterfaces] = None
-    # Aggregation of key dependencies for the generator agent.
-    key_dependencies: Optional[KeyDependencies] = None
-    architectural_patterns_and_gotchas: Optional[ArchitecturalPatternsAndGotchas] = None
-    # Aggregation of testing and configuration for the generator agent.
-    testing_strategy: Optional[TestingStrategy] = None
-    configurations: Optional[Configurations] = None
+    """Output of the Key Components agent."""
+    key_individual_components: Optional[KeyIndividualComponents] = _field(
+        default=None, description="Important files and subdirectories identified by the agent."
+    )
+    key_interfaces: Optional[KeyInterfaces] = _field(
+        default=None, description="Key APIs and abstractions identified by the agent."
+    )
+    key_dependencies: Optional[KeyDependencies] = _field(
+        default=None, description="External and internal dependencies identified by the agent."
+    )
+    architectural_patterns_and_gotchas: Optional[ArchitecturalPatternsAndGotchas] = _field(
+        default=None, description="Patterns and pitfalls identified by the agent."
+    )
+    testing_strategy: Optional[TestingStrategy] = _field(
+        default=None, description="Testing approach identified by the agent."
+    )
+    configurations: Optional[Configurations] = _field(
+        default=None, description="Configuration items identified by the agent."
+    )
 
 
 class DeepDiveDocument(_BaseModel):
     """Output of the Deep Dive agent."""
 
     # Wrapper for the core deep dive section.
-    deep_dive: DeepDive
+    deep_dive: DeepDive = _field(description="Detailed explanation of behavior and structure.")
 
     # Optional fields to capture 'leaky' LLM responses from weaker models.
-    overview: Optional[Overview] = None
-    key_individual_components: Optional[KeyIndividualComponents] = None
-    key_interfaces: Optional[KeyInterfaces] = None
-    key_dependencies: Optional[KeyDependencies] = None
-    architectural_patterns_and_gotchas: Optional[ArchitecturalPatternsAndGotchas] = None
-    testing_strategy: Optional[TestingStrategy] = None
-    configurations: Optional[Configurations] = None
+    overview: Optional[Overview] = _field(
+        default=None, description="High-level summary (often leaked by weaker models)."
+    )
+    key_individual_components: Optional[KeyIndividualComponents] = _field(
+        default=None, description="Components (often leaked by weaker models)."
+    )
+    key_interfaces: Optional[KeyInterfaces] = _field(
+        default=None, description="Interfaces (often leaked by weaker models)."
+    )
+    key_dependencies: Optional[KeyDependencies] = _field(
+        default=None, description="Dependencies (often leaked by weaker models)."
+    )
+    architectural_patterns_and_gotchas: Optional[ArchitecturalPatternsAndGotchas] = _field(
+        default=None, description="Patterns (often leaked by weaker models)."
+    )
+    testing_strategy: Optional[TestingStrategy] = _field(
+        default=None, description="Testing info (often leaked by weaker models)."
+    )
+    configurations: Optional[Configurations] = _field(
+        default=None, description="Config info (often leaked by weaker models)."
+    )
 
 
 class OverviewDocument(_BaseModel):
     """Output of the Overview agent."""
 
-    overview: Overview
+    overview: Overview = _field(description="Conceptual overview of the directory.")
 
     # Optional fields to capture 'leaky' LLM responses.
-    deep_dive: Optional[DeepDive] = None
-    key_individual_components: Optional[KeyIndividualComponents] = None
-    key_interfaces: Optional[KeyInterfaces] = None
-    key_dependencies: Optional[KeyDependencies] = None
-    architectural_patterns_and_gotchas: Optional[ArchitecturalPatternsAndGotchas] = None
-    testing_strategy: Optional[TestingStrategy] = None
-    configurations: Optional[Configurations] = None
+    deep_dive: Optional[DeepDive] = _field(
+        default=None, description="Detailed explanation (often leaked by weaker models)."
+    )
+    key_individual_components: Optional[KeyIndividualComponents] = _field(
+        default=None, description="Components (often leaked by weaker models)."
+    )
+    key_interfaces: Optional[KeyInterfaces] = _field(
+        default=None, description="Interfaces (often leaked by weaker models)."
+    )
+    key_dependencies: Optional[KeyDependencies] = _field(
+        default=None, description="Dependencies (often leaked by weaker models)."
+    )
+    architectural_patterns_and_gotchas: Optional[ArchitecturalPatternsAndGotchas] = _field(
+        default=None, description="Patterns (often leaked by weaker models)."
+    )
+    testing_strategy: Optional[TestingStrategy] = _field(
+        default=None, description="Testing info (often leaked by weaker models)."
+    )
+    configurations: Optional[Configurations] = _field(
+        default=None, description="Config info (often leaked by weaker models)."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -282,6 +320,9 @@ class OverviewDocument(_BaseModel):
 
 class GenerationMetadata(_BaseModel):
     """Metadata about how an artifact was generated."""
+
+    if pydantic is not None:
+        model_config = {"protected_namespaces": ()}
 
     # Model and epoch information.
     model_name: Optional[str] = _field(
@@ -353,20 +394,36 @@ class IndexDocument(_BaseModel):
     """
 
     # Core content sections.
-    overview: Overview
-    key_individual_components: Optional[KeyIndividualComponents] = None
-    deep_dive: Optional[DeepDive] = None
+    overview: Overview = _field(description="High-level conceptual overview.")
+    key_individual_components: Optional[KeyIndividualComponents] = _field(
+        default=None, description="List of important files and subdirectories."
+    )
+    deep_dive: Optional[DeepDive] = _field(
+        default=None, description="Detailed technical deep dive into logic."
+    )
     # Detailed patterns and interfaces.
     architectural_patterns_and_gotchas: Optional[
         ArchitecturalPatternsAndGotchas
-    ] = None
-    key_interfaces: Optional[KeyInterfaces] = None
+    ] = _field(
+        default=None, description="Design patterns, decisions, and pitfalls."
+    )
+    key_interfaces: Optional[KeyInterfaces] = _field(
+        default=None, description="Public APIs and conceptual abstractions."
+    )
     # Dependencies and configurations.
-    key_dependencies: Optional[KeyDependencies] = None
-    configurations: Optional[Configurations] = None
-    testing_strategy: Optional[TestingStrategy] = None
+    key_dependencies: Optional[KeyDependencies] = _field(
+        default=None, description="External and internal dependencies."
+    )
+    configurations: Optional[Configurations] = _field(
+        default=None, description="System flags and configuration items."
+    )
+    testing_strategy: Optional[TestingStrategy] = _field(
+        default=None, description="Approach to testing and validation."
+    )
     # Extensions and metadata.
-    custom_sections: List[CustomSectionData] = _field(default_factory=list)
+    custom_sections: List[CustomSectionData] = _field(
+        default_factory=list, description="User-requested custom analysis sections."
+    )
     verification_notes: List[str] = _field(
         default_factory=list,
         description="Notes from the verifier about unverified claims or documentation-code mismatches.",
@@ -392,7 +449,11 @@ class IndexDocument(_BaseModel):
             key_interfaces=KeyInterfaces(interfaces=[]),
             key_dependencies=KeyDependencies(dependencies=[]),
             verification_notes=[f"SYNTHETIC: File created in session, no index exists."],
-            generated_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            generation_metadata=GenerationMetadata(
+                generated_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                epoch=0,
+                chunk_count=1,
+            ),
         )
 
 

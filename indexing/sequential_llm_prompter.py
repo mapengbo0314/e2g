@@ -85,18 +85,21 @@ except ImportError:
 _QUOTA_ERROR_RETRY_JITTER_SECONDS = 30
 
 
-class _NoOpCounter:
-    def increment(self, *args: Any, **kwargs: Any) -> None:
-        return None
+# Cleaned Observability for Antigravity
+class Observer:
+    """Minimal interface for tracking metrics and retries."""
+    def __init__(self):
+        self.counters = {}
+    def increment(self, name: str, value: int = 1):
+        self.counters[name] = self.counters.get(name, 0) + value
+    def increment_counter(self, name: str, value: int = 1):
+        self.increment(name, value)
 
+_observer = Observer()
 
-class _NoOpMetrics:
-    LLM_RETRIES = _NoOpCounter()
-    LLM_FAILURES = _NoOpCounter()
-
-
-# Global metrics counters for tracking pipeline health and performance.
-metrics = _NoOpMetrics()
+# Unified observability alias
+_stats_instance = _observer
+metrics = _observer
 
 
 class _SimpleStatsRecorder:
@@ -675,8 +678,10 @@ class GeminiLlmPrompter(LlmPrompter):
             data = {"overview": data}
 
         # --- Phase 0.7: Coerce string-valued sections to dicts ---
-        # Handle cases where "overview": "string" instead of "overview": {"content": "string"}
-        # This is common with weaker models or when the prompt is slightly ambiguous.
+        # Handle cases where "overview": "string" instead of "overview": {"content": "string"}.
+        # This occurs when weaker models ignore the schema's nesting requirements and 
+        # return raw text for fields that we expect to be objects with 'content' keys.
+        # We target all standard top-level text-heavy sections here.
         for section_key in ["overview", "deep_dive", "architectural_patterns_and_gotchas", "testing_strategy"]:
             if section_key in data and isinstance(data[section_key], str):
                 logging.info("[Coercion] Coerced string value for '%s' to dict with 'content' key.", section_key)
@@ -706,6 +711,10 @@ class GeminiLlmPrompter(LlmPrompter):
             if not isinstance(items, list):
                 wrapper[list_key] = []
                 logging.info("[Coercion] Initialized missing list '%s' in %s.", list_key, wrapper_key)
+            # --- Phase 2.1: Item-level patching ---
+            # Iterate through each item in the list and ensure it contains all fields
+            # required by its specific Pydantic model. If a field is missing, we
+            # inject a safe default (e.g. "" or "internal") to prevent validation errors.
             defaults = GeminiLlmPrompter._FIELD_DEFAULTS.get(model_name, {})
             for item in items:
                 if isinstance(item, dict):
@@ -713,12 +722,8 @@ class GeminiLlmPrompter(LlmPrompter):
                         if field not in item:
                             item[field] = default_val
                             logging.info(
-                                
-                                "[Coercion] Patched missing '%s' on %s "
-                                
-                                "(name=%s) with default=%r.",
-                                field, model_name,
-                                item.get("name", "<unknown>"), default_val,
+                                "[Coercion] Patched missing '%s' on %s (name=%s) with default=%r.",
+                                field, model_name, item.get("name", "<unknown>"), default_val,
                             )
 
         return data
@@ -1351,8 +1356,14 @@ class GeminiLlmPrompter(LlmPrompter):
             testing_strategy=key_components_doc.testing_strategy,
             configurations=key_components_doc.configurations,
             custom_sections=custom_sections_results,
-            # Record the generation metadata for traceability.
-            generated_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            # --- Phase 4: Metadata Integration ---
+            # Populate the GenerationMetadata sub-model to satisfy SM-101.
+            # This ensures ISO-compliant traceability for trust-oriented audits.
+            generation_metadata=schema.GenerationMetadata(
+                generated_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                model_name=self._config.synthesis_gemini_model if hasattr(self, "_config") else "unknown",
+                epoch=system_prompt.epoch() if hasattr(system_prompt, "epoch") else 0
+            )
         )
 
         # --- STEP 8: Verification Phase ---

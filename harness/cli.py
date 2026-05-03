@@ -43,15 +43,8 @@ def main():
     try:
         if args.mcp:
             from harness.mcp_server import run_mcp_server
-            from harness.state import OverlayState
-            from indexing.fs_manager import RealFsManager
-            state = OverlayState(
-                state_dir=args.index_dir,
-                current_diffs={},
-                provisional_summaries={},
-                fs_manager=RealFsManager()
-            )
-            asyncio.run(run_mcp_server(state, "."))
+            orchestrator = HarnessOrchestrator(index_dir=args.index_dir)
+            asyncio.run(run_mcp_server(orchestrator, "."))
         else:
             if not args.prompt:
                 logging.error("--prompt is required when not running in MCP mode.")

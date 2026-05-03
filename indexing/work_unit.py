@@ -16,28 +16,23 @@ import difflib
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 
 _METADATA_FILE_NAME = "work_units.json"
 
-# Metric paths for tracking indexing health and storage parity.
-SECONDARY_READ_FAILURES_METRIC = "/recursive-index/indexing/secondary_read_failures"
-SECONDARY_WRITE_FAILURES_METRIC = "/recursive-index/indexing/secondary_write_failures"
-READ_DIFFS_METRIC = "/recursive-index/indexing/read_diffs"
+class MetricObserver(Protocol):
+    """Protocol for tracking metrics, implemented by the orchestrator's Observer."""
+    def increment_counter(self, name: str, value: int = 1) -> None: ...
 
 
-class _NoOpCounter:
-    def Increment(self) -> None:
-        return None
-
-    def increment(self) -> None:
-        return None
+# Default observer that does nothing, used if no observer is provided.
+class _NoOpObserver:
+    def increment_counter(self, name: str, value: int = 1) -> None:
+        pass
 
 
-secondary_read_failures = _NoOpCounter()
-secondary_write_failures = _NoOpCounter()
-read_diffs = _NoOpCounter()
+_default_observer = _NoOpObserver()
 
 
 class _FakeMutation:
@@ -168,18 +163,21 @@ class WorkUnit:
     last_indexed_info: LastIndexedInfo | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Serializes the work unit to a JSON-compatible dictionary."""
+        # 1. Capture basic path and file membership info.
         result = {
             "output_path": str(self.output_path),
             "files_to_index": sorted(str(path) for path in self.files_to_index),
             "size_bytes": self.size_bytes,
         }
+        # 2. Append the last_indexed_info if it exists (for incremental indexing).
         if self.last_indexed_info:
             result["last_indexed_info"] = {
                 "commit_identifier": self.last_indexed_info.commit_identifier,
                 "timestamp": self.last_indexed_info.timestamp.isoformat(),
                 "verification_state": self.last_indexed_info.verification_state,
             }
-        # Return the serialized work unit representation.
+        # 3. Finalize and return the serialized work unit representation.
         return result
 
     @classmethod
@@ -457,9 +455,15 @@ class ShadowWorkUnitStorage(WorkUnitStorage):
     result from primary is returned. If the results differ, a warning is logged.
     """
 
-    def __init__(self, primary: WorkUnitStorage, secondary: WorkUnitStorage):
+    def __init__(
+        self, 
+        primary: WorkUnitStorage, 
+        secondary: WorkUnitStorage,
+        observer: MetricObserver | None = None
+    ):
         self._primary = primary
         self._secondary = secondary
+        self._observer = observer or _default_observer
 
     def read(self) -> WorkUnitManifest:
         primary_manifest = self._primary.read()
@@ -486,10 +490,10 @@ class ShadowWorkUnitStorage(WorkUnitStorage):
                 )
                 for line in diff:
                     logging.warning(line)
-                read_diffs.Increment()
+                self._observer.increment_counter("indexing.read_diffs")
         except Exception:
             logging.exception("WorkUnitStorage: Failed to read from secondary storage.")
-            secondary_read_failures.Increment()
+            self._observer.increment_counter("indexing.secondary_read_failures")
         return primary_manifest
 
     def get_timestamp(self) -> datetime.datetime:
@@ -503,10 +507,10 @@ class ShadowWorkUnitStorage(WorkUnitStorage):
                     primary_timestamp,
                     secondary_timestamp,
                 )
-                read_diffs.Increment()
+                self._observer.increment_counter("indexing.read_diffs")
         except Exception:
             logging.exception("WorkUnitStorage: Failed to read from secondary storage.")
-            secondary_read_failures.Increment()
+            self._observer.increment_counter("indexing.secondary_read_failures")
         return primary_timestamp
 
     def write(self, manifest: WorkUnitManifest) -> None:
@@ -516,7 +520,7 @@ class ShadowWorkUnitStorage(WorkUnitStorage):
         except Exception:
             logging.exception("WorkUnitStorage: Failed to write to secondary storage.")
             # Track failed shadow writes for auditing and reliability monitoring.
-            secondary_write_failures.Increment()
+            self._observer.increment_counter("indexing.secondary_write_failures")
 
 
 @dataclasses.dataclass(frozen=True)

@@ -24,10 +24,25 @@ class HarnessNodes:
         system_msg = self.prompter.build_system_message(agent_name)
         user_msg = self.prompter.build_user_message(state)
         
+        provider = os.getenv("HARNESS_LLM_PROVIDER", "gemini")
+        model = os.getenv("HARNESS_LLM_MODEL", "gemini-1.5-flash")
+        
+        # Determine the correct API key for the selected provider
+        api_key = None
+        if provider == "gemini":
+            api_key = os.getenv("GOOGLE_API_KEY")
+        elif provider == "openai":
+            api_key = os.getenv("OPENAI_API_KEY")
+        elif provider == "anthropic":
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+
         config = GeminiLlmPrompterConfig(
             bundle_name="harness", 
-            provider="gemini", 
-            allow_mock_fallback=True
+            provider=provider, 
+            research_gemini_model=model,
+            synthesis_gemini_model=model,
+            api_key=api_key,
+            allow_mock_fallback=(provider == "gemini" and not api_key)
         )
         llm_prompter = GeminiLlmPrompter(config=config, fs_manager=None)
         

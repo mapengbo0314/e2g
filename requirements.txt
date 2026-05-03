@@ -7,3 +7,5 @@ openai
 anthropic
 ollama
 langgraph
+langgraph-checkpoint
+langgraph-checkpoint-sqlite
