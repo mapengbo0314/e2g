@@ -10,6 +10,8 @@ from collections.abc import Sequence
 import concurrent.futures
 import datetime
 import logging
+import fcntl
+import os
 from typing import Any, Protocol
 
 from indexing import file_utils
@@ -571,6 +573,23 @@ class Orchestrator:
             )
 
         return work_unit_result.success
+
+    def reindex_target(self, work_unit: WorkUnit, epoch: int = 0) -> bool:
+        """Trigger a safe targeted reindex for a specific work unit.
+        
+        This method is exposed for the Harness to manually update stale context.
+        Uses fcntl locking to ensure mutual exclusion if called from another process.
+        """
+        lock_file = self._fs_manager.join(self._root_map_dir, ".reindex.lock")
+        self._fs_manager.make_dirs(self._root_map_dir)
+        
+        with open(lock_file, "w") as lock_fd:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX)
+                logging.info("Targeted reindex triggered for %s", work_unit.output_path)
+                return self._process_work_unit(work_unit, epoch)
+            finally:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
 
     def run(self) -> None:
         """Runs the multi-epoch indexing process."""

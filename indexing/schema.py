@@ -383,6 +383,18 @@ class IndexDocument(_BaseModel):
         description="The verification status of this artifact.",
     )
 
+    @classmethod
+    def synthetic_stub(cls, path: str, content: str, summary: str = None) -> "IndexDocument":
+        """Creates a minimal IndexDocument for files that have never been indexed."""
+        return cls(
+            overview=Overview(content=summary or f"[SYNTHETIC] New file: {path}. Not yet indexed."),
+            key_individual_components=KeyIndividualComponents(components=[]),
+            key_interfaces=KeyInterfaces(interfaces=[]),
+            key_dependencies=KeyDependencies(dependencies=[]),
+            verification_notes=[f"SYNTHETIC: File created in session, no index exists."],
+            generated_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        )
+
 
 # ---------------------------------------------------------------------------
 # Utility functions
