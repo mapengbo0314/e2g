@@ -1,6 +1,6 @@
 """LLM prompter for a single directory.
 
-This is a local, screenshot-backed reconstruction of the sequential LLM
+This is a local of the sequential LLM
 prompter used by the indexing pipeline. It preserves the important public
 interfaces and the high-level staged prompting flow while keeping local
 fallbacks lightweight and importable.
@@ -11,8 +11,10 @@ from __future__ import annotations
 import abc
 import dataclasses
 import json
+import os
 import random
 import re
+import subprocess
 import time
 from typing import Any, Callable, Protocol
 
@@ -142,6 +144,11 @@ class LlmPrompter(abc.ABC):
     ) -> schema.IndexDocument:
         """Prompts the LLM to index a directory."""
 
+    @property
+    def repo_root(self) -> str | None:
+        """Returns the repository root path."""
+        return None
+
     @abc.abstractmethod
     def prompt_for_merging(
         self,
@@ -182,6 +189,7 @@ class GeminiLlmPrompterConfig:
     include_search_tool: bool = True
     generate_content_config: Any | None = None
     provider: str = "gemini"
+    repo_root: str | None = None
     # If False, raises error if no real API found.
     allow_mock_fallback: bool = True
 
@@ -248,6 +256,8 @@ class _SimpleConversation:
         if hasattr(self.output_schema_type, "__name__") and self.output_schema_type.__name__ == "VerificationVerdict":
             return self.output_schema_type(passed=True, issues=[])
         # Default fallback to an empty instance of the schema type.
+        if self.output_schema_type is None:
+            return f"Mock response for {self.agent_name}: {user_prompt[:50]}..."
         return self.output_schema_type()
 
 
@@ -274,7 +284,18 @@ class VertexAiConversation:
 
     def prompt(self, user_prompt: str) -> str:
         response = self.chat.send_message(user_prompt)
-        return response.text
+        text = response.text
+        # Parse and store the response as structured state.
+        try:
+            # We reuse the key normalization logic from the OpenAI wrapper.
+            self._last_response = OpenAiConversation._normalize_keys(json.loads(text))
+        except (json.JSONDecodeError, TypeError):
+            self._last_response = text
+        return text
+
+    def get_state(self, _agent_name: str) -> Any:
+        """Returns the parsed state from the last LLM response."""
+        return getattr(self, "_last_response", None)
 
 
 class GoogleAiConversation:
@@ -300,7 +321,17 @@ class GoogleAiConversation:
 
     def prompt(self, user_prompt: str) -> str:
         response = self.chat.send_message(user_prompt)
-        return response.text
+        text = response.text
+        # Parse and store the response as structured state.
+        try:
+            self._last_response = OpenAiConversation._normalize_keys(json.loads(text))
+        except (json.JSONDecodeError, TypeError):
+            self._last_response = text
+        return text
+
+    def get_state(self, _agent_name: str) -> Any:
+        """Returns the parsed state from the last LLM response."""
+        return getattr(self, "_last_response", None)
 
 
 class OpenAiConversation:
@@ -341,11 +372,14 @@ class OpenAiConversation:
     def prompt(self, user_prompt: str) -> str:
         self.history.append({"role": "user", "content": user_prompt})
         
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=self.history,
-            response_format={"type": "json_object"}
-        )
+        kwargs = {
+            "model": self.model_name,
+            "messages": self.history,
+        }
+        if self.output_schema_type is not None:
+            kwargs["response_format"] = {"type": "json_object"}
+        
+        response = self.client.chat.completions.create(**kwargs)
         text = response.choices[0].message.content
         self.history.append({"role": "assistant", "content": text})
         # Parse and store the response as structured state.
@@ -375,7 +409,9 @@ class AnthropicConversation:
         self.client = anthropic.Anthropic(api_key=api_key)
         
         self.model_name = model_name
-        self.system_prompt = system_prompt + "\n\nYou must respond strictly in JSON format." if system_prompt else "You must respond strictly in JSON format."
+        self.system_prompt = system_prompt
+        if self.output_schema_type is not None:
+             self.system_prompt += "\n\nYou must respond strictly in JSON format." if self.system_prompt else "You must respond strictly in JSON format."
         self.output_schema_type = output_schema_type
         self.history = []
         self._last_response: Any = None
@@ -431,19 +467,18 @@ class OllamaConversation:
             len(self.history), total_chars, self.model_name,
         )
         try:
-            # Execute the request against the local Ollama API.
-            response = ollama.chat(
-                model=self.model_name,
-                messages=self.history,
-                format="json",
-                # Pass model-specific configuration options.
-                options={
-                    # Ollama defaults to num_ctx=2048 which silently truncates
-                    # large prompts.  Gemma 4 supports 200K tokens; set this
-                    # high enough that the full source context is preserved.
+            kwargs = {
+                "model": self.model_name,
+                "messages": self.history,
+                "options": {
                     "num_ctx": 131072,
                 },
-            )
+            }
+            if self.output_schema_type is not None:
+                kwargs["format"] = "json"
+            
+            # Execute the request against the local Ollama API.
+            response = ollama.chat(**kwargs)
             # Parse the Ollama response payload.
             text = response['message']['content']
             logging.info(
@@ -548,6 +583,12 @@ class GeminiLlmPrompter(LlmPrompter):
             self._config.throttling_strategy or _SimpleThrottlingStrategy()
         )
         self._fs_manager = fs_manager
+        self._repo_root = config.repo_root
+
+    @property
+    def repo_root(self) -> str | None:
+        """Returns the repository root path."""
+        return self._repo_root
 
     @staticmethod
     def _coerce_for_schema(data: Any, output_schema: type[Any]) -> Any:
@@ -571,6 +612,18 @@ class GeminiLlmPrompter(LlmPrompter):
             if len(data) == 1 or not any(k in data for k in expected_keys):
                 logging.info("[Coercion] Unwrapped 'properties' container from LLM response.")
                 data = data["properties"]
+
+        # --- Phase 0.1: Unwrap class-name wrappers ---
+        # Some models wrap the entire response in a key named after the schema class.
+        class_name = getattr(output_schema, "__name__", "")
+        if class_name:
+            snake_class_name = re.sub(r'(?<!^)(?=[A-Z])', '_', class_name).lower()
+            if snake_class_name in data and isinstance(data[snake_class_name], dict) and len(data) == 1:
+                logging.info("[Coercion] Unwrapping '%s' root key.", snake_class_name)
+                data = data[snake_class_name]
+            elif class_name in data and isinstance(data[class_name], dict) and len(data) == 1:
+                logging.info("[Coercion] Unwrapping '%s' root key.", class_name)
+                data = data[class_name]
 
         # --- Phase 1: Recursively replace null → "" for all string-typed values ---
         # Weaker LLMs (especially Ollama/Gemma) frequently output null for
@@ -618,6 +671,14 @@ class GeminiLlmPrompter(LlmPrompter):
         elif "overview" in required_fields and "overview" not in data and "content" in data:
             logging.info("[Coercion] Wrapped root 'content' into 'overview'.")
             data = {"overview": data}
+
+        # --- Phase 0.7: Coerce string-valued sections to dicts ---
+        # Handle cases where "overview": "string" instead of "overview": {"content": "string"}
+        # This is common with weaker models or when the prompt is slightly ambiguous.
+        for section_key in ["overview", "deep_dive", "architectural_patterns_and_gotchas", "testing_strategy"]:
+            if section_key in data and isinstance(data[section_key], str):
+                logging.info("[Coercion] Coerced string value for '%s' to dict with 'content' key.", section_key)
+                data[section_key] = {"content": data[section_key]}
 
         # --- Phase 2: Patch known missing keys with field-specific defaults ---
         for wrapper_key, (list_key, model_name) in GeminiLlmPrompter._LIST_FIELD_MAP.items():
@@ -698,9 +759,8 @@ class GeminiLlmPrompter(LlmPrompter):
     def _create_single_conversation(
         self,
         system_prompt: str,
-        
         agent_name: str,
-        output_schema_type: type[Any],
+        output_schema_type: type[Any] | None = None,
         model_type: str = "research",
         epoch: int = 1,
     ) -> Any:
@@ -1097,7 +1157,6 @@ class GeminiLlmPrompter(LlmPrompter):
 
     def _run_custom_sections_agent(
         self,
-        
         directory_path: str,
         initial_user_prompt: str,
         system_prompt: Any,
@@ -1108,7 +1167,6 @@ class GeminiLlmPrompter(LlmPrompter):
         deep_dive_summary_str: str,
     ) -> list[Any]:
         """Runs a single synthesis agent to generate all custom sections at once."""
-        # Construct the instruction set for synthesizing custom sections.
         # Check if any custom sections were requested for this directory.
         if not getattr(system_prompt, "custom_sections", lambda: [])():
             return []
@@ -1160,17 +1218,22 @@ class GeminiLlmPrompter(LlmPrompter):
         # --- STEP 1: Research Phase (Code Search) ---
         # Agent plans and executes search queries to find relevant code snippets.
         if self._config.include_search_tool:
-            code_search_instruction = system_prompt.codesearch_planner_instruction()
+            def search_tool_wrapper(plan: Any) -> str:
+                # Extract queries from dict or list format.
+                queries = plan if isinstance(plan, list) else plan.get("queries", []) if isinstance(plan, dict) else []
+                return self._execute_code_search(queries)
+
+            code_search_instruction = system_prompt.research_planner_instruction()
             _, code_search_output_str = self._run_agent_step(
                 directory_path=directory_path,
                 initial_user_prompt=initial_user_prompt,
-                agent_name="codesearch_planner_agent",
+                agent_name="research_planner_agent",
                 error_prompt_generator_instance=error_prompt_generator_instance,
                 instruction=code_search_instruction,
                 output_schema_type=dict,
                 model_type="research",
-                # Track the epoch to ensure temporal consistency in multi-pass indexing.
                 epoch=system_prompt.epoch(),
+                tool_executor=search_tool_wrapper,
             )
             self.last_research_context += f"=== CODE SEARCH OUTPUT ===\n{code_search_output_str}\n\n"
         # Case when code search is intentionally bypassed.
@@ -1179,6 +1242,11 @@ class GeminiLlmPrompter(LlmPrompter):
 
         # --- STEP 2: Research Phase (Read Files) ---
         # Agent selects specific files to read based on search results.
+        def read_files_tool_wrapper(plan: Any) -> str:
+            # Extract files from dict or list format.
+            files = plan if isinstance(plan, list) else plan.get("files", []) if isinstance(plan, dict) else []
+            return self._execute_read_files(files)
+
         read_files_instruction = system_prompt.read_files_planner_instruction(
             code_search_output=code_search_output_str
         )
@@ -1192,9 +1260,9 @@ class GeminiLlmPrompter(LlmPrompter):
             # Execute on research-optimized models for faster iteration.
             model_type="research",
             epoch=system_prompt.epoch(),
+            tool_executor=read_files_tool_wrapper,
         )
         self.last_research_context += f"=== READ FILES OUTPUT ===\n{read_files_output_str}\n\n"
-        # Use research data to identify key components and patterns.
 
         # --- STEP 3: Synthesis Phase (Key Components) ---
         # Agent identifies critical components, interfaces, and patterns.
@@ -1340,12 +1408,22 @@ class GeminiLlmPrompter(LlmPrompter):
 
     
     def prompt_for_root_map_summary(self, root_map_content: str) -> str:
-        """Returns a summary of the root map content."""
-        # Return a truncated preview of the root map as a placeholder summary.
-        return (
-            "Meta-summary of root map:\n\n"
-            f"{root_map_content[:500]}..."
+        """Returns a synthesized summary of the root map content using the LLM."""
+        from indexing import prompt_templates
+        system_prompt = prompt_templates.create_root_map_prompt(root_map_content)
+        
+        logging.info("[RootMap] Requesting architectural synthesis (context=%d bytes).", len(root_map_content))
+        
+        # We use 'synthesis' model type for the senior architect persona.
+        conv = self._create_single_conversation(
+            system_prompt=system_prompt,
+            agent_name="root_map_architect",
+            output_schema_type=None,
+            model_type="synthesis"
         )
+        
+        response = conv.prompt("Please provide the high-level architectural summary.")
+        return response.strip()
 
     def verify_artifact(self, artifact_json: str, source_context: str, is_merger_mode: bool = False) -> verification_types.VerificationVerdict:
         """Runs the verifier prompt and returns a structured verdict."""
@@ -1474,4 +1552,98 @@ class GeminiLlmPrompter(LlmPrompter):
             # Infrastructure failures (network, timeout, OOM) should not
             # block the pipeline.  Auto-pass with low confidence.
             return verification_types.VerificationVerdict.success(confidence=0.5)
+
+    def _execute_web_searches(self, queries: list[str]) -> list[dict[str, str]]:
+        """Executes a list of web searches and returns a list of results.
+        
+        This implementation provides a foundation for automated external dependency
+        verification. It can be extended to use official search APIs (SerpApi, Google)
+        or LLM-based grounding features.
+        """
+        results = []
+        for query in queries:
+            logging.info("[WebSearch] Executing research query: %r", query)
+            # In a production environment, this would integrate with a search provider.
+            # Here we provide a structured placeholder that subsequent agents can use.
+            results.append({
+                "query": query,
+                "result": f"Detailed research results for '{query}' would be retrieved here to inform dependency classification."
+            })
+        return results
+
+    def _execute_read_files(self, files: list[str]) -> str:
+        """Reads the contents of the specified files from the codebase."""
+        if not files:
+            return "No files requested."
+        
+        if not self._fs_manager:
+            return "File system manager not available for reading files."
+
+        results = []
+        # Limit to 5 files to prevent context explosion.
+        for file_path in files[:5]:
+            abs_path = file_path
+            if self._repo_root and not file_path.startswith("/"):
+                abs_path = os.path.join(self._repo_root, file_path)
+            
+            logging.info("[ReadFiles] Reading file: %s", file_path)
+            try:
+                if self._fs_manager.exists(abs_path):
+                    content = self._fs_manager.read(abs_path)
+                    results.append(f"--- FILE: {file_path} ---\n{content}")
+                else:
+                    results.append(f"--- FILE: {file_path} ---\n(File not found)")
+            except Exception as e:
+                results.append(f"--- FILE: {file_path} ---\n(Error reading file: {e})")
+        
+        return "\n\n".join(results)
+
+    def _execute_code_search(self, queries: list[str]) -> str:
+        """Performs a basic grep-like search across the local repository."""
+        if not queries:
+            return "No search queries provided."
+
+        if not self._repo_root:
+            return "Repository root not available for local code search."
+
+        results = []
+        # Limit to 3 queries to manage latency.
+        for query in queries[:3]:
+            logging.info("[CodeSearch] Searching for: %r", query)
+            try:
+                # Handle special filters in the query.
+                import subprocess
+                
+                # Check for filename filter.
+                if query.startswith("filename:"):
+                    filename = query.split(":", 1)[1].strip()
+                    # Use find to search for the filename relative to repo root.
+                    cmd = ["find", ".", "-name", f"*{filename}*", "-not", "-path", "*/.*", "-not", "-path", "*/node_modules/*"]
+                    process = subprocess.run(cmd, cwd=self._repo_root, capture_output=True, text=True, check=False)
+                    output = process.stdout.strip()
+                else:
+                    # Clean the query (remove any leading 'path:' or 'symbol:' which are just hints)
+                    search_term = query
+                    if ":" in query and not query.startswith("http"):
+                         search_term = query.split(":", 1)[1].strip()
+
+                    # Search across all files in the repo root, excluding common noise.
+                    # We limit to 5 matches per query to prevent context overflow.
+                    cmd = [
+                        "grep", "-r", "-n", "-m", "5",
+                        "--exclude-dir=.git", "--exclude-dir=.venv", "--exclude-dir=node_modules",
+                        search_term, "."
+                    ]
+                    process = subprocess.run(cmd, cwd=self._repo_root, capture_output=True, text=True, check=False)
+                    output = process.stdout.strip()
+                
+                if output:
+                    # Clean up absolute paths to be repo-relative for the LLM.
+                    results.append(f"--- SEARCH RESULTS FOR: {query} ---\n{output}")
+                else:
+                    results.append(f"--- SEARCH RESULTS FOR: {query} ---\n(No matches found)")
+            except Exception as e:
+                results.append(f"--- SEARCH RESULTS FOR: {query} ---\n(Search failed: {e})")
+        
+        return "\n\n".join(results)
 

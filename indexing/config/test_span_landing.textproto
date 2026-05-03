@@ -1,0 +1,9 @@
+bundle_name: "span-landing-test"
+git_input {
+  repository_input {
+    repository_url: "https://github.com/mapengbo0314/span-landing.git"
+  }
+}
+custom_output {
+  output_directory: "./local_outputs/test_config_index"
+}

@@ -1,0 +1,7 @@
+bundle_name: "span_landing"
+
+exclude_pattern: "**/node_modules/**"
+exclude_pattern: "**/dist/**"
+exclude_pattern: "**/.git/**"
+exclude_pattern: "**/build/**"
+exclude_pattern: "**/.next/**"

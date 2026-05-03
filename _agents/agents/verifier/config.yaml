@@ -8,10 +8,9 @@ runtime:
 instructions:
   system_rules:
     - ../../../AGENT.md
-    - ../../rules/media_transcription.md
   goals:
     - perform final QA and edge-case checks
-    - verify transcript fidelity against produced files
+    - verify code correctness against verified index context
     - surface regression and robustness risks
   constraints:
     - prefer reproducible checks
@@ -20,11 +19,11 @@ capabilities:
   verification_focus:
     - edge cases
     - workflow robustness
-    - media-to-file fidelity
+    - code correctness and consistency
     - regression risk
   inputs:
     - candidate edits
-    - transcript evidence
+    - verified context
     - expected outputs
   outputs:
     - QA report

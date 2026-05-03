@@ -115,6 +115,14 @@ class VerificationVerdict(_BaseModel):
         default=None,
         description="The model used for verification.",
     )
+    auto_pass_reason: Optional[str] = _field(
+        default=None,
+        description="Reason the artifact was auto-passed without full verification (e.g., 'empty_directory').",
+    )
+    is_empty_bypass: bool = _field(
+        default=False,
+        description="True if this verdict bypassed LLM verification because the directory was empty.",
+    )
 
     @classmethod
     def success(cls, confidence: float = 1.0) -> "VerificationVerdict":

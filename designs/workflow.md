@@ -1,7 +1,7 @@
 01_design_load_context
 description: Loads initial context about the project or feature area. Instructs the AI to read specified documents or code and summarize its understanding for verification.
 Workflow: Load Context for Design Discussion
-Please read monorepo/corp/snippets/snippets_machine/README.md and any resource that is provided in the prompt.
+Please read src/services/snippets/README.md and any resource that is provided in the prompt.
 
 After reading, please provide a high-level description of what you learned so I can correct your understanding and ensure we are on the same page before we discuss the new feature. Focus on the purpose of the system/area and its main components.
 
@@ -104,10 +104,10 @@ Workflow: Mean Code Review
 
 I have a strong intuition that this code may not be high quality. Please review the following code and tear it to shreds. Tell me all the ways in which this code is terrible.
 
-Specifically, flag any place where there are 10 lines of code or more without a comment. Also, point out all places where it doesn't meet Google's readability standards or best practices. Be very critical.
+Specifically, flag any place where there are 10 lines of code or more without a comment. Also, point out all places where it doesn't meet industry-standard readability patterns or best practices. Be very critical.
 
 drift-detec-all
-description: Run drift detect over all the designs in g3doc/CURRENT_DESIGN_DOCS
+description: Run drift detect over all the designs in docs/CURRENT_DESIGN_DOCS
 Prompt: The "Drift Detect All" Protocol
 
 Role: You are a Senior Software Architect and Code Auditor. Your goal is to identify "Implementation Drift"—instances where the codebase has diverged from, or failed to implement, the specifications laid out in the design documentation.
@@ -154,7 +154,7 @@ Action: Begin the drift_detect_all activity now.
 
 
 
-move weekly drift detection with Jetski workflow prompt 
+move weekly drift detection with Agent workflow prompt 
 
 
 {Gemini md (top) → README.md, AGENT_CONTEXT.md, and AGENT_SKILLS.md
@@ -162,7 +162,7 @@ Also contains stuff like lint fixes and others (UI related which i guess could b
 {{README.md
 Vision & Goal
 Core Features (Snippets mode, AI Coach mode, Forward motion, OKR Coverage, Time analysis, Custom Context, Custom report)
-Core Architecture (Frontend, backend, Server side config, App auth IAP, Google Workspace API Authorization → Google secrets manager, Database GCS, Gen AI → Vertex AI with ADC)
+Core Architecture (Frontend, backend, Server side config, App auth, Cloud IAM, Secrets Manager, Object Storage, Gen AI integration)
 UX (Login, Landing, Mode selection & Authorization, date selection[feature], Generation, Results, Refinement)
 Advanced processing & Data handling
 Resiliency and error handling
@@ -175,8 +175,8 @@ Product vision & Goal
 Core Features
 Core Architecture (more details than README doc)
 Service (Purpose - Responsibility - Configuration [instance/scaling yaml])
-FE uses F1 and automatic scaling
-BE uses B4 and basic scaling
+FE uses Cloud Run and automatic scaling
+BE uses managed compute and basic scaling
 Architectural principles & data flow
 Separation of concerns - Server side config - direct client to backend communication - Authentication - Authorization - State management
 UX Flow (same)
@@ -192,9 +192,9 @@ Send for review
 
 
 
-The Role of Recursive-Index (go/Recursive-Index):
+The Role of Recursive-Index:
 Recursive-Index is crucial for bootstrapping the Contextual Infrastructure, especially for existing codebases. It automates the creation of a "mental model" for the AI by:
-Recursive Summarization: Generating hierarchical README.md files by analyzing the code in directories, from the leaves of the project tree up to the root. This creates the "peanuts and hay" described in go/design-is-the-new-code, making the codebase digestible for the AI.
+Recursive Summarization: Generating hierarchical README.md files by analyzing the code in directories, from the leaves of the project tree up to the root. This creates the structural summaries needed for the AI, making the codebase digestible.
 Indexing: Creating an index that AI agents can query to quickly understand code structure, dependencies, and functionality.
 Plan of Action: Values and Issues Resolved
 Values:
@@ -225,14 +225,14 @@ Create a step-by-step plan.md with tasks. Do not write any code yet.
 Start implementing
 
 Automate verification → Force verification steps, test driven development (RULES on linters, type checkers, tests) Get receipts, validate the info, 
-Refactor the user profile component like in my PLAN.md. Use red/green TDD. Run hg fix, hg lint, and blaze test. Fix if needed.
+Refactor the user profile component like in my PLAN.md. Use red/green TDD. Run npm fix, npm lint, and npm test. Fix if needed.
 Don’t bloat the context → Explicit context fed, standard code distribution
 Prevent context rot: long sessions has past mistakes and interactions that can degrade the models performance. Clearing the context to prevent past interactions biasing new responses. Have agent summarize the progress and start fresh sessions
 Progressive disclosure: give agent only the context it needs, don’t dump everything in GEMINI.md use modular skills/agents.md in subbbfolders. Repeatable pipeline tasks, build a custom skill so the agent only loads those instructions when explicitly needed. 
 “Read section 2.1 of the UI guidelines and look at button.ts to change the primary button color.
 Write Concise agents: “AGENTS.md:
 A concise 15-line file:
-Always use Spanner, never raw SQL. Always run blaze test. Ask before modifying DB schemas. Never commit secrets or edit vendor/.”
+Always use Managed DB, never raw SQL. Always run tests. Ask before modifying DB schemas. Never commit secrets or edit vendor/.”
 Learn from failure
 Under prompting
 Ask for a better research phase and stricter plan
@@ -245,12 +245,12 @@ The agent failed to update the DB because I didn't specify the schema path.
 Write a skill for DB migrations to give it the right context.
 Framework setup
 
-Personalized agent skills per client /configs/users/{ldap}/_agent
+Personalized agent skills per client /configs/users/{user_id}/_agent
 
 
 
 Agent frameworks
-Adk/orcas → agent development kit for business logic, complex arbitrary workflows
+Custom Agent Frameworks → agent development kit for business logic, complex arbitrary workflows
 Antigravity → coding agent focused
 
 
@@ -258,4 +258,4 @@ Antigravity → coding agent focused
 → Script to setup harness, tune, connect to a certain IDE (make it where agent.md will always b invoked by any agentic coding platform)
 
 
-Token metrics → with/without Recursive-Index + jetski
+Token metrics → with/without Recursive-Index + Agent Harness

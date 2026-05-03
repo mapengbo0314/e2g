@@ -57,13 +57,11 @@ without starting from zero. Unlike a simple report generator, this system is
 specifically designed to produce knowledge artifacts that are grounded in source
 material and safe for future human and agent consumption.
 
-This design is not being invented from scratch. The upstream production system
-already contains real implementations of bundle definitions, bundle
+This design implements a robust system for bundle definitions, bundle
 verification, work-unit persistence, CLI wrappers, and multiple storage
-backends. The local repository does not yet contain a live `indexing/` package,
-but the `indexing-reference/` directory is a reduced, upstream-derived scaffold
+backends. The `indexing-reference/` directory provides a baseline scaffold
 that preserves the important module boundaries we intend to implement locally.
-This design therefore describes how to build a local `indexing/` package from
+This design therefore describes how to build the `indexing/` package from
 that scaffold while extending it with artifact-level trust controls.
 
 The first major component is the input and configuration layer. In MVP, the
@@ -81,10 +79,9 @@ system ever attempts indexing, bundle definitions must pass blocking validation.
 That includes basic structural checks such as bundle naming rules, input-path
 sanity checks, limits on research-guidance length and custom-section prompts,
 and policy enforcement for `git_input` bundles. It also includes bundle-size
-enforcement based on estimated lines of code so obviously unbounded bundles are
+denial based on estimated lines of code so obviously unbounded bundles are
 rejected before they can consume excessive model context or indexing budget.
-This layer already exists conceptually upstream and should be preserved in the
-local system as a first-class pre-run gate.
+This layer is a first-class pre-run gate.
 
 The third major component is the source preparation and file access layer. Its
 job is to normalize the repository into a consistent local working shape. If
@@ -154,10 +151,10 @@ The ninth major component is the state and persistence layer. The system needs
 to remember what it indexed, what outputs were created, and what version of the
 source tree those outputs correspond to. It will store work-unit manifests,
 root maps, and per-directory outputs in a bundle directory. However, the
-persistence story is broader than filesystem markdown. The upstream system
-already treats work units and summaries as structured persistence concepts with
+persistence story is broader than filesystem markdown. The system
+treats work units and summaries as structured persistence concepts with
 multiple backend flavors, including filesystem persistence, shadow
-primary/secondary reads and writes, and Spanner-backed storage. The local MVP
+primary/secondary reads and writes. The local MVP
 does not need to implement every backend, but it should preserve that shape:
 structured manifests and artifacts are canonical, markdown is derivative, and
 storage abstractions must be designed so they can support richer backends later.
@@ -279,9 +276,8 @@ first target.
 This section describes the concrete implementation plan for the accuracy-focused
 MVP. The goal of this work is to evolve the indexing system from a recursive
 summary generator into a trust-oriented indexing pipeline that produces
-structured, grounded, and minimally verified knowledge artifacts. The local
-repository does not yet contain a live `indexing/` package, but the
-`indexing-reference/` directory gives us a reliable, upstream-derived scaffold
+structured, grounded, and minimally verified knowledge artifacts. The
+`indexing-reference/` directory gives us a reliable baseline scaffold
 for the intended module layout. The implementation below assumes we will build
 the real system under `indexing/` using that structure as a literal starting
 point, while updating some boundaries to reflect artifact-level verification and
@@ -304,13 +300,12 @@ configuration contract rather than replacing it with ad hoc CLI-only behavior.
 
 #### `indexing/scripts/bundle_verifier.py`
 
-This file is the configuration verification layer. It already captures upstream
+This file is the configuration verification layer. It captures
 rules around bundle naming, input path validation, prompt-size limits, custom
 section counts, and bundle-size enforcement. It should be updated only as
 needed to align with the local package shape, but it must remain a blocking
 pre-run gate. The rationale for including this file is that config verification
-already exists in the system and should remain part of the end-to-end trust
-story.
+is a core part of the end-to-end trust story.
 
 #### `indexing/schema.py`
 
@@ -384,8 +379,7 @@ record whether a work unit failed verification, whether its last output was
 degraded, and whether it should be revisited because of invalidation logic
 beyond direct file diffs. The rationale for this change is that work-unit
 manifests are the natural place to record indexing outcomes and later rerun
-decisions, and the upstream system already treats them as structured storage
-objects across multiple backends.
+decisions.
 
 #### `indexing/reindexing.py`
 

@@ -10,7 +10,7 @@ the provided screenshots. It keeps the same core responsibilities:
   delete
 
 It is intentionally lightweight and uses local Python/pathlib substitutes for
-the production Google-internal dependencies.
+the production enterprise-grade dependencies.
 """
 
 # Standard library and third-party imports for filesystem operations and typing.
@@ -71,7 +71,7 @@ class IndexDifferProtocol(Protocol):
 
 @dataclasses.dataclass(slots=True)
 class PathFilteringConfig:
-    """Small local stand-in for the production filtering config."""
+    """Small local stand-in for the production-ready filtering config."""
 
     exclude_patterns: Sequence[object] = ()
     include_patterns: Sequence[object] = ()

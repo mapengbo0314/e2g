@@ -4,13 +4,13 @@ Tracks implementation progress against `recursive-index-design.md`.
 
 ---
 
-## Phase 1: Scaffold `indexing/` from `indexing-reference/`
+## Phase 1: Initialize `indexing/`
 
 | Step | Status | Notes |
 |------|--------|-------|
-| Copy `indexing-reference/` → `indexing/` | ✅ DONE | Direct copy completed |
-| Update internal imports to `indexing.*` | ✅ DONE | All imports corrected |
-| Replace upstream-specific imports with local stubs | ✅ DONE | Replaced absl, internal Google utils |
+| Set up `indexing/` directory | ✅ DONE | Initial setup completed |
+| Update relative imports to `indexing.*` | ✅ DONE | All imports corrected |
+| Replace internal-specific imports with generic stubs | ✅ DONE | Replaced proprietary utilities |
 | Verify scaffold imports cleanly | ✅ DONE | |
 
 ## Phase 2: Core Types — `verification_types.py`, `schema.py` updates

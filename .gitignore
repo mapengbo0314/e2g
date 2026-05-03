@@ -4,6 +4,9 @@
 local_index_output/
 github_index_output/
 .index_output/
+.indexing-reference/
+.designs/
+.pytest_cache
 local_outputs/
 llm_index*
 progress_epoch_*

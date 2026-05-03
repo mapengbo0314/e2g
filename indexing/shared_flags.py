@@ -43,7 +43,6 @@ class PipelineConfig:
     max_chunk_parallelization: int = 8
     max_parallel_bundles: int = 4
     dry_run: bool = False
-    use_srcfs_file_reading: bool = False
 
 
 @dataclass
@@ -115,8 +114,7 @@ class LegacyFlags:
     @property
     def max_parallel_bundles(self) -> int: return config.pipeline.max_parallel_bundles
     # Debugging and UI-specific toggles.
-    @property
-    def use_srcfs_file_reading(self) -> bool: return config.pipeline.use_srcfs_file_reading
+    # Debugging and UI-specific toggles.
     @property
     def add_graphviz_tool(self) -> bool: return config.add_graphviz_tool
     @property
@@ -148,7 +146,6 @@ LLM_PROVIDER = _legacy.provider
 DRY_RUN = _legacy.dry_run
 MAX_PARALLEL_BUNDLES = _legacy.max_parallel_bundles
 # Feature-specific flag constants.
-USE_SRCFS_FILE_READING = _legacy.use_srcfs_file_reading
 ADD_GRAPHVIZ_TOOL = _legacy.add_graphviz_tool
 REVIEW_ANSWER = _legacy.review_answer
 DEBUG_MODE = _legacy.debug

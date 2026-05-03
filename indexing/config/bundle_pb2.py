@@ -38,10 +38,10 @@ class InterleavedOutput:
 
 @dataclass
 class Metadata:
-    bug_component_ids: List[int] = field(default_factory=list)
+    issue_tracker_ids: List[int] = field(default_factory=list)
     team_ids: List[int] = field(default_factory=list)
     managers: List[str] = field(default_factory=list)
-    yaqs_tags: List[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)
 
 @dataclass
 class ProjectBundle:

@@ -1,14 +1,12 @@
 # Agent Config Schema
 
-The screenshot set showed a consistent per-agent structure:
+The agents follow a consistent per-agent structure:
 
 - `BUILD`
 - `agent.json`
 - `config.yaml`
 
-The exact `config.yaml` body was not visible, so this repository uses a
-shared schema that keeps the same pattern while remaining easy to refine when
-you send clearer images.
+This repository uses a shared schema that keeps a consistent pattern while remaining easy to refine.
 
 ## Shape
 

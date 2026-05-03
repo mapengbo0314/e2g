@@ -97,6 +97,14 @@ class Dependency(_BaseModel):
         default="",
         description="A description of how this dependency is used by the code.",
     )
+    dependency_type: str = _field(
+        default="internal",
+        description='Type of dependency: "internal" (part of this codebase), "external" (library, API, or infrastructure), or "documentation_only" (claimed in documentation but not strictly verified in code).',
+    )
+    verification_status: str = _field(
+        default="verified_in_code",
+        description='Verification status: "verified_in_code" (seen in imports/calls), "found_in_config" (package.json/requirements.txt), or "unverified_missing_declaration" (used in code but missing from manifest).',
+    )
 
 
 class ConfigurationItem(_BaseModel):
@@ -359,6 +367,10 @@ class IndexDocument(_BaseModel):
     testing_strategy: Optional[TestingStrategy] = None
     # Extensions and metadata.
     custom_sections: List[CustomSectionData] = _field(default_factory=list)
+    verification_notes: List[str] = _field(
+        default_factory=list,
+        description="Notes from the verifier about unverified claims or documentation-code mismatches.",
+    )
 
     # Trust metadata (populated by the pipeline).
     generation_metadata: Optional[GenerationMetadata] = _field(

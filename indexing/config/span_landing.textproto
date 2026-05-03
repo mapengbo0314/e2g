@@ -1,0 +1,8 @@
+bundle_name: "span-landing"
+
+# Standard exclusions for JS/React projects
+# You can override --repo_url and --output_dir via CLI
+exclude_pattern: ".*/node_modules/.*"
+exclude_pattern: ".*/\\.git/.*"
+exclude_pattern: ".*/dist/.*"
+exclude_pattern: ".*/build/.*"

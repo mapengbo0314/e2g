@@ -1,8 +1,7 @@
 """Main entrypoint for running the AI Codebase Indexer on project bundles.
 
-This is the local equivalent of the upstream generate_bundles.py. It provides
-a CLI-free programmatic API for running the indexing pipeline against local
-directories.
+This script provides a programmatic API for running the indexing pipeline
+against local directories and Git repositories.
 """
 
 from __future__ import annotations
@@ -133,6 +132,7 @@ def create_llm_prompter(
     bundle: BundleConfig,
     throttling_strategy: Any = None,
     fs_manager: Any = None,
+    repo_root: str | None = None,
 ) -> sequential_llm_prompter.LlmPrompter:
     """Creates an LLM prompter for a bundle."""
     llm_cfg = shared_flags.config.llm
@@ -154,6 +154,7 @@ def create_llm_prompter(
             # Dry run and mock fallback flags.
             dry_run=shared_flags.config.pipeline.dry_run,
             allow_mock_fallback=llm_cfg.allow_mock_fallback,
+            repo_root=repo_root,
         ),
         fs_manager=fs_manager,
     )
@@ -197,7 +198,7 @@ def execute_indexing(
         max_parallel=shared_flags.config.llm.max_parallelization
     )
     prompter = llm_prompter or create_llm_prompter(
-        bundle, throttling_strategy=throttling, fs_manager=fs_mgr
+        bundle, throttling_strategy=throttling, fs_manager=fs_mgr, repo_root=input_prefix
     )
 
     index_differ = None
@@ -352,13 +353,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Run the AI Codebase Indexer")
     parser.add_argument(
-        "--input_dir", type=str, required=False, help="Path to the source code to index"
+        "--config", type=str, required=False, help="Path to a .textproto bundle configuration file"
     )
     parser.add_argument(
-        "--output_dir", type=str, required=True, help="Path to write the generated index"
-    )
-    parser.add_argument(
-        "--bundle_name", type=str, default="local_project", help="Name of the bundle"
+        "--output_dir", type=str, required=False, help="Optional override for the output directory"
     )
     parser.add_argument(
         "--dry_run", action="store_true", help="Perform a dry run with mocked LLM responses"
@@ -374,10 +372,7 @@ if __name__ == "__main__":
         "--model_name", type=str, help="The specific model to use for the selected provider"
     )
     parser.add_argument(
-        "--repo_url", type=str, help="GitHub repository URL to clone and index"
-    )
-    parser.add_argument(
-        "--config", type=str, help="Path to a .textproto bundle configuration file"
+        "--repo_url", type=str, required=False, help="Optional override for the repository URL"
     )
 
     # Parse command line arguments to configure the execution environment.
@@ -386,21 +381,14 @@ if __name__ == "__main__":
     # Resolve absolute paths if running under Bazel to ensure outputs land in the workspace.
     workspace_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
     if workspace_dir:
-        if args.input_dir and not os.path.isabs(args.input_dir):
-            args.input_dir = os.path.normpath(os.path.join(workspace_dir, args.input_dir))
-        if args.output_dir and not os.path.isabs(args.output_dir):
-            args.output_dir = os.path.normpath(os.path.join(workspace_dir, args.output_dir))
         if args.config and not os.path.isabs(args.config):
             args.config = os.path.normpath(os.path.join(workspace_dir, args.config))
-        # Ensure the output directory exists in the workspace.
-        os.makedirs(args.output_dir, exist_ok=True)
+        if args.output_dir and not os.path.isabs(args.output_dir):
+            args.output_dir = os.path.normpath(os.path.join(workspace_dir, args.output_dir))
+            # Ensure the output directory exists in the workspace if provided.
+            os.makedirs(args.output_dir, exist_ok=True)
 
-    if not args.input_dir and not args.repo_url and not args.config:
-        print("ERROR: One of --input_dir, --repo_url, or --config must be provided.")
-        sys.exit(1)
-
-    # Load bundle from config if provided.
-    bundle_from_proto = None
+    # Load bundle from config if provided, otherwise create a transient one.
     if args.config:
         try:
             from indexing.scripts import bundle_verifier
@@ -409,6 +397,12 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"ERROR: Failed to parse config {args.config}: {e}")
             sys.exit(1)
+    else:
+        # Create a default bundle if no config is provided but we have other inputs.
+        from indexing.config import bundle_pb2
+        bundle_from_proto = bundle_pb2.ProjectBundle()
+        bundle_from_proto.bundle_name = "transient_bundle"
+        print("Using transient bundle configuration.")
 
     # Apply CLI flags to shared_flags to control global pipeline behavior.
     shared_flags.config.pipeline.dry_run = args.dry_run
@@ -450,11 +444,11 @@ if __name__ == "__main__":
         print(f"ERROR: {env_var} environment variable is required when not performing a dry run.")
         sys.exit(1)
     
-    def run_with_config(input_path: str, bundle_name: str, exclude_patterns: list[str] = None, include_patterns: list[str] = None, custom_sections: list[Any] = None):
+    def run_with_config(input_paths: list[str], bundle_name: str, output_dir: str, exclude_patterns: list[str] = None, include_patterns: list[str] = None, custom_sections: list[Any] = None):
         config = BundleConfig(
             bundle_name=bundle_name,
-            input_dirs=[input_path] if input_path else [],
-            output_dir=args.output_dir,
+            input_dirs=input_paths,
+            output_dir=output_dir,
             exclude_patterns=exclude_patterns or [],
             include_patterns=include_patterns or [],
             custom_sections=custom_sections or [],
@@ -467,37 +461,60 @@ if __name__ == "__main__":
             print(f"Indexing failed: {e}")
             sys.exit(1)
 
-    if bundle_from_proto:
-        # If we have a proto, it might have multiple inputs or a git input.
-        if bundle_from_proto.git_input and bundle_from_proto.git_input.repository_input:
-            # Handle git input from proto.
-            repo = bundle_from_proto.git_input.repository_input[0] # Just take the first for now.
-            repo_url = repo.repository_url
-            with custom_temporary_directory(prefix="repo_clone_") as temp_dir:
-                cloner = github_cloner.GithubCloner()
-                if cloner.clone(repo_url, temp_dir):
-                    run_with_config(temp_dir, bundle_from_proto.bundle_name, bundle_from_proto.exclude_pattern, bundle_from_proto.include_pattern, bundle_from_proto.custom_sections)
-                else:
-                    print(f"ERROR: Failed to clone repository {repo_url}")
-                    sys.exit(1)
-        elif bundle_from_proto.input:
-            # Handle local inputs from proto.
-            # For now, we only support one directory in BundleConfig, so we take the first or merge.
-            # We'll just run the first one as a proof of concept.
-            main_dir = bundle_from_proto.input[0].directory
-            if workspace_dir and not os.path.isabs(main_dir):
-                main_dir = os.path.normpath(os.path.join(workspace_dir, main_dir))
-            # Resolve relative to config if needed, but for now assume absolute or relative to cwd.
-            run_with_config(main_dir, bundle_from_proto.bundle_name, bundle_from_proto.exclude_pattern, bundle_from_proto.include_pattern, bundle_from_proto.custom_sections)
-    elif args.repo_url:
-        # If a repository URL is provided, clone it into a temporary directory.
+    # Resolve the output directory.
+    # Prioritize CLI flag, then custom_output from proto, then default.
+    final_output_dir = args.output_dir
+    if not final_output_dir and bundle_from_proto.custom_output:
+        final_output_dir = bundle_from_proto.custom_output.output_directory
+    
+    if not final_output_dir:
+        # Fallback if neither CLI nor proto specifies an output directory.
+        final_output_dir = "./index_out"
+    
+    # Ensure absolute path for output dir.
+    if not os.path.isabs(final_output_dir) and workspace_dir:
+        final_output_dir = os.path.normpath(os.path.join(workspace_dir, final_output_dir))
+    os.makedirs(final_output_dir, exist_ok=True)
+
+    # Resolve the repository URL (CLI flag overrides config).
+    repo_url = args.repo_url
+    if not repo_url and bundle_from_proto.git_input and bundle_from_proto.git_input.repository_input:
+        repo_url = bundle_from_proto.git_input.repository_input[0].repository_url
+
+    # Process based on the resolved input source.
+    if repo_url:
+        # Handle git input (cloning).
         with custom_temporary_directory(prefix="repo_clone_") as temp_dir:
             cloner = github_cloner.GithubCloner()
-            if cloner.clone(args.repo_url, temp_dir):
-                run_with_config(temp_dir, args.bundle_name)
+            if cloner.clone(repo_url, temp_dir):
+                run_with_config(
+                    [temp_dir], 
+                    bundle_from_proto.bundle_name, 
+                    final_output_dir,
+                    bundle_from_proto.exclude_pattern, 
+                    bundle_from_proto.include_pattern, 
+                    bundle_from_proto.custom_sections
+                )
             else:
-                print(f"ERROR: Failed to clone repository {args.repo_url}")
+                print(f"ERROR: Failed to clone repository {repo_url}")
                 sys.exit(1)
+    elif bundle_from_proto.input:
+        # Handle local inputs from proto.
+        input_paths = []
+        for inp in bundle_from_proto.input:
+            path = inp.directory
+            if workspace_dir and not os.path.isabs(path):
+                path = os.path.normpath(os.path.join(workspace_dir, path))
+            input_paths.append(path)
+            
+        run_with_config(
+            input_paths, 
+            bundle_from_proto.bundle_name, 
+            final_output_dir,
+            bundle_from_proto.exclude_pattern, 
+            bundle_from_proto.include_pattern, 
+            bundle_from_proto.custom_sections
+        )
     else:
-        # Otherwise, run indexing against the specified local directory.
-        run_with_config(args.input_dir, args.bundle_name)
+        print(f"ERROR: Bundle {bundle_from_proto.bundle_name} has no valid input sources.")
+        sys.exit(1)

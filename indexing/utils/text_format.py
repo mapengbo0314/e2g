@@ -11,7 +11,7 @@ class ParseError(Exception):
 def Parse(text: str, message: T) -> T:
     """Parses a textproto string into a dataclass message.
     
-    This is a simplified parser for the Glimpse bundle configuration subset.
+    This is a simplified parser for the recursive-index bundle configuration subset.
     """
     lines = text.splitlines()
     _parse_recursive(lines, message, 0)
@@ -46,7 +46,7 @@ def _parse_recursive(lines: list[str], obj: Any, start_line: int) -> int:
             
         attr_type = type(getattr(obj, key))
         
-        if value == "{":
+        if value == "{" or not value:
             # Nested message
             field_val = getattr(obj, key)
             if isinstance(field_val, list):

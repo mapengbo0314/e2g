@@ -1,7 +1,7 @@
 """Protocol for interacting with the index state.
 
 Both a protocol and an implementation using the local file system.
-This is a local, screenshot-backed reconstruction of the production
+This is a local of the production
 `state.py`, adapted to use `pathlib` and simple filesystem helpers.
 """
 

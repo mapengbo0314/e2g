@@ -20,18 +20,15 @@ from indexing import schema
 from indexing import state
 from indexing import verification
 from indexing import work_unit as work_unit_lib
-# Resiliency and retry logic for network-bound LLM calls.
-import tenacity
 
 
-from indexing.llm_indexer import VerificationFailedError
 
 
 WorkUnit = work_unit_lib.WorkUnit
 
 # Maximum number of work units to process in a single epoch. This cutoff is to
 # prevent large bundles from taking too long to index. Moreover, we wouldn't
-# be able to check them into monorepo anyway.
+# be able to store them efficiently in standard storage anyway.
 _MAX_WORK_UNITS_TO_PROCESS = 5000
 
 
@@ -98,36 +95,90 @@ class _SimpleProgressManager:
         return f"{self._root_map_dir}/progress_epoch_{epoch}.jsonl"
 
     def read_progress(self, epoch: int) -> dict[str, str]:
-        import json, os
+        import json, os, fcntl
         path = self.get_progress_file(epoch)
         progress = {}
         with self._lock:
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        if not line.strip(): continue
-                        try:
-                            data = json.loads(line)
-                            progress[data["path"]] = data["status"]
-                        except json.JSONDecodeError:
-                            pass
+                    try:
+                        fcntl.flock(f, fcntl.LOCK_SH)
+                        for line in f:
+                            if not line.strip(): continue
+                            try:
+                                data = json.loads(line)
+                                progress[data["path"]] = data["status"]
+                            except json.JSONDecodeError:
+                                pass
+                    finally:
+                        fcntl.flock(f, fcntl.LOCK_UN)
         return progress
 
     def write_progress(self, epoch: int, data: dict[str, str]) -> None:
-        import json, os
+        import json, os, fcntl
         path = self.get_progress_file(epoch)
         with self._lock:
             with open(path, "w", encoding="utf-8") as f:
-                for k, v in data.items():
-                    f.write(json.dumps({"path": k, "status": v}) + "\n")
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX)
+                    for k, v in data.items():
+                        f.write(json.dumps({"path": k, "status": v}) + "\n")
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)
 
     def mark_work_unit_completed(self, output_path: str, epoch: int) -> None:
-        import json, os
+        import json, os, fcntl
         path = self.get_progress_file(epoch)
         with self._lock:
+            # Check if we should compact before appending
+            if os.path.exists(path) and os.path.getsize(path) > 1024 * 1024: # 1MB
+                 self._compact_jsonl(epoch)
+
             with open(path, "a", encoding="utf-8") as f:
-                json.dump({"path": str(output_path), "status": "COMPLETED"}, f)
-                f.write("\n")
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX)
+                    json.dump({"path": str(output_path), "status": "COMPLETED"}, f)
+                    f.write("\n")
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)
+
+    def _compact_jsonl(self, epoch: int) -> None:
+        """Prunes duplicate status entries from the JSONL log to keep it O(N).
+        
+        IMPORTANT: Caller MUST hold self._lock before calling this method.
+        """
+        import json, os, fcntl, tempfile
+        path = self.get_progress_file(epoch)
+        if not os.path.exists(path): return
+        
+        progress = {}
+        with open(path, "r", encoding="utf-8") as f:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX)
+                for line in f:
+                    if not line.strip(): continue
+                    try:
+                        data = json.loads(line)
+                        progress[data["path"]] = data["status"]
+                    except json.JSONDecodeError: pass
+            finally:
+                fcntl.flock(f, fcntl.LOCK_UN)
+        
+        # Atomic write-back via tempfile to prevent corruption on crash
+        dir_name = os.path.dirname(path)
+        fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".jsonl", text=True)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as tf:
+                for k, v in progress.items():
+                    tf.write(json.dumps({"path": k, "status": v}) + "\n")
+            os.replace(tmp_path, path)
+        except Exception:
+            # Clean up temp file on failure
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
     def delete_progress_file(self, epoch: int) -> None:
         path = self.get_progress_file(epoch)
@@ -431,7 +482,14 @@ class Orchestrator:
         return results
 
     def _process_work_unit(self, work_unit: WorkUnit, epoch: int) -> bool:
-        """Processes a single work unit for the given epoch."""
+        """Processes a single work unit for the given epoch.
+        
+        Verification retries are handled internally by the LlmIndexer's
+        _generate_index_for_chunk and _merge_with_retries methods. The
+        orchestrator does NOT run its own retry loop to avoid retry
+        amplification (Review Finding #4) and shared-state race
+        conditions (Plan O1).
+        """
         _stats_instance.increment_counter(
             f"{self._bundle_name}.work_units.processed"
         )
@@ -457,16 +515,11 @@ class Orchestrator:
             "Generating Index for %s epoch %d...", work_unit.output_path, epoch
         )
 
-        # --- Trust Pipeline: Generation & Verification Loop ---
-        # This nested function handles the 'Generate -> Verify -> Fix' cycle.
-        @tenacity.retry(
-            stop=tenacity.stop_after_attempt(3),
-            wait=tenacity.wait_exponential(multiplier=1, min=2, max=10),
-            reraise=True,
-        )
-        def _generate_and_verify():
-            """Generates an artifact and verifies it against the source context."""
-            result = self._indexer.generate_index_for_work_unit(
+        try:
+            # The indexer handles the full Generate -> Verify -> Retry cycle
+            # internally via _generate_index_for_chunk (per-chunk) and
+            # _merge_with_retries (merger). No orchestrator-level retry needed.
+            work_unit_result = self._indexer.generate_index_for_work_unit(
                 work_unit,
                 epoch,
                 previous_root_map_content,
@@ -474,78 +527,6 @@ class Orchestrator:
                 self._input_prefix_to_strip,
                 verifier=self._verifier,
             )
-            
-            # Serialize the generated artifact for verification and persistence.
-            if result.artifact is None:
-                logging.warning(
-                    "[Orchestrator] %s: artifact is None, skipping verification.",
-                    work_unit.output_path,
-                )
-                return result
-                
-            artifact_json = result.artifact.model_dump_json(indent=2)
-            
-            if self._verifier:
-                logging.info(
-                    "[Orchestrator] %s: starting verification "
-                    "(artifact=%d bytes, source_context=%d bytes).",
-                    work_unit.output_path,
-                    len(artifact_json),
-                    len(result.source_context),
-                )
-                # Execute automated verification against the Pydantic schema rules.
-                verdict = self._verifier.verify(artifact_json, result.source_context)
-                
-                # Update verification state in the artifact for persistence.
-                if result.artifact:
-                    result.artifact.verification_state = schema.VerificationState(
-                        verified=verdict.passed,
-                        verification_model=verdict.verification_model,
-                        verified_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                        confidence=verdict.confidence,
-                        issues=verdict.issues,
-                    )
-
-                if not verdict.passed:
-                    # Feed verification issues back to the indexer for self-correction.
-                    self._indexer._config.verification_issues = verdict.issues
-                    logging.warning(
-                        "[Orchestrator] %s: VERIFICATION FAILED "
-                        "(confidence=%.2f, decision=%s). Issues:\n%s",
-                        work_unit.output_path,
-                        verdict.confidence,
-                        verdict.decision,
-                        "\n".join(f"  - {issue}" for issue in verdict.issues),
-                    )
-                    # Raise custom error so we can catch it and recover the result.
-                    raise VerificationFailedError(
-                        f"Verification failed for {work_unit.output_path}",
-                        result=result,
-                        issues=verdict.issues
-                    )
-                else:
-                    logging.info(
-                        "[Orchestrator] %s: verification PASSED (confidence=%.2f).",
-                        work_unit.output_path,
-                        verdict.confidence,
-                    )
-                
-            # Verification passed, clear any previous issues.
-            self._indexer._config.verification_issues = []
-            return result
-
-        try:
-            work_unit_result = _generate_and_verify()
-        except VerificationFailedError as ve:
-            # Resiliency: If we exhausted all retries and it still failed verification,
-            # we accept the 'best effort' artifact rather than crashing the pipeline.
-            logging.error(
-                "Verification failed for %s epoch %d after all retries. "
-                "Proceeding with 'Best Effort' index.",
-                work_unit.output_path,
-                epoch,
-            )
-            work_unit_result = ve.result
         except Exception as e:
             logging.error(
                 "Critical error generating index for %s epoch %d: %s",

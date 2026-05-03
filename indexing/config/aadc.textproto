@@ -3,28 +3,26 @@
 
 bundle_name: "aadc"
 
-# go/keep-sorted start
 input: {
-  directory: "ads/ai/aadc/"
+  directory: "src/ai/core/"
 }
 
 input: {
-  directory: "ads/ai/training/workflow/aadc_demographics_batch"
+  directory: "src/training/workflows/batch/"
 }
 
 input: {
-  directory: "ads/ai/training/workflow/aadc_demographics_batch_xmanager"
+  directory: "src/training/workflows/config/"
 }
 
 input: {
-  directory: "configs/file/placer/aadc-demographics-storage"
+  directory: "config/storage/"
 }
 
 input: {
-  directory: "production/borg/aadc-demographics"
+  directory: "infra/k8s/"
 }
 
 input: {
-  directory: "production/security/bclid/demographics"
+  directory: "infra/security/"
 }
-# go/keep-sorted end

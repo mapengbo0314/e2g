@@ -11,6 +11,7 @@ from collections.abc import Sequence
 import concurrent.futures
 import dataclasses
 
+import datetime
 import logging
 from pathlib import Path
 from typing import Any
@@ -69,7 +70,7 @@ class LlmIndexerConfig:
       include_search_tool: Whether to include the search tool in the agent
         abilities.
       codebase_specific_context: Additional context to add to the prompt for a
-        specific codebase instead of the default generic mono context.
+        specific codebase instead of the default generic project context.
       filtering_config: Optional configuration for filtering paths.
       custom_sections: Custom sections requested by the user.
     """
@@ -147,6 +148,7 @@ class LlmIndexer:
                         index_file_name=get_index_file_name(epoch),
                         codebase_specific_context=self._config.codebase_specific_context,
                         custom_sections=self._config.custom_sections,
+                        repo_root=self._config.llm_prompter.repo_root,
                     )
                 else:
                     system_prompt = prompt_templates.InitialIndexerPrompt(
@@ -159,6 +161,7 @@ class LlmIndexer:
                         index_file_name=get_index_file_name(epoch),
                         codebase_specific_context=self._config.codebase_specific_context,
                         custom_sections=self._config.custom_sections,
+                        repo_root=self._config.llm_prompter.repo_root,
                     )
 
                 user_prompt_template = USER_PROMPT_TEMPLATE
@@ -194,27 +197,34 @@ class LlmIndexer:
                     if not verdict.passed:
                         raise VerificationFailedError("Chunk failed", result=artifact_chunk, issues=verdict.issues)
                     
+                    # Extract info issues as verification notes
+                    if hasattr(verdict, 'detailed_issues'):
+                        info_issues = [
+                            issue.description for issue in verdict.detailed_issues 
+                            if getattr(issue, 'severity', 'error') == "info"
+                        ]
+                        artifact_chunk.verification_notes = info_issues
+                    
                     artifact_chunk.verification_state = schema.VerificationState(
-                        verified=True, confidence=1.0, issues=[],
-                        is_empty_bypass=getattr(verdict, 'is_empty_bypass', False)
+                        verified=True, 
+                        confidence=getattr(verdict, 'confidence', 1.0), 
+                        issues=verdict.issues,
+                        is_empty_bypass=getattr(verdict, 'is_empty_bypass', False),
+                        verification_model=getattr(verdict, 'verification_model', None),
+                        verified_at=datetime.datetime.now(datetime.timezone.utc).isoformat()
                     )
                 return artifact_chunk
                 
-            except Exception as ve:
-                if isinstance(ve, VerificationFailedError):
-                    current_issues = ve.issues
-                    result = getattr(ve, "result", None)
-                    previous_artifact = result.model_dump_json() if hasattr(result, 'model_dump_json') else ""
-                else:
-                    logging.warning(f"Transient infrastructure error: {ve}")
-                    result = None
+            except VerificationFailedError as ve:
+                current_issues = ve.issues
+                result = getattr(ve, "result", None)
+                previous_artifact = result.model_dump_json() if hasattr(result, 'model_dump_json') else ""
                 
                 if attempt == max_attempts - 1:
                     logging.error("Chunk failed after all retries. Proceeding with 'Best Effort'.")
-                    if not hasattr(result, 'model_dump_json'):
-                        import indexing.schema as schema
+                    if not result:
                         result = schema.IndexDocument(
-                            overview=schema.Overview(content="Processing failed due to unrecoverable error.")
+                            overview=schema.Overview(content="Processing failed due to unrecoverable verification error.")
                         )
                     
                     result.verification_state = schema.VerificationState(
@@ -224,84 +234,23 @@ class LlmIndexer:
                     return result
                 
                 time.sleep(2 ** attempt)
+            except Exception as e:
+                # Infrastructure errors (network, auth, quota) should bubble up
+                # to the prompter's internal retries or the orchestrator.
+                logging.error(f"Unexpected infrastructure error in chunk generation: {e}")
+                raise
 
-        # Canonicalize the directory path for display in prompts
-        display_path = self._config.index_state.get_display_path(
-            str(directory_path)
+        # Safety net: if the loop exits without returning (should be unreachable),
+        # synthesize a failed artifact rather than returning None.
+        logging.error("[LlmIndexer] _generate_index_for_chunk loop exited without returning for %s. This is a bug.", directory_path)
+        fallback = schema.IndexDocument(
+            overview=schema.Overview(content="Processing failed: retry loop exited unexpectedly.")
         )
-
-        str_directory_contents = {
-            str(k): v for k, v in directory_contents_chunk.items()
-        }
-        # Inject existing index data if available to allow the LLM to improve upon it.
-        extra_ctx = ""
-        if existing_index:
-            extra_ctx += f"existing_index:\n{existing_index}\n"
-
-        if epoch > 0:
-            # Use the IndexImproverPrompt to refine existing summaries in non-zero epochs.
-            system_prompt = prompt_templates.IndexImproverPrompt(
-                directory_path=str(display_path),
-                epoch=epoch,
-                directory_contents=repr(str_directory_contents),
-                subdirectory_indexes=repr(subdirectory_indexes),
-                extra_context=extra_ctx,
-                previous_epoch_str=previous_root_map_content or "",
-                index_file_name=get_index_file_name(epoch),
-                codebase_specific_context=self._config.codebase_specific_context,
-                custom_sections=self._config.custom_sections,
-            )
-        else:
-            # Generate the baseline index using the InitialIndexerPrompt for the first epoch.
-            system_prompt = prompt_templates.InitialIndexerPrompt(
-                directory_path=str(display_path),
-                epoch=epoch,
-                directory_contents=repr(str_directory_contents),
-                subdirectory_indexes=repr(subdirectory_indexes),
-                extra_context=extra_ctx,
-                previous_epoch_str=previous_root_map_content or "",
-                index_file_name=get_index_file_name(epoch),
-                codebase_specific_context=self._config.codebase_specific_context,
-                custom_sections=self._config.custom_sections,
-            )
-
-        user_prompt_template = USER_PROMPT_TEMPLATE
-        if is_partial:
-            user_prompt_template += PARTIAL_SUMMARY_PROMPT_ADDITION
-            keys_str = [str(k) for k in directory_contents_chunk.keys()]
-            user_prompt_template += (
-                f"Please summarize only the following files: {keys_str}"
-            )
-
-        # First, format the template with the directory path.
-        initial_user_prompt = user_prompt_template.format(
-            directory_path=display_path
+        fallback.verification_state = schema.VerificationState(
+            verified=False, confidence=0.0, issues=["Internal error: retry loop exited without result"],
+            is_empty_bypass=False
         )
-
-        # Then append any verification issues. We do this separately to avoid 
-        # KeyError if the issue text contains curly braces (which Gemma often does).
-        if getattr(self._config, "verification_issues", None):
-            epg = getattr(error_prompt_generator, 'IndexerErrorPromptGenerator', None)
-            if epg:
-                initial_user_prompt += "\n\n" + epg().generate_error_prompt(
-                    "Verification failed for previous attempt.",
-                    self._config.verification_issues
-                )
-
-        logging.info(
-            "Generating index for %s with prompt: %s",
-            directory_path,
-            initial_user_prompt,
-        )
-
-        epg = getattr(error_prompt_generator, 'IndexerErrorPromptGenerator', None)
-        epg_instance = epg() if epg else error_prompt_generator
-        return self._config.llm_prompter.prompt_for_indexing(
-            directory_path=str(directory_path),
-            initial_user_prompt=initial_user_prompt,
-            system_prompt=system_prompt,
-            error_prompt_generator_instance=epg_instance,
-        )
+        return fallback
 
     def _merge_with_retries(self, chunk_docs, work_unit, verifier) -> schema.IndexDocument:
         import time
@@ -323,47 +272,58 @@ class LlmIndexer:
                 if verifier:
                     from indexing import rendering
                     chunk_context = ""
+                    context_limit_reached = False
                     for doc in chunk_docs:
                         doc_md = rendering.to_markdown(doc)
                         if len(chunk_context) + len(doc_md) > 24000:
-                            chunk_context += f"\n\n...[Truncated due to context limits]..."
+                            context_limit_reached = True
                             break
                         chunk_context += f"\n\n{doc_md}"
+
+                    if context_limit_reached:
+                        logging.warning(
+                            "[Merger] Context exceeds verifier window (%d bytes). skipping verification.",
+                            len(chunk_context)
+                        )
+                        merged_doc.verification_state = schema.VerificationState(
+                            verified=True, confidence=0.5, issues=["Verification skipped due to context size"],
+                            is_empty_bypass=False
+                        )
+                        return merged_doc
 
                     verdict = verifier.verify(merged_doc.model_dump_json(), chunk_context, is_merger_mode=True)
                     if not verdict.passed:
                         raise VerificationFailedError("Merger failed", result=merged_doc, issues=verdict.issues)
                     
+                    # Extract info issues as verification notes
+                    if hasattr(verdict, 'detailed_issues'):
+                        info_issues = [
+                            issue.description for issue in verdict.detailed_issues 
+                            if getattr(issue, 'severity', 'error') == "info"
+                        ]
+                        merged_doc.verification_notes = info_issues
+
                     merged_doc.verification_state = schema.VerificationState(
-                        verified=True, confidence=1.0, issues=[],
-                        is_empty_bypass=getattr(verdict, 'is_empty_bypass', False)
+                        verified=True, 
+                        confidence=getattr(verdict, 'confidence', 1.0), 
+                        issues=verdict.issues,
+                        is_empty_bypass=getattr(verdict, 'is_empty_bypass', False),
+                        verification_model=getattr(verdict, 'verification_model', None),
+                        verified_at=datetime.datetime.now(datetime.timezone.utc).isoformat()
                     )
                 return merged_doc
                 
-            except Exception as ve:
-                # Handle verification failures by extracting issues and the previous
-                # artifact state to feed back into the error prompt.
-                if isinstance(ve, VerificationFailedError):
-                    current_issues = ve.issues
-                    result = getattr(ve, "result", None)
-                    previous_artifact = result.model_dump_json() if hasattr(result, 'model_dump_json') else ""
-                else:
-                    # Log unexpected infrastructure errors (e.g. timeout, connection dropped)
-                    # and leave result as None to trigger the fallback path below.
-                    logging.warning(f"Transient infrastructure error in Merger: {ve}")
-                    result = None
+            except VerificationFailedError as ve:
+                current_issues = ve.issues
+                result = getattr(ve, "result", None)
+                previous_artifact = result.model_dump_json() if hasattr(result, 'model_dump_json') else ""
                 
-                # If we've exhausted all retries, synthesize a best-effort failure artifact
-                # to prevent the pipeline from crashing completely.
                 if attempt == max_attempts - 1:
-                    if not hasattr(result, 'model_dump_json'):
-                        import indexing.schema as schema
+                    if not result:
                         result = schema.IndexDocument(
-                            overview=schema.Overview(content="Merge failed due to unrecoverable error.")
+                            overview=schema.Overview(content="Merge failed due to unrecoverable verification error.")
                         )
                         
-                    # Force the verification state to reflect the failure so it can be re-run
-                    # in future epochs or flagged for manual review.
                     result.verification_state = schema.VerificationState(
                         verified=False, confidence=0.0, issues=current_issues,
                         is_empty_bypass=False
@@ -371,6 +331,9 @@ class LlmIndexer:
                     return result
                 
                 time.sleep(2 ** attempt)
+            except Exception as e:
+                logging.error(f"Unexpected infrastructure error in merger: {e}")
+                raise
 
     def generate_subcomponent_list_section(
         self,

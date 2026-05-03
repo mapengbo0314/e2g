@@ -18,8 +18,11 @@ The dry run mode allows you to verify the entire pipeline (planning, generation,
 # Set PYTHONPATH to the project root
 export PYTHONPATH=.
 
-# Run the bundle generator with the dry-run flag
-python3 indexing/generate_bundles.py --dry_run --bundle_name=my_project --root_dirs=./path/to/source
+# Run with a config file
+python3 indexing/generate_bundles.py --dry_run --config=indexing/config/my_project.textproto --model_name=mock
+
+# OR run with a direct repo URL (no config needed)
+python3 indexing/generate_bundles.py --repo_url="https://github.com/user/repo.git" --output_dir="./local_out" --model_name=mock
 ```
 
 ## Running a Full Indexing Pass
@@ -33,15 +36,43 @@ To run a real indexing pass with LLM generation, you must provide a Gemini API k
 
 2.  **Execute the Generator**:
     ```bash
-    python3 indexing/generate_bundles.py --bundle_name=my_project --root_dirs=./path/to/source
+    python3 indexing/generate_bundles.py --config=indexing/config/my_project.textproto
     ```
 
-### Configuration Flags
+-   `--config`: Path to your `.textproto` bundle configuration. Optional if `--repo_url` is provided.
+-   `--model_name`: **(Required)** The specific model to use (e.g., `gemini-1.5-pro`, `gemma4:e2b`).
+-   `--repo_url`: The Git repository URL to index.
+-   `--output_dir`: Where to save the index files.
+-   `--dry_run`: Enable mocked LLM responses.
+-   `--llm_provider`: The provider to use (gemini, openai, anthropic, ollama). Default: `gemini`.
 
--   `--bundle_name`: A unique identifier for your project.
--   `--root_dirs`: Comma-separated list of directories to index.
--   `--output_dir`: (Optional) Where to save the index files. Defaults to `index_out/`.
--   `--dry_run`: Enable mocked LLM responses for verification logic testing.
+### Example: Running locally with Ollama
+
+The indexing engine now supports local tool-based research (Code Search and File Reading) when using Ollama.
+
+```bash
+./.venv/bin/python -m indexing.generate_bundles \
+    --repo_url="https://github.com/mapengbo0314/span-landing.git" \
+    --output_dir="./local_outputs/span_landing_index" \
+    --llm_provider=ollama \
+    --model_name=gemma4:e2b
+```
+
+### Example .textproto (indexing/config/my_project.textproto)
+
+```textproto
+bundle_name: "my_project"
+input {
+  directory: "src"
+}
+input {
+  directory: "lib"
+}
+exclude_pattern: ".*_test\\.py"
+custom_output {
+  output_directory: "index_out/"
+}
+```
 
 ## Running Tests
 

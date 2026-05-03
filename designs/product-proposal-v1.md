@@ -126,7 +126,7 @@ Responsibilities:
 - emit a structured `IndexDocument`
 - render it to markdown
 
-This layer should preserve the multi-stage prompting model you reconstructed:
+This layer should preserve the multi-stage prompting model:
 
 - research-oriented analysis of files / code contents
 - synthesis-oriented merging into structured section output
@@ -286,7 +286,7 @@ You said you want weekly or change-aware updates. I think the right MVP approach
 - propagate invalidation upward to parents
 - delete stale paths removed from the source tree
 
-This fits the reconstructed `IndexDiffer` design very naturally.
+This fits the `IndexDiffer` design very naturally.
 
 The key idea is:
 we should diff work units, not just files.
@@ -398,7 +398,7 @@ There are a few choices I think we should settle before implementation:
 
 ### 1. Config shape
 Do we want:
-- a Glimpse-like bundle config file
+- a structured bundle config file
 or
 - a simpler CLI-first config for MVP?
 

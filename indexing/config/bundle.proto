@@ -1,15 +1,8 @@
-edition = "2024";
+// edition = "2024";
 
 import "indexing/config/indexer/indexer_config.proto";
 
 option features.utf8_validation = NONE;
-
-// Screenshot-backed reconstruction of the upstream bundle.proto.
-//
-// This reference file preserves the visible message layout, field names, and
-// comments from the provided photos. If you send the remaining sections later,
-// we can tighten this further and fill in any unseen fields without changing
-// the overall shape.
 
 // A bundle of a group of directories that are indexed together.
 message ProjectBundle {
@@ -35,7 +28,7 @@ message ProjectBundle {
   // Optional.
   repeated string include_pattern = 8;
 
-  // Additional approved file extensions for this bundle (e.g. .gcl, .borg).
+  // Additional approved file extensions for this bundle (e.g. .ts, .py).
   // If set, they will be used in addition to the global approved extensions.
   // https://github.com/pengbolicious/e-2-g/blob/main/indexing/indexer/path_filtering_config.py?q=APPROVED_EXTENSIONS
   // Optional.
@@ -60,8 +53,8 @@ message ProjectBundle {
   // 3. Only files with approved extensions (e.g. .py, .java, .md) are
   //    included.
   message InputDirectory {
-    // Directory to be indexed, relative to google3, for example,
-    // "java/com/google/common/flogger".
+    // Directory to be indexed, relative to the project root, for example,
+    // "src/main/java/com/example/lib".
     string directory = 1;
 
     // Optional targeted instructions for the research planners to guide their
@@ -76,7 +69,7 @@ message ProjectBundle {
     //    - Good: "This directory uses the plugin pattern. Prioritize reading
     //      classes implementing Plugin."
     // 3. Force Distant Lookups:
-    //    - Good: "Logic is driven by //cloud/config/security_policy.textproto,
+    //    - Good: "Logic is driven by config/security_policy.textproto,
     //      you MUST read that file."
     // 4. Keep it Concise: 2-3 sentences maximum to ensure strong adherence
     //    without draining attention.
@@ -99,7 +92,7 @@ message ProjectBundle {
 
   // A Git repository to be indexed.
   message GitRepository {
-    // The owner of the repository (e.g., "google").
+    // The owner of the repository.
     // Required.
     string owner = 1;
 
@@ -133,21 +126,15 @@ message ProjectBundle {
   // If this field is specified, the input field must be empty.
   // Optional.
   //
-  // Glimpse will clone the requested repository into a temporary directory and
+  // recursive-index will clone the requested repository into a temporary directory and
   // then index it in the specified output directory.
   //
-  // Glimpse is not responsible for licensing checks. The user must ensure they
+  // recursive-index is not responsible for licensing checks. The user must ensure they
   // have the right to:
   //   (a) clone the repository, and
   //   (b) store derived data in the specified output directory.
-  // The Glimpse team recommends using a directory like '~/indexes/<repo_name>'
+  // The recursive-index team recommends using a directory like '~/indexes/<repo_name>'
   // for the output.
-  //
-  // The generated index may contain Google proprietary information and should
-  // not be uploaded to public locations. Contact the Glimpse team if
-  // externalization is required; we know how to ensure Glimpse indexes
-  // definitely do not include proprietary information, but have not done the
-  // work yet.
   GitInput git_input = 7;
 
   // Output config for the generated index files.
@@ -184,17 +171,17 @@ message ProjectBundle {
 
   // Metadata for the project bundle.
   message Metadata {
-    // The Buganizer component ID.
-    repeated int64 bug_component_ids = 1;
+    // The issue tracker component ID.
+    repeated int64 issue_tracker_ids = 1;
 
-    // A list of Google group names or team IDs owning the bundle.
+    // A list of group names or team IDs owning the bundle.
     repeated int64 team_ids = 2;
 
-    // A list of manager LDAP usernames.
+    // A list of manager usernames.
     repeated string managers = 3;
 
-    // A list of YAQS tags associated with the bundle.
-    repeated string yaqs_tags = 4;
+    // A list of tags associated with the bundle.
+    repeated string tags = 4;
   }
 
   Metadata metadata = 9;

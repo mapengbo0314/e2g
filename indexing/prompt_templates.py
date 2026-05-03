@@ -36,413 +36,65 @@ class bundle_pb2:  # noqa: N801
 MAX_CODE_SEARCH_QUERIES: Final[int] = 5
 MAX_READ_FILE_QUERIES: Final[int] = 5
 
-CODESEARCH_REFERENCE: Final[str] = textwrap.dedent("""\
-Core Concepts
+SEARCH_REFERENCE: Final[str] = textwrap.dedent("""\
+Common Search Qualifiers (GitHub / Commercial Search Style)
 
+* **Repository & Path**
+  * `repo:OWNER/NAME`: Search within a specific repository.
+  * `org:ORGNAME`: Search across all repositories in an organization.
+  * `path:PATH/TO/DIR`: Restrict search to a specific path or directory.
+  * `filename:FILENAME`: Search for a specific file by name.
+  * `extension:EXT`: Filter by file extension (e.g., `extension:py`).
 
-Regex Default: Queries are Regular Expressions (RE2 syntax) by default.
-Unquoted text is treated as a regex.
-foo. matches "food", "fool", etc.
-Literal Search: Use double quotes "" for literal strings. Special characters
-inside quotes are not interpreted.
-"foo()" matches the literal "foo()".
-Case Insensitive: Matching is case-insensitive by default (case:no).
-Implicit AND: Space-separated terms are combined with AND.
-foo bar finds files containing both "foo" AND "bar".
-Negation: Use - to exclude terms.
+* **Content & Symbols**
+  * `language:LANG`: Filter by programming language (e.g., `language:typescript`).
+  * `symbol:NAME`: Search for symbol definitions (supported by some commercial indexers like Sourcegraph).
+  * `content:QUERY`: Search for text within file contents (usually the default).
+  * `NOT term`: Exclude results containing a specific term.
+  * `term1 AND term2`: Find files containing both terms.
+  * `term1 OR term2`: Find files containing either term.
 
-foo -bar finds files containing "foo" but NOT "bar".
+* **Metadata & History**
+  * `user:USERNAME`: Find repositories owned by a user or files modified by them.
+  * `created:YYYY-MM-DD`: Filter by creation date.
+  * `pushed:YYYY-MM-DD`: Filter by last push date.
+  * `stars:>100`: Filter by repository popularity.
+  * `fork:true|false`: Include or exclude forks.
 
-Escaping: Use \\ to escape special characters (e.g., \\, \\, (, )).
-foo\\.bar matches "foo.bar" literally.
-Word Boundaries: Use \\b for whole word matching.
-\\bfoo\\b matches "foo" but not "foobar".
-Logical Operators
-
-AND: Logical conjunction (space is shorthand).
-file:\\.py AND content:main
-OR / |: Logical disjunction. | can be used within filter values.
-lang:py OR lang:java
-lang:py|java
-
-( ): Grouping expressions. Note: Add spaces around parentheses, e.g.,
-
-( foo OR bar ), to distinguish from regex grouping.
-( content:foo OR content:bar ) AND lang:cc
-Common Filters (Atoms)
-
-content:<regex> / c:<regex>: Search within file contents.
-c:MyClass
-file:<regex> / f:<regex>: Search within file paths/names.
-f:mono/my/project/.*\\.py$
--f:.*test\\.cc$ (Exclude test files)
-lang:<lang> / l:<lang>: Filter by language (e.g., cc, java, py, go).
-See go/cs-lang-reference.
-
-l:py
-
-symbol:<regex> / s:<regex>: Search for symbol definitions (classes,
-functions, variables, etc.) as indexed by Kythe.
-s:MyClass
-s:my_namespace::MyFunction
-class:<regex>: Search for class definitions,
-class:MyClass
-function:<regex> / func:<regex>: Search for function or method definitions,
-func:HandleRequest
-comment:<regex>: Search only within code comments,
-comment:TODO
-
-usage:<regex>: Search for matches not in comments or string literals,
-
-usage:my_var
-case:yes|no|auto: Set case sensitivity, auto is sensitive if the query has
-uppercase letters. Default is no.
-MyVar case:yes
-within:<context> / w:<context>: Restrict content matches to lexical contexts
-like string literal, comment. Can be negated with -.
-c:"magic" within:stringliteral
-c:TODO within:-comment
-author:<user> / a:<user>: Files modified by a specific author in any
-revision.
-
-a:<USERNAME>
-
-blame:<user>: Content sections where the last change was by <user>.
-c:oops blame:<USERNAME>
-at:<cl_number>: Search files at a specific CL snapshot,
-f:myfile at_cl:123456789
-from:<cl_number> / to:<cl_number>: Search within a CL range. to:0 means
-HEAD.
-from:0 includes all history.
-c:new_feature from:123 to:456
-removed:yes: Search only for code that has been deleted.
-c:oldFunction removed:yes lang:java
-
-repo:<repo> / r:<repo> & branch:<branch> / b:<branch>: Search in specific
-
-Git-on-Borg repos.
-contents:repo/google/foobar@master/main branch:main
-git:repo/google/foobar@master branch:mainbranch
-f:foo git:android/platform/superproject/main
-project:<name>: Search across one or more UBlueprint projects.
-(see go/cs-search-projects)
-project:codesearch crs
-protoid: Restrict to directories. -protoid for files only.
-f:go id://project (truncated)
-acl_workspace:<user/id or w:name>: Include results from a CitC workspace.
-
-acl_workspace:<USERNAME>/1234
-
-acl_workspace:eng
-pcre:yes: Enables Perl Compatible Regular Expressions features.
-pcre:yes (fns?func)\\(.*)
-matcher:{regex|text|fuzzy} Specify matcher type. regex is default.
-matcher:fuzzy f?jp?Ctrl
-Regular Expressions (RE2 / PCRE)
-
-Default engine is RE2 (go/re2syntax). Most regex matches are partial.
-pcre:yes enables additional PCRE features like (?!), until-line,
-(?s, dot all)...
+* **Advanced Operators**
+  * `"phrase"`: Search for an exact phrase.
+  * `*`: Wildcard for matching parts of words.
+  * `regex:PATTERN`: Some tools support PCRE or RE2 regular expressions for content or path filtering.
 """)
 
-_KEY_G3_CONTEXT: Final[str] = textwrap.dedent("""\
-Your prompt may encounter Google-internal concepts and jargon. Below are a few
-facts about the codebase.
+CLOUD_CONTEXT: Final[str] = textwrap.dedent("""\
+This project utilizes modern, industry-standard cloud-native infrastructure and DevOps practices.
+**1. Infrastructure & Orchestration**
+* **Containerization (Docker):** Standard unit of software that packages up code and all its dependencies.
+* **Orchestration (Kubernetes / K8s):** The system for automating deployment, scaling, and management of containerized applications.
+* **Nodes & Clusters:** A cluster consists of a set of worker machines, called nodes, that run containerized applications.
+* **Pods:** The smallest deployable units of computing that you can create and manage in Kubernetes.
 
-**1. Core Infrastructure & Concepts**
+**2. Storage & Databases**
+* **Object Storage (S3 / GCS / Azure Blob):** Scalable storage for unstructured data (images, logs, backups).
+* **Managed Databases (RDS / Cloud SQL / Neon):** Fully managed relational database services (PostgreSQL, MySQL).
+* **NoSQL (DynamoDB / CosmosDB / MongoDB):** Distributed, non-relational database systems for high-scale applications.
+* **Distributed Locking (Redis / Etcd):** Services used for distributed coordination and state management.
 
-* **a. Distributed Computing & Resource Management**
-  * **Borg / Borg cells:** Google’s system for managing and running large numbers of computer jobs across many machines. It acts as a giant scheduler.
-  * **Borg cell:** A collection of machines, usually within a single datacenter, that are managed together by Borg. It represents a **neighborhood** or logical grouping of resources.
-  * **Borg Prime:** The “brain” of a Borg cell. It's a server replicated for reliability that makes scheduling decisions.
-  * **Borglet:** A program that runs on every machine in a Borg cell. It acts as a local agent, following the Borg Prime’s instructions to start, stop, and clean up jobs on the machine.
-  * **Borg Job:** A description of a set of tasks that need to be run. A Borg policy defines the program, number of copies, and required resources.
-  * **Borg Task:** A single running instance of a program within a Borg job. If a job specifies 100 copies, each copy is a task.
-  * **Resource Containers:** A mechanism for isolating the resources (CPU, memory, disk) used by jobs, preventing tasks from interfering with each other.
-  * **Borgcfg:** A command-line tool used to interact with Borg, allowing users to submit jobs, check status, and fetch logs.
-  * **CellScore:** The system used by BorgProxy to determine the “best” Borg cell for a job, considering factors like resource availability and data locality.
-  * **BorgCores:** A scheduler for CPU and memory within a cell, dealing with **allocation** and data location.
-  * **Mars:** A system for scheduling and managing batch jobs on Borg, often used for non-latency-sensitive or infrequent jobs.
-  * **Autopilot:** A resource allocation system built into Borg that automatically adjusts the resources allocated to running jobs based on real-time demand.
-  * **Bns:** A system for naming services on Borg, providing a simplified and standardized way to deploy and operate them.
-  * **Sigmar:** UI for viewing and managing Borg jobs.
+**3. Development Workflow & CI/CD**
+* **Version Control (GitHub / GitLab / Bitbucket):** Distributed version control systems for tracking changes in source code.
+* **Pull Requests (PR) / Merge Requests (MR):** Proposals to merge code changes into a main branch, including peer review.
+* **CI/CD Pipelines (GitHub Actions / Jenkins / CircleCI):** Automated workflows for building, testing, and deploying code.
+* **Monorepo vs. Polyrepo:** Strategy of keeping all code in one repository versus splitting it across multiple repos.
 
-* **2. Resource Units & Accounting**
-  * **GU / Google Compute Unit:** Google’s internal unit for measuring computing power, providing a consistent way to compare the processing capability of different CPUs.
-  * **Ganpati:** Google’s system for managing user accounts and groups within the production environment.
-  * **FlexUs:** A system for managing the allocation of resources (CPU, memory, disk) to teams and projects within Borg and other infrastructure.
-  * **Flex Limit:** The maximum amount of a specific resource (CPU, memory, disk) a team or project is allowed to use within a particular Borg cell.
-  * **Resource Symphony:** A Borg resource allocation framework.
-  * **Resource Optimization Tradeoffs (RoT):** A tool for calculating and comparing the cost of running a service under different resource configurations.
-  * **PerfTune / Tune (Deprecated):** A deprecated dashboard that provided cost estimates for various resource-related settings.
-
-* **3. Configuration Management**
-  * **Borg Configuration Language (BCL):** A declarative language for writing Borg configuration files, describing how jobs should be run.
-  * **BCL2:** An imperative language based on Python, also used for writing Borg configuration files.
-  * **General Configuration Language (GCL):** A language Google uses to describe configurations.
-  * **Pliny:** A system used to configure the Borg user for a server, connecting it with the appropriate product associations to determine resource access.
-  * **Prodspec:** A system for modeling the desired state of production systems, used by P2020 Rollouts to determine necessary changes.
-  * **Warpzone:** A way to represent a server’s footprint in your allocation model, in the deployed configuration.
-  * **Prodplan:** Another way to represent a server’s footprint.
-
-* **b. Networking**
-  * **Jupiter:** Google’s modern, high-bandwidth, low-latency datacenter network fabric.
-  * **Software-Defined Networking (SDN):** A network management approach where the control plane is separated from the data plane.
-  * **B4:** Google’s SDN project for running Google’s global network and controlling inter-datacenter traffic.
-  * **Global Traffic Controller (GTC):** The system that responds to DNS requests for Google services, directing users to the optimal datacenter.
-  * **Google Front End (GFE):** Servers at the edge of Google’s network that receive internet traffic and perform tasks like SSL termination and request routing.
-  * **Stubby:** A network front-end used by MetOps, SRE, PARMs, and service owners to view and manage the network.
-  * **BorgProxy:** A service that allows access between Google’s corporate network (Corp) and production network (Prod).
-  * **AutoBahn:** An encrypted transport service for accessing services in Google’s production network (Prod), typically requiring both machine and user credentials.
-  * **CorpSSH:** A system allowing SSH access to desktops and servers, requiring Security Key authentication.
-  * **Google Guest:** The wireless network provided for guests in Google offices.
-  * **B2:** Google’s Backbone, a software-defined network. It connects core clusters and edge locations, handling high-priority, user-facing traffic.
-  * **B4:** Google’s Beyond Backbone, a Software-Defined Network (SDN) connecting Google’s data centers.
-  * **Peering routers:** Routers located at the edge of Google’s network that establish connections with other networks on the Internet.
-  * **Caches:** Servers located at the edge of Google’s network that store copies of frequently accessed content.
-  * **Metro PoPs:** A Point of Presence (PoP) located within a metropolitan area, providing network connectivity and services within that region.
-  * **Edge PoP:** Likely a PoP at the edge of Google’s backbone network, providing high-capacity connections and routing between regions.
-  * **Backbone PoP:** A PoP that is specifically part of the backbone network (B2 or B4), providing connectivity between different parts of the backbone.
-  * **Network Service Level Objective (SLO):** A defined target for the performance and availability of network services.
-  * **Quality of Service (QoS):** Mechanisms used to prioritize and manage different types of network traffic.
-
-* **2. Load Balancing**
-  * **Global Service Load Balancer (GSLB):** Google’s system for distributing traffic across multiple datacenters.
-  * **Google Infrastructure Configuration Service (GICS):** Used for asking configuration changes to GSLB.
-  * **application frontend (AFE):** The part of a service that handles requests from users or clients.
-  * **application backend (ABE):** The part of a service that performs the actual processing and data storage.
-  * **Viceroy:** A dashboard for viewing GSLB data and real-time traffic for a service. It replaced Forbin.
-  * **Forbin (Deprecated):** The system replaced by Viceroy, which displayed GSLB data.
-
-* **c. Storage**
-  * **1. File Systems**
-  * **Colossus:** Google’s distributed file system, a successor to GFS, designed for massive scale and high reliability.
-  * **Chunks:** In the context of Colossus, these are the actual blocks of data that make up a file.
-  * **Colossus File System (CFS):** The original version of Colossus, lacking true directory objects.
-  * **Colossus namespace (CNS):** A layer built on top of CFS that provides real directory objects, making file management more hierarchical and user-friendly.
-  * A `cns` path looks like `/cns/<cell-name>/home/<user-group>/...` while, for example, `/cns/d/<home>/ducile/path/to/file`.
-  * **D servers:** Low-level storage servers providing the mapped access to the actual disks on which files are stored.
-  * **CMETA:** Colossus Metadata, a Bigtable storing metadata about files in Colossus.
-  * **Curator:** A component that handles file-level operations like creating, deleting, and storage server management.
-  * **META:** NameSpace metadata, a table within CNS storing metadata about directories and files.
-  * **Namespace compression:** Part of Colossus handling file-level or large operations, including directory operations, renames, and snapshots.
-  * **Reed-Solomon:** An error-correcting code used by Colossus for redundancy.
-  * **Nested encodings:** An extension of Reed-Solomon encoding used in Colossus.
-  * **Google Drive:** Google’s cloud storage service for users, familiar to those outside of Google.
-  * **x20:** An internal Google system for sharing large files and datasets, providing native file-level access from Linux desktops.
-  * **Managed Storage:** A network storage solution (NPS or CIFS) for services in Google’s corporate datacenters.
-  * **BinFS:** A system for securely distributing verified files from Google’s internal codebase (mono) to Googlers.
-
-* **2. Databases**
-  * **Bigtable:** A distributed, NoSQL database designed for handling massive amounts of structured data.
-  * **Spanner:** A globally distributed, externally consistent database designed for strong consistency across multiple datacenters.
-  * **F1:** A storage engine specifically designed for Spanner, improving performance and efficiency.
-  * **SSTables:** “Sorted String Tables” - a persistent, ordered, immutable map from keys to values.
-
-* **d. Accounts, Groups, and Authentication**
-  * **Ganpati:** The secure system where your corporate account data is stored.
-  * **Dasher user:** A user account within Google Workspace (formerly G Suite). This account is used for accessing Google’s public-facing services and is linked to the user’s google.com email address.
-  * **CorpLogin (SSO):** The service that authenticates you to internal web applications and delegates credentials to other account systems.
-  * **Gaia:** Google’s externally-available account service. It manages Google Accounts.
-  * **Google Workspace:** The suite of online productivity tools (Gmail, Docs, Calendar, etc.) that Google uses internally and also sells to other companies.
-  * **Active Directory (AD):** A directory service used by Windows.
-  * **LDAP:** Lightweight Directory Access Protocol. At Google LDAP usage is mostly legacy.
-  * **Bagpims:** Group System Comparison Documentation comparing the various group management systems.
-  * **Google Groups:** The familiar Google Groups service.
-  * **Gaia Groups:** A groups system used internally at Google.
-  * **Low Overhead Authentication Service (LOAS):** A system for generating and managing short-lived credentials.
-  * **SSH:** Secure Shell.
-  * **gcert:** A command-line tool that generates temporary credentials (LOAS and SSH).
-
-* **II. Software Development & Deployment**
-
-* **a. Code Management & Version Control**
-  * **mono:** Google’s massive, unified code repository.
-  * **CodeSearch:** A web-based tool for browsing and searching code.
-  * **Cider:** The Cloud IDE.
-  * **monorepo:** Google’s internal version control system.
-  * **Critique:** Google’s web-based tool for code review.
-  * **Fugue:** A distributed version control system similar to Git.
-  * **Git:** A widely used distributed version control system.
-  * **Rebase:** A tool for managing multiple, dependent code changes in separate workspaces.
-
-* **b. Build & Packaging**
-  * **Blaze:** Google’s internal build system, used to compile code, run tests, and create packages.
-  * **BUILD files:** Specify the software that can be built from code in a package, and the dependencies that exist between code.
-  * **Forge:** A system that distributes and caches compilation jobs for Blaze.
-  * **BuildRabbit:** Blaze in the cloud.
-  * **Midas Package Manager (MPM):** A system for building, managing, and deploying packages of binary and static data files.
-
-* **c. Testing**
-  * **TAP (Test Automation Platform):** Google’s primary continuous build system.
-  * **Guitar:** Google’s framework for larger-scale integration testing.
-  * **AutoRollback:** A feature of TAP that automatically reverts code changes if they cause widespread test failures.
-  * **Google Integration Testing Suite (ITS):** Provides tools for integration testing of servers and pipelines.
-  * **SamMan (Deprecated):** A previously popular testing environment.
-  * **Web Testing:** A framework within TAP for testing web applications by automating browsers.
-  * **Hexa, hexabox, Mini, Scuba, Robolectric (Android), Earl Grey (iOS):** Various other testing tools.
-  * **Sponge:** A centralized repository for the output of the build system (Blaze) and other test systems.
-  * **Test Fusion:** The dashboard for Sponge V2.
-
-* **d. Release Management & Deployment**
-  * **Rapid (Release Automation Platform):** A service that automates the release process.
-  * **Rollouts:** A suite of services for safely and consistently deploying code and configuration changes.
-  * **P2020:** A set of tools and processes for modernizing Google’s production deployment and release management.
-  * **Legislator:** A service within P2020 Rollouts that can run workflows.
-  * **Annealing:** The part of P2020 Rollouts that actuates changes.
-  * **Strategist:** A component of Annealing defining the strategy for how a rollout should proceed.
-  * **Enforcer:** Another component of Annealing that enforces the rollout strategy.
-  * **Prodspec:** A system for modeling the desired state of a production system.
-  * **CAS (Canary Analysis Service):** Used to check if a recent change is causing problems.
-  * **Rollouts UI:** The user interface for Rollouts.
-
-* **e. IDEs and Editors**
-  * **IntelliJ:** IntelliJ IDEA is a popular Java IDE.
-  * **Cider V:** Cider V is Google’s next-generation IDE, based on VS Code.
-  * **gLinux:** Google’s internal, managed distribution of Debian Linux.
-  * **macOS:** The operating system used on Apple MacBooks.
-  * **Chrome Remote Desktop (CRD):** A system allowing remote access to a Cloudtop instance.
-  * **Cloudtop:** Google’s virtual desktop environment.
-  * **VMware:** A virtualization platform.
-  * **Puppet:** A configuration management system used to manage the configuration of all Linux, macOS, and Windows Corp machines.
-  * **Rapture:** Google’s custom package repository and software deployment mechanism for Linux.
-  * **GoogGet:** Google’s package management system for Windows.
-
-* **III. Server-Side Technologies & Frameworks**
-
-* **A. RPC & Communication**
-  * **Stubby:** Google’s internal RPC framework.
-  * **gRPC:** A high-performance, open-source RPC framework developed by Google.
-  * **Protocol Buffers (Protobufs):** A method of serializing structured data.
-  * **Borg Name Service (BNS):** A system mapping logical names like service names to the network addresses of the machines running that service.
-  * **Chubby:** A distributed lock service.
-  * **RPCs:** A system for defining who is allowed to access your server’s RPCs.
-  * **BCID (Borg Caller ID):** A system that helps ensure that the binaries running in Borg were actually built from the correct source code in monorepo.
-  * **Extensible Stubs:** The library that manages Stubby stubs.
-
-* **B. Server Frameworks**
-  * **Goa:** A framework for building servers in the Go programming language.
-  * **AXI Web:** A framework for building specialized web applications.
-  * **Scaffolding:** A framework for building servers in C++.
-  * **Angular:** A popular framework for building web applications.
-  * **Apps Framework:** A framework for building servers in Java or Kotlin.
-  * **Boq Web:** A framework for building web applications, probably built on top of Boq.
-
-* **C. Data Processing Pipelines**
-  * **Flume:** Google’s internal framework for writing big data analysis pipelines.
-    * **FlumeJava:** The Java API for Flume.
-    * **FlumeC++:** The C++ API for Flume.
-    * **FlumeGo:** The Go API for Flume.
-    * **FlumePython:** The Python API for Flume.
-    * **DAX:** A task management pipeline framework.
-    * **Streaming Flume:** The streaming version of Flume.
-  * **Apache Flume:** An unrelated open-source project.
-  * **Apache Beam:** An open-source, unified programming model.
-  * **PatchPanel (Deprecated):** A job launcher pipeline.
-  * **Plx workflows:** Workflow utilities in the PLX ecosystem.
-  * **DreamPipe:** Another potential replacement for PatchPanel.
-  * **Workflow Task Master:** A system for managing work units (tasks).
-  * **Analytics Task Manager:** A task management system.
-  * **Placer:** A tool for copying input data files to a local processing datacenter.
-
-* **IV. Monitoring, Alerting, & Incident Management**
-
-* **A. Monitoring**
-  * **Borgmon (Deprecated):** Google’s former primary monitoring system, now largely replaced by Monarch.
-  * **Dumptruck (Deprecated):** Formerly used to store historical monitoring data from Borgmon.
-  * **Prober Service:** Provides synthetic monitoring of services by sending real-world requests.
-  * **Monarch:** Google’s current, global, high-performance monitoring system.
-  * **Streamz:** An RPC service enabling Monarch to collect data from servers dynamically.
-  * **Automon:** Automatically generates monitoring dashboards for every job in production.
-  * **P2020 Monitoring Dashboards:** The new name for Automon.
-  * **HTTP prober:** A built-in probe in Prober Service.
-  * **Stubby prober:** A built-in probe in Prober Service.
-  * **Common Execution Path (CEP) prober:** A more flexible way to define probes in Prober Service.
-  * **Horizontal Monitoring Data (HMD):** HMD is a system for configuring dashboards, which monitor data is stored long-term in Monarch.
-  * **Query Explorer (QE):** A tool for querying and visualizing the monitoring data stored in Monarch.
-  * **gMon-Monarch alerting:** Libraries for defining custom alerts based on Monarch data.
-  * **SLO Repository v2, and SLA Buckets:** Tools for defining and managing Service Level Objectives (SLOs) and Service Level Agreements (SLAs).
-  * **vmprober:** A system for synthetic monitoring, likely focused on monitoring virtual machines (VMs).
-
-* **B. Alerting & Notifications**
-  * **Alert Manager:** Collects alerts from monitoring systems and sends notifications.
-  * **AMC (Alert Manager Console) (Deprecated):** The user interface for Alert Manager.
-  * **Customer User Journeys (CUJs) (Deprecated):** Formerly part of AMC, being replaced by features in IRM.
-  * **Lifeguard:** A system for receiving pager alerts.
-  * **SMS:** Short Message Service (text messaging), used for receiving pager alerts.
-  * **Telebot:** Another system for receiving pager alerts.
-  * **Escalator config:** Configuration for escalation paths.
-  * **Mercury:** Documentation on escalation targets.
-  * **Subspace:** A service where you configure how alert notifications are delivered.
-
-* **C. Incident Management**
-  * **IRM (Incident Response and Management):** The system for tracking outages and communicating their status.
-  * **IMAG (Incident Management at Google):** The protocol used at Google for managing large-scale incidents.
-  * **Tech-IR:** A team of senior SREs with expertise in running and resolving incidents.
-  * **Delta SRE:** The team that developed the IMAG protocol.
-  * **Incident Command System (ICS):** A standardized approach to incident management used by emergency response agencies.
-  * **DRT (Disaster Recovery Testing):** Exercises to test Google’s ability to recover from major disasters.
-
-* **D. Logging**
-  * **Sawmill:** Google’s system for collecting, storing, and analyzing structured event logs.
-    * **Envelope:** The Envelope is a process that runs alongside each server task and handles tasks like logging.
-    * **Unified Logging Service (ULS):** ULS is the component of Sawmill that collects logs from server tasks.
-    * **xulog / loge:** The two geo-replicated locations where Sawmill data is stored.
-    * **Wipeout pipeline:** The pipeline that removes personally identifiable information (PII) from logs.
-    * **Retention Team:** The team that manages retention and deletion policies for logs.
-    * **Logs Proxy:** A service that enforces access control for logs in Sawmill.
-  * **Eldar:** Eldar is part of the Sawmill system.
-  * **Logs Front Door (LFD):** LFD is another web interface, also part of Sawmill.
-  * **Remote Debug Logging (RDL):** RDL is the system that collects and stores the textual debug logs from your servers.
-  * **AnaLog:** Analog is a web-based tool for searching and browsing through the textual debug logs.
-  * **Dapper:** Dapper is Google’s distributed tracing system.
-
-* **V. Troubleshooting & Debugging**
-
-* **A. Tools & Systems**
-  * **Debug handlers (aka z-pages):** Special web pages built into your server that show internal debugging information.
-  * **Sherlog:** A system for tracing across-stack events.
-  * **Third Eye:** A service that automatically reports on exceptions and errors logged by servers.
-  * **Coroner:** A service that automatically collects and analyzes crash data for servers.
-  * **Herodotus:** A service that keeps track of changes made to production systems.
-  * **F1:** A service for performing SQL queries on logs data and other data sources.
-    * **f1 Command-line tool:** The `f1-sql` command-line tool.
-    * **f1 Query:** A system for querying and analyzing data from various sources.
-    * **PLX:** A web UI for F1 and other query engines.
-  * **Dremel (Deprecated):** A former system for interactive analysis of large datasets.
-  * **PowerDrill (Deprecated):** A former tool for interactive data analysis, now replaced by PLX Explorer.
-  * **Performance tools:** A general category of tools for analyzing server performance.
-  * **pprof:** A widely-used tool for visualizing profiling information.
-  * **rpcStudio:** A web-based tool for sending and receiving RPC requests.
-  * **ServerThrottler:** A library that you can include in your server code to help it handle overload situations.
-  * **YAQS (Yet Another Question System):** Google’s internal platform for asking and answering technical questions.
-
-* **VI. Configuration & Experimentation**
-
-* **A. Configuration Management**
-  * **CDPush:** A system for pushing configuration data updates to servers without restarting them.
-  * **Conductor:** Another system for pushing configuration data updates, similar to CDPush.
-
-* **B. Experimentation**
-  * **Mendel:** A system for managing experiments in production, allowing controlled rollout of changes to subsets of users or requests.
-  * **Rasta:** A platform for analyzing A/B tests, comparing the performance of different versions of a feature.
-
-* **VII. Guidelines**
-Understand the difference between Google general guidelines and Google team specific guidelines (like GWS, Youtube, etc.).
-* SQL refers to GoogleSQL.
-* GoogleSQL is a standardized SQL dialect used in many query engines and services at Google, and is also released in open source as ZetaSQL.
-  * GoogleSQL Query engines:
-    * F1 Query
-    * Dremel (now BigQuery)
-    * Spanner
-    * Cloud Spanner
-    * Procella
-    * Voxel (SQL evaluator library)
-  * GoogleSQL Processing systems:
-    * SQL Pipelines
-    * Flume Relational Engine
-    * PLX workflows
+**4. Observability & Reliability**
+* **Logging (ELK / Splunk / Datadog):** Centralized systems for collecting and analyzing application logs.
+* **Metrics (Prometheus / Grafana):** Monitoring systems for tracking performance and health metrics.
+* **Tracing (Jaeger / OpenTelemetry):** Distributed tracing for debugging request flows across microservices.
+* **Site Reliability Engineering (SRE):** The discipline that incorporates aspects of software engineering and applies them to infrastructure and operations problems.
 """)
+
+
 
 OUTPUT_GOALS: Final[str] = textwrap.dedent("""\
 Create overviews of a particular codebase with this output. Engineers and agents
@@ -517,7 +169,6 @@ class IndexerPrompt(abc.ABC):
     the code search, then reading the files, and then answering the final
     prompt.
     """
-
     def __init__(
         self,
         *,
@@ -528,9 +179,9 @@ class IndexerPrompt(abc.ABC):
         subdirectory_indexes: str,
         index_file_name: str,
         codebase_specific_context: str,
-        
         custom_sections: Sequence[bundle_pb2.ProjectBundle.CustomSection],
         extra_context: str = "",
+        repo_root: str | None = None,
     ):
         self._epoch = epoch
         self._previous_epoch_str = previous_epoch_str
@@ -538,10 +189,10 @@ class IndexerPrompt(abc.ABC):
         self._directory_contents = directory_contents
         self._subdirectory_indexes = subdirectory_indexes
         self._index_file_name = index_file_name
-        self._codebase_specific_context = codebase_specific_context
+        self._codebase_specific_context = codebase_specific_context or CLOUD_CONTEXT
+        self._repo_root = repo_root
         
         self._custom_sections = custom_sections
-        
         self._extra_context = extra_context
 
     @abc.abstractmethod
@@ -574,6 +225,11 @@ The index file name pattern for other directories is:
 <INDEX_FILE_NAME>
 {index_file_name}
 </INDEX_FILE_NAME>
+
+Repository root (search here for manifests):
+<REPOSITORY_ROOT>
+{repo_root}
+</REPOSITORY_ROOT>
 """).format(
             epoch=self._epoch,
             previous_epoch_str=self._previous_epoch_str,
@@ -581,6 +237,7 @@ The index file name pattern for other directories is:
             directory_contents=self._directory_contents,
             subdirectory_indexes=self._subdirectory_indexes,
             index_file_name=self._index_file_name,
+            repo_root=self._repo_root or "Unknown",
         )
 
 
@@ -592,23 +249,24 @@ The index file name pattern for other directories is:
         """Returns the custom sections of the prompt."""
         return self._custom_sections
 
-    def codesearch_planner_instruction(self) -> str:
-        """Returns the instruction for the codesearch planner agent."""
+    def research_planner_instruction(self) -> str:
+        """Returns the instruction for the research planner agent."""
         agent_role = textwrap.dedent("""\
 Your Role: You act as a researcher. You plan codebase searches to document a
-directory's contents.
+directory's contents. You are a senior architect who knows that the best documentation
+comes from ground-truth manifests and verified usage.
 """)
 
         ability = textwrap.dedent("""\
 Code search: You cannot perform code searches directly. You generate queries
 for the code search tool. You can plan at most {max_code_search_queries} queries.
 The system discards any extra queries. Use this language reference for the
-codesearch query syntax:
-<CODESEARCH_REFERENCE>
-{codesearch_reference}
-</CODESEARCH_REFERENCE>
+code search query syntax:
+<SEARCH_REFERENCE>
+{search_reference}
+</SEARCH_REFERENCE>
 """).format(
-            codesearch_reference=CODESEARCH_REFERENCE,
+            search_reference=SEARCH_REFERENCE,
             max_code_search_queries=MAX_CODE_SEARCH_QUERIES,
         )
 
@@ -617,11 +275,30 @@ Your task:
 
 1. Inspect the directory contents and any subdirectory summaries.
 2. Create a research plan. Decide what information you need to gather via code
-search to better understand the directory's code. Look at the files. Consider
-important missing context pieces. Examples include consumed interface definitions,
-exposed interface consumers, key production configurations, documentation, and tests.
+search to better understand the directory's code.
 
-IMPORTANT: format your output as a list of code search queries.
+### Manifest Discovery Mandate:
+Look for dependency manifest files that define the project's external environment. You are indexing a subdirectory, but manifest files are often at the REPOSITORY ROOT. You MUST search the ENTIRE repository for these manifests if they are not in your current directory.
+
+If you see signs of a specific ecosystem, search for:
+- **Node/JS**: `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `deno.json`
+- **Python**: `requirements.txt`, `pyproject.toml`, `setup.py`, `Pipfile`, `poetry.lock`
+- **Go**: `go.mod`, `go.sum`
+- **Rust**: `Cargo.toml`, `Cargo.lock`
+- **Java/Kotlin**: `pom.xml`, `build.gradle`, `build.gradle.kts`
+- **Ruby**: `Gemfile`, `Gemfile.lock`
+- **C#/.NET**: `*.csproj`, `packages.config`
+- **C/C++**: `CMakeLists.txt`, `Makefile`, `vcpkg.json`
+- **Swift**: `Package.swift`, `Podfile`
+- **Dart**: `pubspec.yaml`
+- **Infrastructure**: `Dockerfile`, `docker-compose.yml`, `earthly.sh`
+
+### Dependency Classification Rules:
+- **Internal**: Any component, interface, or library that exists WITHIN this repository.
+- **External**: Any third-party library, managed service (S3, Cloud SQL, etc.), or system dependency installed via a package manager.
+
+IMPORTANT: format your output as a JSON object with a "queries" list field.
+Example: {"queries": ["filename:package.json", "path:src/auth symbol:login"]}
 """)
 
         return textwrap.dedent("""\
@@ -634,7 +311,6 @@ IMPORTANT: format your output as a list of code search queries.
             codebase_context=self._codebase_specific_context,
             ability=ability,
             prompt_context=self.prompt_context(),
-            
             task=task,
         )
 
@@ -646,7 +322,8 @@ IMPORTANT: format your output as a list of code search queries.
         """Returns the instruction for the read files planner agent."""
         agent_role = textwrap.dedent("""\
 Your Role: You act as a researcher. You plan file reading to document a
-directory's contents.
+directory's contents. You focus on extracting dependency data from manifests
+and verifying their usage in actual source code.
 """)
 
         ability = textwrap.dedent("""\
@@ -672,24 +349,18 @@ Create a plan to read files to help summarize the directory.
 1. Inspect the directory contents, subdirectory summaries, and code search
 additional information.
 2. Create a research plan. Decide what additional information you need to
-gather by reading files. You already have access to all code in the directory.
-Focus on reading other code within the codebase to better understand the directory's
-code. Reading known files wastes time and lowers summary quality.
+gather by reading files.
 
-Use workspace-relative paths (e.g., 'foo/bar.py'). To locate files from imports,
-be aware of the following language-specific quirks in mono:
+### Manifest Reading Mandate:
+Always prioritize reading any manifest files (e.g., `package.json`, `go.mod`, `requirements.txt`, `pyproject.toml`) found by the research agent. These are essential for identifying external dependencies and their roles.
 
-* **C++:** Include paths are relative to `mono/`; you can use them verbatim.
-  Example: `#include "foo/bar.h"` maps to `foo/bar.h`.
-* **Java:** Imports generally map to paths relative to `mono/java/` or
-  `mono/javatests/`. Example: `import com.google.foo.Bar;` maps to
-  `recursive-index/foo/Bar.java`.
-* **Python:** Absolute imports typically start with `mono.`. Example:
-  `from mono.foo import bar` maps to `foo/bar.py`
-* **Go:** Imports use the `mono/` prefix explicitly. Example:
-  `import "mono/foo/bar"` maps to the package directory `foo/bar/`.
+### Usage Verification Mandate:
+For every dependency found in a manifest, you MUST identify at least one file that uses it (e.g. via an `import` or `require` statement) to confirm its role and provided a high-quality `usage_description`.
 
-IMPORTANT: format your output as a list of files you want to read.
+Use workspace-relative paths (e.g., 'foo/bar.py'). 
+
+IMPORTANT: format your output as a JSON object with a "files" list field.
+Example: {"files": ["package.json", "src/index.ts"]}
 """)
 
         return textwrap.dedent("""\
@@ -702,7 +373,6 @@ IMPORTANT: format your output as a list of files you want to read.
             role_description=agent_role,
             codebase_context=self._codebase_specific_context,
             ability=ability,
-            
             prompt_context=self.prompt_context(),
             previous_context=previous_context,
             task=task,
@@ -714,9 +384,7 @@ IMPORTANT: format your output as a list of files you want to read.
         code_search_output: str,
         read_files_output: str,
         key_components_output: str,
-        
         deep_dive_output: str,
-    
     ) -> str:
         """Returns the instruction for the custom sections agent.
 
@@ -738,7 +406,6 @@ Read files results:
 </READ_FILES_OUTPUT>
 
 Key components summary:
-
 <KEY_COMPONENTS_SUMMARY>
 {key_components_output}
 </KEY_COMPONENTS_SUMMARY>
@@ -755,10 +422,7 @@ Deep dive summary:
         )
 
         agent_role = textwrap.dedent("""\
-Your Role: You act as a technical writer on a team summarizing a large
-codebase. You focus on synthesizing both general research and your
-targeted specialized research to produce deep, domain-specific analysis
-for the codebase.
+Your Role: You are **Architect**, a senior staff-level AI agent specialized in reverse-engineering and understanding this codebase. You focus on synthesizing both general research and your targeted specialized research to produce deep, domain-specific analysis for the codebase.
 """)
 
         task_instructions = [
@@ -833,7 +497,8 @@ Your task:
 
 1. Inspect the directory contents and any subdirectory summaries.
 2. Inspect the additional context from the previous research.
-3. Summarize the following sections for the directory: Key Components (Files and Subdirectories), Key Interfaces, Key Dependencies, and Configuration and Flags.
+3. Summarize the following sections for the directory: Key Components (Files and Subdirectories), Key Interfaces, Key Dependencies (explicitly classifying them as 'internal' or 'external'), and Configuration and Flags.
+
 """)
         return textwrap.dedent("""\
 {codebase_context}
@@ -845,7 +510,9 @@ Your task:
 {task}
 {extra_context}
 """).format(
-            role_description=self.role_description(),
+            role_description=textwrap.dedent("""\
+Your Role: You are **Architect**, a senior staff-level AI agent specialized in reverse-engineering and understanding this codebase. Your mission is to build a comprehensive mental model of the code and foresee architectural consequences of changes. You follow elite engineering standards, prioritize context efficiency, and provide deep, technical insights that go beyond surface-level summaries.
+"""),
             codebase_context=self._codebase_specific_context,
             output_goals=OUTPUT_GOALS,
             prompt_context=self.prompt_context(),
@@ -906,7 +573,9 @@ IMPORTANT: DO NOT repeat the information found in key components summary.
 {task}
 {extra_context}
 """).format(
-            role_description=self.role_description(),
+            role_description=textwrap.dedent("""\
+Your Role: You are **Architect**, a senior staff-level AI agent specialized in reverse-engineering and understanding this codebase. Your mission is to build a comprehensive mental model of the code and foresee architectural consequences of changes. You follow elite engineering standards, prioritize context efficiency, and provide deep, technical insights that go beyond surface-level summaries.
+"""),
             codebase_context=self._codebase_specific_context,
             output_goals=OUTPUT_GOALS,
             output_format=_output_format(schema.DeepDiveDocument),
@@ -975,7 +644,9 @@ IMPORTANT: keep the overview under 2 paragraphs (1000 words) and do not include 
 {task}
 {extra_context}
 """).format(
-            role_description=self.role_description(),
+            role_description=textwrap.dedent("""\
+Your Role: You are **Architect**, a senior staff-level AI agent specialized in reverse-engineering and understanding this codebase. Your mission is to build a comprehensive mental model of the code and foresee architectural consequences of changes. You follow elite engineering standards, prioritize context efficiency, and provide deep, technical insights that go beyond surface-level summaries.
+"""),
             codebase_context=self._codebase_specific_context,
             output_goals=OUTPUT_GOALS,
             output_format=_output_format(schema.OverviewDocument),
@@ -985,16 +656,42 @@ IMPORTANT: keep the overview under 2 paragraphs (1000 words) and do not include 
             extra_context=self._extra_context,
         )
 
+    def verifier_agent_instruction(
+        self,
+        *,
+        artifact_json: str,
+        source_context: str,
+        is_merger_mode: bool = False,
+    ) -> str:
+        """Returns the instruction for the verifier agent."""
+        agent_role = textwrap.dedent("""\
+Your Role: You are **Verifier**, a specialized quality assurance agent. Your mission is to perform final QA and edge-case checks on generated artifacts.
+
+### Adversarial Verification Mandates:
+1. **Ground Truth Priority**: The source code's usage ALWAYS takes precedence over manifest files (package.json/requirements.txt).
+2. **Ghost Dependencies**: Look for dependencies mentioned in manifest files that are NOT actually used in the code. Flag these as `found_in_config`.
+3. **Implicit Dependencies**: Identify dependencies used in code (via imports or service calls) that are NOT declared in manifest files.
+4. **Incorrect Classification**: Ensure that internal project components aren't accidentally classified as 'external' dependencies just because they are in a different directory.
+
+You report failures with concrete evidence.
+""")
+
+        return textwrap.dedent("""\
+{role_description}
+{task}
+""").format(
+            role_description=agent_role,
+            task=create_verifier_prompt(artifact_json, source_context),
+        )
+
 
 class InitialIndexerPrompt(IndexerPrompt):
     """Initial indexer prompt."""
 
     def role_description(self) -> str:
-        del self  # Unused.
+        """Returns the role description for the architect agent."""
         return textwrap.dedent("""\
-Your Role: You act as a technical writer on a team summarizing a large codebase.
-Summarize the contents of a particular directory. Provide an overview of
-its interactions with its subdirectories.
+Your Role: You are **Architect**, a senior staff-level AI agent specialized in reverse-engineering and understanding this codebase. Your mission is to build a comprehensive mental model of the code and foresee architectural consequences of changes. You follow elite engineering standards, prioritize context efficiency, and provide deep, technical insights that go beyond surface-level summaries.
 """)
 
 
@@ -1065,13 +762,14 @@ def create_verifier_prompt(artifact_json: str, source_context: str) -> str:
 You are an expert factual verifier for a codebase indexing system.
 Your job is to read the generated artifact JSON and verify that EVERY claim made in it is explicitly supported by the source code context provided.
 
-Rule 1: If the artifact claims a dependency, interface, or component exists, it MUST be visible in the source context.
+Rule 1: If the artifact claims a dependency, interface, or component exists, it SHOULD be visible in the source context.
 Rule 2: If the artifact makes a claim about how something works, it MUST be supported by the code or comments in the source context.
 Rule 3: You must NOT verify if the JSON structure is valid. Assume it is syntactically correct. Your job is ONLY semantic factual verification.
-Rule 4: If you find ANY unsupported claims or hallucinated components/dependencies, you must mark `passed` as false and list the specific issues in the `issues` array.
-Rule 5: If the source context was truncated, do NOT fail verification just because a claimed file is not visible. Only fail if a claim directly contradicts what IS visible.
-Rule 6: The artifact follows a fixed schema including sections like 'key_dependencies', 'configurations', and 'architectural_patterns'. Do not fail verification because these sections exist; only fail if the specific items or claims within them are not grounded in the source or research context.
-Rule 7: The provided source context includes both the immediate directory contents and 'RESEARCH CONTEXT' gathered from across the codebase. Use both as valid grounds for verification.
+Rule 4: If you find a dependency or configuration that is documented in a README/MD file but not found in the actual source code, do NOT mark `passed` as false. Instead, mark it as an `info` severity issue with category `unsupported_claim`.
+Rule 5: Distinguish between Hallucinations (things that don't exist anywhere) and Documentation Claims (things documented but not yet implemented/visible in code). Only Hallucinations should block publication.
+Rule 6: If the source context was truncated, do NOT fail verification just because a claimed file is not visible. Only fail if a claim directly contradicts what IS visible.
+Rule 7: Large external libraries (e.g., react, vite, tailwind) found in package.json/lock files are 'external' dependencies. Do not flag them as issues if they are listed as such.
+Rule 8: The provided source context includes both the immediate directory contents and 'RESEARCH CONTEXT' gathered from across the codebase. Use both as valid grounds for verification.
 
 === SOURCE CONTEXT ===
 {truncated_context}
@@ -1079,5 +777,27 @@ Rule 7: The provided source context includes both the immediate directory conten
 === GENERATED ARTIFACT ===
 {artifact_json}
 
-Return your verdict in the requested JSON format.
+Return your verdict in the requested JSON format (VerificationVerdict).
+If there are unverified documentation claims, set `passed=True` but list them in `detailed_issues` with `severity='info'`.
 """)
+
+
+def create_root_map_prompt(root_map_content: str) -> str:
+    """Creates the senior architect prompt for root map synthesis."""
+    return textwrap.dedent(f"""\
+        You are a senior software architect creating a high-level "Map" of a large codebase.
+        Your goal is to synthesize multiple directory overviews into a single, cohesive architectural summary of the project.
+        
+        ### Instructions:
+        1. Identify the core purpose and architectural themes of the project.
+        2. Group related directories into logical components or layers (e.g., Infrastructure, API, Core Logic, UI).
+        3. Explain the data flow or interaction patterns between these components.
+        4. Focus on the "Big Picture". Avoid listing every single directory; instead, explain the system's design.
+        5. If the input is already a collection of summaries, further synthesize them into a higher-level abstraction.
+        
+        ### Input Context (Overviews/Summaries):
+        {root_map_content}
+        
+        Write a professional, neutral, and highly useful summary for other engineers and autonomous agents.
+    """)
+

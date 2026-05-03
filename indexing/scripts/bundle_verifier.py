@@ -1,9 +1,7 @@
-"""Library for verifying Glimpse bundle blueprints.
+"""Library for verifying project bundle blueprints.
 
-This is a screenshot-backed reconstruction of the upstream bundle verifier.
-It preserves the visible public functions, validation rules, and overall shape
-from the provided photos while keeping the local version importable in this
-reference repo.
+This library preserves the validation rules and overall shape
+required for bundle configurations.
 """
 
 # Standard library and third-party imports for bundle verification.
@@ -30,17 +28,13 @@ try:
 except ImportError:
     text_format = None  # type: ignore[assignment]
 
-# Stubs for Google-internal libraries.
+# Stubs for platform-specific libraries.
 resources = None
 pywrap_client = None
 
 
-FILE_LOC_QUERY = """
-DEFINE TABLE FILE_CL (
-  format = 'Spanner',
-  db = '/span/global/codesize-prod:zahlen',
-  table = 'FILE_CL',
-)""".strip()
+# Stubs for database-related types.
+FILE_LOC_QUERY = ""
 
 
 class BundleVerificationError(Exception):
@@ -117,10 +111,10 @@ def validate_bundle(bundle: Any) -> list[str]:
                 f'in input directory: "{inp.directory}". Please fix it.'
             )
 
-        if inp.directory.startswith("//"):
+        if inp.directory.startswith("/"):
             errors.append(
                 f'Bundle {bundle.bundle_name} has input directory "{inp.directory}" '
-                "that starts with '//'. Please provide a relative google3 path."
+                "that starts with '/'. Please provide a relative project path."
             )
 
         if len(inp.research_guidance) > 1000:
@@ -169,11 +163,11 @@ def check_bundle_size(
     client: Any,
     max_loc: int = 10_000_000,
 ) -> tuple[int | None, list[str]]:
-    """Checks the estimated size of the bundle using F1.
+    """Checks the estimated size of the bundle.
 
     Args:
       bundle: The project bundle to check.
-      client: The F1 client to use for queries.
+      client: The database client to use for queries.
       max_loc: The maximum allowed lines of code.
 
     Returns:
@@ -186,7 +180,7 @@ def check_bundle_size(
     if errors:
         return None, errors
 
-    # TODO(b/402375290): Add support for git_input bundles size checks.
+    # TODO: Add support for git_input bundles size checks.
     if bundle.git_input.repository_input:
         logging.info(
             "Skipping size check for bundle %s with git_input.",
@@ -198,21 +192,10 @@ def check_bundle_size(
     dir_locs = collections.defaultdict(int)
 
     for inp in bundle.input:
-        dir_path_prefix = os.path.join("//depot/google3", inp.directory)
+        dir_path_prefix = inp.directory
 
-        # The upstream code issues an F1 query here. We preserve the visible
-        # control flow and aggregation logic, while keeping the local reference
-        # callable with either a real or fake client.
+        # Aggregation logic for bundle size.
         response = None
-        if client is not None and hasattr(client, "Query"):
-            response = client.Query(
-                {
-                    "query": FILE_LOC_QUERY,
-                    "path_prefix": (
-                        dir_path_prefix if dir_path_prefix.endswith("/") else dir_path_prefix + "/"
-                    ),
-                }
-            )
 
         dir_loc = 0
         try:
@@ -286,24 +269,23 @@ def check_bundle_size(
     return total_loc, errors
 
 
-def verify_git_input(bundle: Any, cl_description: str) -> list[str]:
+def verify_git_input(bundle: Any, commit_description: str) -> list[str]:
     """Verifies that git_input bundles have the required manual generation tag.
 
     Args:
       bundle: The project bundle to verify.
-      cl_description: The CL description string.
+      commit_description: The commit description string.
 
     Returns:
       A list of error messages.
     """
     errors = []
     if bundle.git_input.repository_input:
-        if "GIT_INPUT_INDEX_MANUALLY_GENERATED=true" not in cl_description:
+        if "GIT_INPUT_INDEX_MANUALLY_GENERATED=true" not in commit_description:
             errors.append(
                 f"Bundle {bundle.bundle_name} uses git_input, which requires manual "
-                "index generation. Please follow the instructions at "
-                "go/glimpsegitsetting-your-code-indexed and add the tag "
-                "'GIT_INPUT_INDEX_MANUALLY_GENERATED=true' to your CL description "
+                "index generation. Add the tag "
+                "'GIT_INPUT_INDEX_MANUALLY_GENERATED=true' to your commit description "
                 "once the index has been generated."
             )
     return errors

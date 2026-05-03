@@ -149,6 +149,55 @@ def get_health_bar(confidence: float) -> str:
     return f"{emoji} **{bar} {percentage}%**"
 
 
+def _recursive_summarize(
+    items: list[str],
+    llm_prompter: LlmPrompterProtocol,
+    chunk_size: int = 10,
+    max_item_chars: int = 24000,
+) -> str:
+    """Recursively summarizes a list of content items using Map-Reduce.
+    
+    Args:
+        items: List of text items to summarize.
+        llm_prompter: The LLM prompter for synthesis calls.
+        chunk_size: Number of items per batch.
+        max_item_chars: Maximum characters per individual item before forced
+            truncation. Prevents infinite loops when a single item exceeds
+            the LLM context window (Review Finding #7).
+    """
+    if not items:
+        return "No content to summarize."
+    if len(items) == 1:
+        return items[0]
+
+    # Force-truncate oversized individual items to prevent batching deadlocks
+    safe_items = []
+    for item in items:
+        if len(item) > max_item_chars:
+            logging.warning(
+                "[RootMap] Truncating oversized summary item (%d chars > %d limit).",
+                len(item), max_item_chars,
+            )
+            safe_items.append(item[:max_item_chars] + "\n...[TRUNCATED]")
+        else:
+            safe_items.append(item)
+
+    logging.info(f"[RootMap] Map-Reduce: Processing {len(safe_items)} items in {len(range(0, len(safe_items), chunk_size))} chunks.")
+    
+    summaries = []
+    for i in range(0, len(safe_items), chunk_size):
+        chunk = safe_items[i:i + chunk_size]
+        chunk_text = "\n\n".join(chunk)
+        # We use the same prompter method; the prompter should handle the synthesis logic.
+        summary = llm_prompter.prompt_for_root_map_summary(chunk_text)
+        summaries.append(summary)
+    
+    if len(summaries) == 1:
+        return summaries[0]
+        
+    return _recursive_summarize(summaries, llm_prompter, chunk_size, max_item_chars)
+
+
 def regenerate_root_map(
     work_units: Sequence[WorkUnit],
     output_dir: str,
@@ -158,10 +207,8 @@ def regenerate_root_map(
     llm_prompter: LlmPrompterProtocol,
 ) -> None:
     """Writes a root map file consolidating overviews from all index files."""
-    # Define the output file path for the specific indexing epoch.
     root_map_file = Path(output_dir) / f"root_map_v{epoch}.md"
 
-    # Extract directory paths from work units and sort for consistent output.
     all_index_paths = sorted(
         [
             Path(getattr(work_unit, "output_path", getattr(work_unit, "unit_id", "")))
@@ -172,12 +219,10 @@ def regenerate_root_map(
         "Regenerating root map for %d directories.", len(all_index_paths)
     )
 
-    # Aggregate all overviews into a single context for LLM summarization.
     collected_data = collect_overviews(
         index_state, work_units, epoch, log_warnings=True
     )
 
-    # Calculate global project health using the new weighted confidence logic.
     project_health = calculate_project_health(collected_data)
     health_bar = get_health_bar(project_health)
 
@@ -185,23 +230,11 @@ def regenerate_root_map(
         f"## {item['display_path']}\n\n{item['content']}\n" 
         for item in collected_data
     ]
-    overviews_text = "\n".join(overviews_list)
     
-    # Truncate overviews_text safely to prevent Context Window Exceeded errors 
-    # on local LLMs. We slice at the nearest newline to avoid cutting mid-word or
-    # breaking markdown structures abruptly.
-    prompt_text = overviews_text
-    if len(prompt_text) > 30000:
-        logging.warning("Overviews text truncated for RootMap LLM synthesis to prevent context overflow.")
-        cut_index = prompt_text.rfind('\n', 0, 30000)
-        if cut_index == -1:
-            cut_index = 30000
-        prompt_text = prompt_text[:cut_index] + "\n\n...[Truncated]..."
-        
-    # Generate the top-level summary using the aggregated overviews.
-    summary = llm_prompter.prompt_for_root_map_summary(prompt_text)
+    # --- Recursive Map-Reduce Synthesis ---
+    # Instead of naive truncation, we recursively summarize chunks of overviews.
+    summary = _recursive_summarize(overviews_list, llm_prompter)
     
-    # Extract verification issues for the global report.
     unverified_sections = [
         item for item in collected_data if not item["is_verified"]
     ]
@@ -214,7 +247,7 @@ def regenerate_root_map(
             issues_report += f"- **{item['display_path']}**: {len(item['issues'])} issues noted.\n"
         issues_report += "\n"
 
-    # Assemble the final markdown document for the current indexing epoch.
+    overviews_text = "\n".join(overviews_list)
     content = "\n".join(
         [
             f"# Root Map - Epoch {epoch}\n",
@@ -226,8 +259,6 @@ def regenerate_root_map(
         ]
     )
 
-    # Persist the final root map to the specified output directory.
     root_map_file.parent.mkdir(parents=True, exist_ok=True)
     root_map_file.write_text(content, encoding="utf-8")
-    # Logging instead of printing for cleaner production logs.
     logging.info("Successfully wrote root map to %s", root_map_file)

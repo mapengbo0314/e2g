@@ -49,10 +49,15 @@ def render_section(section: schema.Section) -> Optional[str]:
         if not section.dependencies:
             return None
         # Map each dependency to its respective usage description string.
-        items = "\n".join(
-            [f"- **{d.name}**: {d.usage_description}" for d in section.dependencies]
-        )
-        return f"# Key Dependencies\n\n{items}"
+        # Include type indicator for external/unverified dependencies.
+        items = []
+        for d in section.dependencies:
+            type_label = ""
+            if getattr(d, "dependency_type", "internal") != "internal":
+                type_label = f" *[{d.dependency_type}]*"
+            items.append(f"- **{d.name}**{type_label}: {d.usage_description}")
+        
+        return f"# Key Dependencies\n\n" + "\n".join(items)
     
     if isinstance(section, schema.ArchitecturalPatternsAndGotchas):
         return (
@@ -111,6 +116,17 @@ def to_markdown(doc: schema.IndexDocument) -> str:
         md = render_section(custom_section)
         if md:
             output.append(md.strip())
+
+    if doc.verification_notes:
+        notes = "\n".join([f"- {note}" for note in doc.verification_notes])
+        output.append(f"# Verification Notes\n\n> [!NOTE]\n> These are informational findings from the verifier (e.g., documented claims not yet found in the code).\n\n{notes}")
+
+    # Add verification footer for auditability.
+    if doc.verification_state and doc.verification_state.verified:
+        vs = doc.verification_state
+        model_str = f" by {vs.verification_model}" if vs.verification_model else ""
+        time_str = f" at {vs.verified_at}" if vs.verified_at else ""
+        output.append(f"---\n*Verified{model_str}{time_str} (Confidence: {vs.confidence:.2f})*")
 
     result = "\n\n".join(output)
     return sanitize_unicode(result)

@@ -42,22 +42,92 @@ class VerificationCache:
         self.cache: dict[str, dict[str, Any]] = self._load_cache()
 
     def _load_cache(self) -> dict[str, dict[str, Any]]:
+        import fcntl
+        import tempfile
+        import os
         cache = {}
+        
+        # --- Handle Legacy .json Migration (Review Finding #6) ---
+        legacy_json_file = self.cache_file.with_suffix('.json')
+        if legacy_json_file.exists():
+            if not self.cache_file.exists():
+                # Migrate: legacy exists, JSONL does not yet
+                try:
+                    with open(legacy_json_file, "r", encoding="utf-8") as f:
+                        legacy_data = json.load(f)
+                    
+                    # Write to temp file and atomic rename to prevent corruption on crash
+                    dir_name = str(self.cache_file.parent)
+                    fd, temp_path = tempfile.mkstemp(dir=dir_name, text=True)
+                    with os.fdopen(fd, "w", encoding="utf-8") as f:
+                        for hash_key, verdict in legacy_data.items():
+                            cache[hash_key] = verdict
+                            f.write(json.dumps({"key": hash_key, "verdict": verdict}) + "\n")
+                    
+                    os.replace(temp_path, str(self.cache_file))
+                    legacy_json_file.unlink()  # Safe unlink after atomic replace
+                    logging.info("Migrated legacy verification cache to JSONL format.")
+                    return cache
+                except Exception as e:
+                    logging.warning(f"Failed to migrate legacy cache: {e}. Starting fresh.")
+                    return {}
+            else:
+                # Orphaned .json from a previously interrupted migration.
+                # The .jsonl already exists, so the .json is stale — clean it up.
+                logging.info("Cleaning up orphaned legacy verification cache file.")
+                legacy_json_file.unlink(missing_ok=True)
+        
         if not self.cache_file.exists():
             return cache
+        
+        # --- Load and Compact JSONL (Review Finding #5) ---
+        # Read all entries, deduplicating by key (last-write-wins)
         try:
-            with open(self.cache_file, 'r', encoding='utf-8') as f:
-                for line in f:
-                    if not line.strip(): continue
+            with self._lock:
+                with open(self.cache_file, 'r', encoding='utf-8') as f:
                     try:
-                        data = json.loads(line)
-                        cache[data['key']] = data['verdict']
-                    except Exception:
-                        pass
+                        fcntl.flock(f, fcntl.LOCK_SH)
+                        for line in f:
+                            if not line.strip(): continue
+                            try:
+                                data = json.loads(line)
+                                cache[data['key']] = data['verdict']
+                            except Exception:
+                                pass
+                    finally:
+                        fcntl.flock(f, fcntl.LOCK_UN)
+            
+            # Compact: rewrite the JSONL with deduplicated entries to prevent
+            # O(E * N) unbounded growth across multi-epoch runs.
+            if cache:
+                self._compact_cache(cache)
+            
             return cache
         except Exception:
             logging.warning("Verification cache is corrupted. Starting fresh.")
             return {}
+    
+    def _compact_cache(self, cache: dict[str, dict[str, Any]]) -> None:
+        """Rewrites the JSONL cache with deduplicated entries.
+        
+        Uses atomic tempfile rename to ensure crash safety.
+        """
+        import tempfile
+        import os
+        
+        dir_name = str(self.cache_file.parent)
+        try:
+            fd, temp_path = tempfile.mkstemp(dir=dir_name, text=True)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                for key, verdict in cache.items():
+                    f.write(json.dumps({"key": key, "verdict": verdict}) + "\n")
+            os.replace(temp_path, str(self.cache_file))
+        except Exception as e:
+            logging.warning(f"Cache compaction failed: {e}")
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
     def _compute_hash(self, artifact_json: str, source_context: str) -> str:
         """Computes a stable hash of the input and context."""
@@ -80,13 +150,18 @@ class VerificationCache:
         return None
 
     def store_verdict(self, artifact_json: str, source_context: str, verdict: verification_types.VerificationVerdict) -> None:
+        import fcntl
         key = self._compute_hash(artifact_json, source_context)
         dumped = verdict.model_dump() if pydantic is not None else verdict.model_dump()
         with self._lock:
             self.cache[key] = dumped
             self.cache_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.cache_file, 'a', encoding='utf-8') as f:
-                f.write(json.dumps({"key": key, "verdict": dumped}) + "\n")
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX)
+                    f.write(json.dumps({"key": key, "verdict": dumped}) + "\n")
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)
 
 
 class ArtifactVerifier:

@@ -1,22 +1,22 @@
 # proto-file: indexing/config/bundle.proto
 # proto-message: ProjectBundle
 
-# Unique name for the rcs bundle
-bundle_name: "rcs"
+# Unique name for the communication bundle
+bundle_name: "comm_svc"
 
-# Core Java codebase
+# Core application logic
 input: {
-  directory: "java/com/google/communication/rcs/"
+  directory: "src/main/java/com/enterprise/communication/"
 }
 input: {
-  directory: "javatests/com/google/communication/rcs/"
+  directory: "src/test/java/com/enterprise/communication/"
 }
 
-# APIs
+# APIs and interfaces
 input: {
-  directory: "communication/rcs/"
+  directory: "api/communication/"
 }
 
 # Exclude large test data or noise patterns
 exclude_pattern: ".*/testdata/.*"
-exclude_pattern: ".*\\.rpclog"
+exclude_pattern: ".*\\.log"
