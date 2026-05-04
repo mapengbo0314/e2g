@@ -58,6 +58,9 @@ except ImportError:
     ollama = None
 
 # Dynamic resolution of indexing project modules with fallback mechanisms.
+class UnrecoverableLlmError(Exception):
+    """Exception raised for unrecoverable LLM errors (e.g. model not found)."""
+    pass
 try:
     from indexing import error_prompt_generator
 except ImportError:
@@ -292,8 +295,8 @@ class VertexAiConversation:
         text = response.text
         # Parse and store the response as structured state.
         try:
-            # We reuse the key normalization logic from the OpenAI wrapper.
-            self._last_response = OpenAiConversation._normalize_keys(json.loads(text))
+            extracted = OpenAiConversation._extract_json(text)
+            self._last_response = OpenAiConversation._normalize_keys(json.loads(extracted))
         except (json.JSONDecodeError, TypeError):
             self._last_response = text
         return text
@@ -329,7 +332,8 @@ class GoogleAiConversation:
         text = response.text
         # Parse and store the response as structured state.
         try:
-            self._last_response = OpenAiConversation._normalize_keys(json.loads(text))
+            extracted = OpenAiConversation._extract_json(text)
+            self._last_response = OpenAiConversation._normalize_keys(json.loads(extracted))
         except (json.JSONDecodeError, TypeError):
             self._last_response = text
         return text
@@ -374,6 +378,26 @@ class OpenAiConversation:
             return [OpenAiConversation._normalize_keys(i) for i in obj]
         return obj
 
+    @staticmethod
+    def _extract_json(text: str) -> str:
+        """Extracts JSON from a string that might contain markdown fences."""
+        if not text:
+            return ""
+        cleaned = text.strip()
+        # First, attempt to match standard markdown json fences.
+        # The DOTALL flag ensures we capture multi-line JSON structures.
+        fence_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', cleaned, re.DOTALL)
+        if fence_match:
+            return fence_match.group(1)
+            
+        # Fallback to extracting the outermost braces
+        start = cleaned.find('{')
+        end = cleaned.rfind('}')
+        if start != -1 and end != -1 and end > start:
+            return cleaned[start:end+1]
+            
+        return cleaned
+
     def prompt(self, user_prompt: str) -> str:
         self.history.append({"role": "user", "content": user_prompt})
         
@@ -389,7 +413,8 @@ class OpenAiConversation:
         self.history.append({"role": "assistant", "content": text})
         # Parse and store the response as structured state.
         try:
-            self._last_response = OpenAiConversation._normalize_keys(json.loads(text))
+            extracted = OpenAiConversation._extract_json(text)
+            self._last_response = OpenAiConversation._normalize_keys(json.loads(extracted))
         except (json.JSONDecodeError, TypeError):
             self._last_response = text
         return text
@@ -415,9 +440,9 @@ class AnthropicConversation:
         
         self.model_name = model_name
         self.system_prompt = system_prompt
+        self.output_schema_type = output_schema_type
         if self.output_schema_type is not None:
              self.system_prompt += "\n\nYou must respond strictly in JSON format." if self.system_prompt else "You must respond strictly in JSON format."
-        self.output_schema_type = output_schema_type
         self.history = []
         self._last_response: Any = None
 
@@ -434,7 +459,8 @@ class AnthropicConversation:
         self.history.append({"role": "assistant", "content": text})
         # Parse and store the response as structured state.
         try:
-            self._last_response = OpenAiConversation._normalize_keys(json.loads(text))
+            extracted = OpenAiConversation._extract_json(text)
+            self._last_response = OpenAiConversation._normalize_keys(json.loads(extracted))
         except (json.JSONDecodeError, TypeError):
             self._last_response = text
         return text
@@ -493,7 +519,8 @@ class OllamaConversation:
             self.history.append({"role": "assistant", "content": text})
             # Store parsed JSON state for get_state retrieval.
             try:
-                self._last_response = OpenAiConversation._normalize_keys(json.loads(text))
+                extracted = OpenAiConversation._extract_json(text)
+                self._last_response = OpenAiConversation._normalize_keys(json.loads(extracted))
             except (json.JSONDecodeError, TypeError):
                 self._last_response = text
             return text
@@ -571,6 +598,10 @@ class GeminiLlmPrompter(LlmPrompter):
         "Component": {"description": ""},
         "Interface": {"description": ""},
         "ConfigurationItem": {"definition_link": "", "description": ""},
+        "ImplementationInvariant": {"primitive": "", "intent": "", "usage_context": ""},
+        "ExportedSymbol": {"name": "", "signature": "", "summary": ""},
+        "TechDebtNote": {"category": "", "description": "", "impact": ""},
+        "WorkflowPattern": {"name": "", "framework": "", "nodes": [], "edges": [], "entry_point": ""},
     }
 
     def __init__(
@@ -699,7 +730,12 @@ class GeminiLlmPrompter(LlmPrompter):
                 logging.info("[Coercion] Injected missing mandatory wrapper '%s'.", wrapper_key)
             
             wrapper = data[wrapper_key]
-            if not isinstance(wrapper, dict):
+            if isinstance(wrapper, list):
+                # If the LLM returned the list directly instead of the wrapper object.
+                logging.info("[Coercion] Wrapped naked list in '%s' to dict with '%s' key.", wrapper_key, list_key)
+                wrapper = {list_key: wrapper}
+                data[wrapper_key] = wrapper
+            elif not isinstance(wrapper, dict):
                 # If the LLM returned something like "" or "none" for the wrapper,
                 # convert it to an empty dict with the required list key.
                 wrapper = {list_key: []}
@@ -733,6 +769,10 @@ class GeminiLlmPrompter(LlmPrompter):
         "key_individual_components": ("components", "Component"),
         "key_interfaces": ("interfaces", "Interface"),
         "configurations": ("configurations", "ConfigurationItem"),
+        "implementation_invariants": ("invariants", "ImplementationInvariant"),
+        "workflow_patterns": ("patterns", "WorkflowPattern"),
+        "blueprint": ("symbols", "ExportedSymbol"),
+        "tech_debt": ("notes", "TechDebtNote"),
     }
 
     _STRING_KEYS = {
@@ -889,11 +929,18 @@ class GeminiLlmPrompter(LlmPrompter):
         # Calculate retry delay with exponential backoff and jitter.
         base_delay = min(2**attempt, self._config.delay_on_failure_max_seconds)
         # Determine the type of failure to apply appropriate retry strategy.
-        if "quota" in str(e).lower():
+        error_str = str(e).lower()
+        
+        # Unrecoverable: Model not found (404)
+        if "not_found" in error_str and "model" in error_str:
+            logging.error("[LlmPrompter] UNRECOVERABLE ERROR: Model '%s' not found. Check your provider and model name. Error: %s", self._config.model_name, e)
+            raise UnrecoverableLlmError(f"Model '{self._config.model_name}' not found. Stopping run.") from e
+            
+        if "quota" in error_str:
             # Handle rate limiting or credit exhaustion specifically.
             self._stats.increment_counter("llm.runtime_quota_errors")
             sleep_duration = random.randint(0, _QUOTA_ERROR_RETRY_JITTER_SECONDS)
-            logging.exception(
+            logging.info(
                 "LLM call failed for %s due to quota issues, retrying in %d seconds: %r",
                 directory_path,
                 sleep_duration,
@@ -1049,7 +1096,9 @@ class GeminiLlmPrompter(LlmPrompter):
                     return parsed_output
                 if isinstance(parsed_output, str) and pydantic is not None:
                     if hasattr(output_schema, 'model_validate_json'):
-                        return output_schema.model_validate_json(parsed_output)
+                        # Clean the string in case it still contains markdown fences.
+                        cleaned_output = OpenAiConversation._extract_json(parsed_output)
+                        return output_schema.model_validate_json(cleaned_output)
                     return parsed_output
                 # Ensure we don't return None on a successful call that produced no data.
                 if parsed_output is None:
@@ -1337,6 +1386,9 @@ class GeminiLlmPrompter(LlmPrompter):
             deep_dive=deep_dive_doc.deep_dive,
             testing_strategy=key_components_doc.testing_strategy,
             configurations=key_components_doc.configurations,
+            implementation_invariants=key_components_doc.implementation_invariants,
+            blueprint=key_components_doc.blueprint,
+            tech_debt=key_components_doc.tech_debt,
             custom_sections=custom_sections_results,
             # --- Phase 4: Metadata Integration ---
             # Populate the GenerationMetadata sub-model to satisfy SM-101.
@@ -1478,20 +1530,7 @@ class GeminiLlmPrompter(LlmPrompter):
 
                 # Ollama often wraps JSON in markdown fences: ```json {...} ```
                 # We need to strip them and retry parsing.
-                import re
-                cleaned = response.strip()
-                
-                # First, attempt to match standard markdown json fences.
-                # The DOTALL flag ensures we capture multi-line JSON structures.
-                fence_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', cleaned, re.DOTALL)
-                if fence_match:
-                    cleaned = fence_match.group(1)
-                else:
-                    # If there are no fences, fallback to extracting any raw JSON-like 
-                    # object structure found anywhere within the response body.
-                    obj_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', cleaned, re.DOTALL)
-                    if obj_match:
-                        cleaned = obj_match.group(0)
+                cleaned = OpenAiConversation._extract_json(response)
 
                 try:
                     data = json.loads(cleaned)

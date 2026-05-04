@@ -13,7 +13,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, Optional
 
 # Optional Pydantic import for schema-driven validation.
 try:
@@ -235,6 +235,44 @@ class ArtifactVerifier:
             logging.warning("[Verifier] Stage 1 FAILED (unexpected): %s", e)
             return verification_types.VerificationVerdict.syntactic_failure(str(e))
 
+    def _check_mandatory_sections(self, doc: schema.IndexDocument, source_context: str) -> Optional[verification_types.VerificationVerdict]:
+        """Enforces presence of mandatory sections (blueprint, invariants) for non-trivial codebases."""
+        issues = []
+        
+        # Heuristic: Is this a directory with source code?
+        code_extensions = {".py", ".ts", ".js", ".go", ".rs", ".c", ".cpp", ".h", ".java", ".kt", ".swift", ".rb"}
+        has_code = any(ext in source_context for ext in code_extensions)
+        
+        if not has_code:
+            return None
+
+        # 1. Enforce Blueprint (Symbols)
+        if not doc.blueprint or not doc.blueprint.symbols:
+            issues.append("Mandatory section 'blueprint.symbols' is empty despite source code presence. Extract exact function/class signatures.")
+        
+        # 2. Enforce Implementation Invariants
+        if not doc.implementation_invariants or not doc.implementation_invariants.invariants:
+             # We might want to be slightly more lenient here, but let's at least warn or fail if it's totally empty.
+             # For Zero-Discovery, invariants are crucial.
+             issues.append("Mandatory section 'implementation_invariants' is empty. Document mechanical primitives (locking, atomicity, etc.).")
+
+        if issues:
+            logging.warning("[Verifier] Mandatory section check FAILED: %s", "; ".join(issues))
+            detailed = [
+                verification_types.VerificationIssue(
+                    category=verification_types.IssueCategory.EMPTY_MANDATORY_SECTION.value,
+                    severity=verification_types.IssueSeverity.CRITICAL.value,
+                    description=i
+                ) for i in issues
+            ]
+            return verification_types.VerificationVerdict.failure(
+                issues=issues,
+                detailed_issues=detailed,
+                can_retry=True
+            )
+        
+        return None
+
     def _stage2_semantic_verification(
         self, 
         artifact_json: str, 
@@ -296,8 +334,14 @@ class ArtifactVerifier:
         stage1_result = self._stage1_syntactic_validation(artifact_json)
         if isinstance(stage1_result, verification_types.VerificationVerdict):
             # Stage 1 failed, abort and return the failure immediately.
-            logging.warning("[Verifier] Pipeline aborted at Stage 1.")
+            logging.warning("[Verifier] Pipeline aborted at Stage 1 (syntactic).")
             return stage1_result
+            
+        # Stage 1.5: Mandatory Section Enforcement (NEW)
+        mandatory_result = self._check_mandatory_sections(stage1_result, source_context)
+        if mandatory_result:
+            logging.warning("[Verifier] Pipeline aborted at Stage 1.5 (mandatory sections).")
+            return mandatory_result
             
         if skip_semantic:
             # Return success if Stage 1 passes and semantic verification is disabled.

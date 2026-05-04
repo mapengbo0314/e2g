@@ -117,7 +117,9 @@ find the right place to start reading code.
 3. **Usefulness: CRITICAL GOAL** Make the summaries useful. Help a skilled
 engineer understand the codebase. Ensure they know where to look for more detail
 in as few steps as possible.
-4. **Targeted Detail: Important Goal** Provide an appropriate level of detail
+4. **Mechanical Grounding: NEW CRITICAL GOAL** Identify the underlying technical primitives that ensure reliability (e.g., locking, atomicity, concurrency models). This prevents agents from breaking mechanical contracts.
+5. **Blueprint Fidelity: NEW CRITICAL GOAL** Extract exact structural signatures (type hints, arguments) for public symbols. This enables "Zero-Discovery" implementation.
+6. **Targeted Detail: Important Goal** Provide an appropriate level of detail
 for each directory and component. Tune the level of detail based on complexity
 and importance. Write very brief explanations of purpose for trivial files and
 directories. A single sentence description suffices for simple utility classes.
@@ -279,6 +281,13 @@ search to better understand the directory's code.
 
 ### Manifest Discovery Mandate:
 Look for dependency manifest files that define the project's external environment. You are indexing a subdirectory, but manifest files are often at the REPOSITORY ROOT. You MUST search the ENTIRE repository for these manifests if they are not in your current directory.
+
+### Mechanical & Signature Mandate:
+You MUST search for:
+1. **Critical Primitives**: Look for `fcntl`, `flock`, `threading`, `asyncio.Lock`, `tempfile`, `os.rename` (atomic), `multiprocessing`.
+2. **Structural Signatures**: Identify all public-facing functions and classes. Your research plan MUST include reading the definitions of these symbols to extract their exact signatures.
+3. **Implicit Dependencies**: Search for usage of environment variables (`os.environ`, `getenv`) or external service calls that aren't in manifests.
+4. **Workflow State Machines**: Look for LangGraph `StateGraph`, Temporal `Workflow`, or custom orchestration logic that dictates system behavior.
 
 If you see signs of a specific ecosystem, search for:
 - **Node/JS**: `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `deno.json`
@@ -497,7 +506,14 @@ Your task:
 
 1. Inspect the directory contents and any subdirectory summaries.
 2. Inspect the additional context from the previous research.
-3. Summarize the following sections for the directory: Key Components (Files and Subdirectories), Key Interfaces, Key Dependencies (explicitly classifying them as 'internal' or 'external'), and Configuration and Flags.
+3. Summarize the following sections for the directory: 
+   - **Key Components**: Files and Subdirectories.
+   - **Key Interfaces**: Conceptual abstractions.
+   - **Key Dependencies**: Internal vs External.
+   - **Configuration and Flags**: System controls.
+   - **Implementation Invariants**: Mechanical primitives (locking, atomicity, concurrency) that define the system's reliability.
+   - **Blueprint**: Exact structural signatures (e.g., `def foo(a: int) -> str`) for all public symbols. Ensure signatures are extracted exactly from the source code.
+   - **Workflow Patterns**: Orchestration flows, LangGraph nodes/edges, or Temporal state machines.
 
 """)
         return textwrap.dedent("""\
@@ -671,7 +687,9 @@ Your Role: You are **Verifier**, a specialized quality assurance agent. Your mis
 1. **Ground Truth Priority**: The source code's usage ALWAYS takes precedence over manifest files (package.json/requirements.txt).
 2. **Ghost Dependencies**: Look for dependencies mentioned in manifest files that are NOT actually used in the code. Flag these as `found_in_config`.
 3. **Implicit Dependencies**: Identify dependencies used in code (via imports or service calls) that are NOT declared in manifest files.
-4. **Incorrect Classification**: Ensure that internal project components aren't accidentally classified as 'external' dependencies just because they are in a different directory.
+4. **Blueprint Integrity**: Ensure that the `blueprint` signatures match the source code character-for-character (including type hints).
+5. **Shadow Tech Debt**: Identify naming slop, redundant aliases (multiple names for the same instance), and "Zombie APIs" (exported but never consumed). Document these in the `tech_debt` section.
+6. **Mechanical Fragility**: Flag any place where a critical primitive (like a lock) is used inconsistently (e.g., used in write but not in read).
 
 You report failures with concrete evidence.
 """)

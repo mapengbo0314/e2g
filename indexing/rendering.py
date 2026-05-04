@@ -82,7 +82,50 @@ def render_section(section: schema.Section) -> Optional[str]:
             ]
         )
         return f"# Configuration and flags\n\n{items}"
-    
+
+    if isinstance(section, schema.ImplementationInvariants):
+        if not section.invariants:
+            return None
+        # Summarize mechanical primitives and their architectural intent.
+        items = "\n".join(
+            [
+                f"- **{i.primitive}**: {i.intent} ({i.usage_context})"
+                for i in section.invariants
+            ]
+        )
+        return f"# Implementation Invariants\n\n{items}"
+
+    if isinstance(section, schema.Blueprint):
+        if not section.symbols:
+            return None
+        # List exported symbols with their exact structural signatures.
+        items = "\n".join(
+            [f"- `{s.signature}`: {s.summary}" for s in section.symbols]
+        )
+        return f"# Blueprint\n\n{items}"
+
+    if isinstance(section, schema.TechDebt):
+        if not section.notes:
+            return None
+        # Document mechanical fragility and architectural inconsistencies.
+        items = "\n".join(
+            [
+                f"- **{n.category}**: {n.description} *Impact: {n.impact}*"
+                for n in section.notes
+            ]
+        )
+        return f"# Tech Debt\n\n{items}"
+
+    if isinstance(section, schema.WorkflowPatterns):
+        if not section.patterns:
+            return None
+        # Format workflow nodes and edges for orchestration clarity.
+        items = []
+        for p in section.patterns:
+            flow = f" -> ".join(p.edges) if p.edges else "Single Node"
+            items.append(f"- **{p.name}** ({p.framework}): {p.summary}\n  - Flow: `{flow}`\n  - Entry: `{p.entry_point}`")
+        return f"# Workflow Patterns\n\n" + "\n".join(items)
+
     if isinstance(section, schema.CustomSectionData):
         return f"# {section.title}\n\n{section.content}" if section.content else None
     
@@ -99,9 +142,13 @@ def to_markdown(doc: schema.IndexDocument) -> str:
         "architectural_patterns_and_gotchas",
         "key_individual_components",
         "key_interfaces",
+        "blueprint",
+        "workflow_patterns",
         "key_dependencies",
+        "implementation_invariants",
         "configurations",
         "testing_strategy",
+        "tech_debt",
     ]
 
     # Iterate through the ordered sections and render them if present.

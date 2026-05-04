@@ -65,6 +65,7 @@ class Component(_BaseModel):
     )
 
 
+
 class Interface(_BaseModel):
     """Represents an interface exported by a directory."""
 
@@ -79,6 +80,33 @@ class Interface(_BaseModel):
             "A description of what the interface does, what abstraction it represents, "
             "and how it is intended to be used by consumers."
         )
+    )
+
+
+class ExportedSymbol(_BaseModel):
+    """Represents a public symbol with its structural signature."""
+
+    name: str = _field(description="The name of the symbol.")
+    signature: str = _field(
+        description="The exact structural signature (e.g., 'def run(p: str) -> int')."
+    )
+    summary: str = _field(description="A brief description of its intent.")
+    line_number: Optional[int] = _field(
+        default=None, description="The starting line number in the source file."
+    )
+
+
+class ImplementationInvariant(_BaseModel):
+    """Represents a mechanical invariant or primitive (locking, atomicity)."""
+
+    primitive: str = _field(
+        description="The underlying primitive (e.g., 'fcntl.flock', 'threading.Lock')."
+    )
+    intent: str = _field(
+        description="What the primitive ensures (e.g., 'atomic state persistence')."
+    )
+    usage_context: str = _field(
+        description="Where or how it is used within this directory."
     )
 
 
@@ -104,6 +132,50 @@ class Dependency(_BaseModel):
     verification_status: str = _field(
         default="verified_in_code",
         description='Verification status: "verified_in_code" (seen in imports/calls), "found_in_config" (package.json/requirements.txt), or "unverified_missing_declaration" (used in code but missing from manifest).',
+    )
+
+
+class WorkflowPattern(_BaseModel):
+    """Represents a specific workflow or orchestration pattern (e.g., LangGraph, Temporal)."""
+
+    name: str = _field(
+        description="The name of the workflow or orchestration pattern."
+    )
+    framework: str = _field(
+        description="The framework used (e.g., LangGraph, Temporal, StateMachine)."
+    )
+    nodes: List[str] = _field(
+        default_factory=list,
+        description="Key nodes or states in the workflow."
+    )
+    edges: List[str] = _field(
+        default_factory=list,
+        description="Key transitions or edges between nodes."
+    )
+    entry_point: str = _field(
+        default="",
+        description="The entry point or initial state of the workflow."
+    )
+
+
+class WorkflowPatterns(_BaseModel):
+    """A collection of workflow patterns detected in the directory."""
+
+    patterns: List[WorkflowPattern] = _field(
+        default_factory=list,
+        description="List of detected workflow or orchestration patterns."
+    )
+
+
+class TechDebtNote(_BaseModel):
+    """Represents an observed inconsistency or mechanical fragility."""
+
+    category: str = _field(
+        description="The category of debt, e.g., 'Redundant Shims', 'Inconsistent Naming'."
+    )
+    description: str = _field(description="A detailed description of the identified debt.")
+    impact: str = _field(
+        description="The architectural impact or cognitive load introduced."
     )
 
 
@@ -195,13 +267,39 @@ class TestingStrategy(Section):
         description="Describe the testing strategy for the code in this directory. Use null if not applicable.",
     )
 
-
 class Configurations(Section):
     """Configurations and flags that control behavior."""
 
     configurations: Optional[List[ConfigurationItem]] = _field(
         default_factory=list,
         description="Important configuration items and how they are used. Use null or empty list if none.",
+    )
+
+
+class ImplementationInvariants(Section):
+    """Mechanical invariants and primitives for the directory."""
+
+    invariants: List[ImplementationInvariant] = _field(
+        default_factory=list,
+        description="Critical mechanical primitives found in the code.",
+    )
+
+
+class Blueprint(Section):
+    """Structural blueprint of exported symbols and their signatures."""
+
+    symbols: List[ExportedSymbol] = _field(
+        default_factory=list,
+        description="Public symbols with their exact signatures for implementation grounding.",
+    )
+
+
+class TechDebt(Section):
+    """Analysis of tech debt and mechanical fragility."""
+
+    notes: List[TechDebtNote] = _field(
+        default_factory=list,
+        description="Observed inconsistencies found during indexing or verification.",
     )
 
 
@@ -252,6 +350,18 @@ class KeyComponentsDocument(_BaseModel):
     )
     configurations: Optional[Configurations] = _field(
         default=None, description="Configuration items identified by the agent."
+    )
+    implementation_invariants: Optional[ImplementationInvariants] = _field(
+        default=None, description="Mechanical primitives identified by the agent."
+    )
+    workflow_patterns: Optional[WorkflowPatterns] = _field(
+        default=None, description="Workflow patterns identified by the agent."
+    )
+    blueprint: Optional[Blueprint] = _field(
+        default=None, description="Public symbol signatures identified by the agent."
+    )
+    tech_debt: Optional[TechDebt] = _field(
+        default=None, description="Analysis of tech debt and mechanical fragility identified by the agent."
     )
 
 
@@ -419,6 +529,19 @@ class IndexDocument(_BaseModel):
     )
     testing_strategy: Optional[TestingStrategy] = _field(
         default=None, description="Approach to testing and validation."
+    )
+    # Technical grounding sections.
+    implementation_invariants: Optional[ImplementationInvariants] = _field(
+        default=None, description="Mechanical invariants and reliability primitives."
+    )
+    workflow_patterns: Optional[WorkflowPatterns] = _field(
+        default=None, description="Workflow orchestration patterns (e.g., LangGraph, Temporal)."
+    )
+    blueprint: Optional[Blueprint] = _field(
+        default=None, description="Structural signatures for zero-discovery implementation."
+    )
+    tech_debt: Optional[TechDebt] = _field(
+        default=None, description="Analysis of mechanical fragility and slop."
     )
     # Extensions and metadata.
     custom_sections: List[CustomSectionData] = _field(

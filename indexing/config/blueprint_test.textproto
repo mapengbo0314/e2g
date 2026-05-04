@@ -1,0 +1,12 @@
+# proto-file: indexing/config/bundle.proto
+# proto-message: ProjectBundle
+
+bundle_name: "e2g_blueprint_test"
+
+input: {
+  directory: "indexing/"
+  research_guidance: "Indexing pipeline: schema models, sequential LLM prompter, work-unit execution, and verification. Prioritize schema.py, orchestrator.py, and sequential_llm_prompter.py."
+}
+
+exclude_pattern: ".*/__pycache__/.*"
+exclude_pattern: ".*\\.pyc"

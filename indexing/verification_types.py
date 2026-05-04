@@ -53,6 +53,7 @@ class IssueCategory(str, enum.Enum):
     OMITTED_COMPONENT = "omitted_component"
     MALFORMED_JSON = "malformed_json"
     SCHEMA_VIOLATION = "schema_violation"
+    EMPTY_MANDATORY_SECTION = "empty_mandatory_section"
 
 
 class PublicationDecision(str, enum.Enum):

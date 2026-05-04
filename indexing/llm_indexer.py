@@ -498,6 +498,9 @@ class LlmIndexer:
                 # Convert the generated Pydantic artifact to its markdown representation.
                 markdown_result = rendering.to_markdown(doc)
                 success = True
+            except sequential_llm_prompter.UnrecoverableLlmError:
+                # Re-raise unrecoverable errors to trigger orchestrator fail-fast.
+                raise
             except Exception:  # pylint: disable=broad-exception-caught
                 # Log the failure but ensure the process continues for other units.
                 logging.exception("Failed processing %s", work_unit.output_path)
@@ -567,6 +570,9 @@ class LlmIndexer:
                         f"Finished processing chunk {chunk_id} (out of {len(chunks)}) for"
                         f" {work_unit.output_path}"
                     )
+                except sequential_llm_prompter.UnrecoverableLlmError:
+                    # Propagate unrecoverable errors to trigger orchestrator fail-fast.
+                    raise
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     # Handle individual chunk failures without aborting the entire unit.
                     logging.error(
