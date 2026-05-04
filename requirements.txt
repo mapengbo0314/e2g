@@ -6,6 +6,6 @@ tenacity==8.2.3
 openai
 anthropic
 ollama
-langgraph
-langgraph-checkpoint
-langgraph-checkpoint-sqlite
+langgraph>=0.0.40,<1.0
+langgraph-checkpoint>=0.0.10,<1.0
+langgraph-checkpoint-sqlite>=0.0.5,<1.0

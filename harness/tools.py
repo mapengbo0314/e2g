@@ -21,7 +21,7 @@ class ContextTools:
                 summary = self.overlay_state.read_summary(path)
                 results[path] = summary
             except FileNotFoundError:
-                results[path] = "[SYNTHETIC] New file. No context available."
+                results[path] = "No indexed summary available for this path."
         return results
 
     def get_verified_context(self, path: str) -> VerifiedContextItem:
@@ -30,12 +30,19 @@ class ContextTools:
         source_code = ""
         full_path = os.path.join(self.workspace_root, path)
         try:
-            with open(full_path, "r", encoding="utf-8") as f:
-                source_code = f.read()
-        except FileNotFoundError:
+            if os.path.isdir(full_path):
+                # For directories, we list children if no index exists
+                children = os.listdir(full_path)
+                source_code = f"Directory contents: {', '.join(children)}"
+            elif os.path.exists(full_path):
+                with open(full_path, "r", encoding="utf-8") as f:
+                    source_code = f.read()
+            else:
+                source_code = ""
+        except Exception as e:
             import logging
-            logging.warning(f"File not found on disk, assuming synthetic base for: {full_path}")
-            source_code = ""
+            logging.error(f"Error reading path {full_path}: {e}")
+            source_code = f"Error reading file: {str(e)}"
             
         # If there are active changes in the session, show them as diff
         active_diffs = getattr(self.overlay_state, "active_diffs", {})
@@ -47,21 +54,34 @@ class ContextTools:
 
         # 2. Fetch Index Data
         try:
-            artifact_json = self.overlay_state.read_artifact(path)
+            artifact_json = None
+            current_path = path
+            
+            # Try to find an artifact for the exact path, or traverse up to find a directory artifact
+            while current_path and current_path != ".":
+                try:
+                    artifact_json = self.overlay_state.read_artifact(current_path)
+                    if artifact_json:
+                        break
+                except FileNotFoundError:
+                    # Move up one directory level
+                    parent = os.path.dirname(current_path)
+                    if parent == current_path:
+                        break
+                    current_path = parent
+            
+            if not artifact_json:
+                raise FileNotFoundError(f"No artifact found for {path} or its parents.")
+
             doc = IndexDocument.model_validate_json(artifact_json)
             
-            # Waterfall Budgeting implementation
-            # The algorithm statically budgets token allocations by prioritizing high-value 
-            # architectural definitions (Overview, Interfaces) over raw source code to prevent
-            # context window exhaustion during deep verification loops.
             content_parts = []
-            
             doc_dict = doc.model_dump()
             
             # Base Layer: Overview
             overview = doc_dict.get("overview", {})
             if overview and overview.get("content"):
-                content_parts.append(f"Overview:\n{overview['content']}")
+                content_parts.append(f"Semantic Overview:\n{overview['content']}")
                 
             # Base Layer: Key Interfaces
             interfaces_dict = doc_dict.get("key_interfaces", {})
@@ -87,5 +107,5 @@ class ContextTools:
         except FileNotFoundError:
             # File exists on disk but not in index
             if source_code:
-                return {"path": path, "summary": f"[SYNTHETIC] Unindexed file.\n\nSource Code:\n```\n{source_code}\n```"}
-            return {"path": path, "summary": "[SYNTHETIC] New file. No verified context available."}
+                return {"path": path, "summary": f"Unindexed file context.\n\nSource Code:\n```\n{source_code}\n```"}
+            return {"path": path, "summary": "New file. No verified context available."}

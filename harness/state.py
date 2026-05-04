@@ -16,6 +16,19 @@ class VerifiedContextItem(TypedDict):
     path: str
     summary: str
 
+class RunResult(TypedDict):
+    """Structured return type for orchestrator.run() and resume().
+
+    Gives callers (CLI, MCP server) a deterministic way to detect
+    whether the graph completed, suspended at human, or failed.
+    """
+    status: str              # "completed" | "suspended" | "failed"
+    thread_id: str
+    escalation_reason: str   # empty string if not suspended
+    final_step: str          # last node that ran
+    human_prompt: str        # prompt to show the human (empty if N/A)
+    artifacts_produced: list # list of generated artifacts or strategies
+
 class HarnessState(TypedDict):
     # Input
     user_prompt: str
@@ -32,7 +45,7 @@ class HarnessState(TypedDict):
 
     # Implementation phase
     generated_diffs: dict[str, str]      # From Implementer: {path: unified_diff_str}
-    provisional_summaries: dict[str, str]# From Implementer: {path: summary_str}
+    provisional_summaries: dict[str, str]  # From Implementer: {path: summary_str}
     implementation_notes: list[str]
 
     # Review phase
@@ -44,10 +57,12 @@ class HarnessState(TypedDict):
     # Safeguards
     review_retry_count: int
     verify_retry_count: int
-    retry_history: list[str]
     max_retries: int
-    human_escalation_required: bool
     escalation_reason: str
+
+    # Human-in-the-loop fields (v3.0 scalability fix)
+    human_feedback: str                  # Injected by resume() after human input
+    step_history: list[str]              # Observability: ["planner:planned", "reviewer:review_failed", ...]
     
     # LangGraph messages
     messages: Annotated[list, add_messages]

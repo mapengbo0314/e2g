@@ -709,7 +709,7 @@ class GeminiLlmPrompter(LlmPrompter):
             # Ensure the inner list key is present.
             items = wrapper.get(list_key)
             if not isinstance(items, list):
-                wrapper[list_key] = []
+                items = wrapper[list_key] = []
                 logging.info("[Coercion] Initialized missing list '%s' in %s.", list_key, wrapper_key)
             # --- Phase 2.1: Item-level patching ---
             # Iterate through each item in the list and ensure it contains all fields
@@ -1007,10 +1007,7 @@ class GeminiLlmPrompter(LlmPrompter):
         for attempt in range(self._config.max_attempts):
             # Track retries for monitoring and alerting.
             if attempt > 0:
-                metrics.LLM_RETRIES.increment(
-                    self._config.indexer_type,
-                    self._config.bundle_name,
-                )
+                self._stats.increment_counter("llm.retries")
             attempts_this_conversation += 1
 
             # If a conversation is stuck or repetitive, reset the session state.
@@ -1065,12 +1062,7 @@ class GeminiLlmPrompter(LlmPrompter):
                 if pydantic is not None and isinstance(
                     e, getattr(pydantic, "ValidationError", tuple())
                 ):
-                    metrics.LLM_FAILURES.increment(
-                        self._config.indexer_type,
-                        self._config.bundle_name,
-                        "validation_error",
-                        "UNKNOWN",
-                    )
+                    self._stats.increment_counter("llm.failures.validation_error")
                     # Extract detailed error information for the LLM's self-healing loop.
                     user_prompt = self._handle_pydantic_validation_error(
                         e,
@@ -1080,12 +1072,7 @@ class GeminiLlmPrompter(LlmPrompter):
                     continue
                 # Catch JSON parsing errors and request regeneration.
                 if isinstance(e, json.JSONDecodeError):
-                    metrics.LLM_FAILURES.increment(
-                        self._config.indexer_type,
-                        self._config.bundle_name,
-                        "json_decode_error",
-                        "UNKNOWN",
-                    )
+                    self._stats.increment_counter("llm.failures.json_decode_error")
                     user_prompt = self._handle_json_decoding_error(
                         e,
                         directory_path,
@@ -1094,12 +1081,7 @@ class GeminiLlmPrompter(LlmPrompter):
                     )
                     continue
                 # Catch generic runtime errors and trigger retry logic.
-                metrics.LLM_FAILURES.increment(
-                    self._config.indexer_type,
-                    self._config.bundle_name,
-                    type(e).__name__,
-                    getattr(e, "code", "UNKNOWN") or "UNKNOWN",
-                )
+                self._stats.increment_counter(f"llm.failures.{type(e).__name__}")
                 user_prompt = self._handle_llm_prompt_error(
                     e,
                     directory_path,
