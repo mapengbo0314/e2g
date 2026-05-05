@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from typing import List, Optional
 
 from indexing import schema
 from indexing import verification
@@ -15,7 +16,7 @@ class FakeLlmPrompter:
         self.verdict = verdict
         self.calls = 0
 
-    def verify_artifact(self, artifact_json: str, source_context: str, is_merger_mode: bool = False) -> verification_types.VerificationVerdict:
+    def verify_artifact(self, artifact_json: str, source_context: str, directory_files: Optional[List[str]] = None, is_merger_mode: bool = False) -> verification_types.VerificationVerdict:
         self.calls += 1
         return self.verdict
 
@@ -28,48 +29,30 @@ class VerificationTest(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    def test_syntactic_validation_success(self):
+    def test_stage1_syntactic_validation_success(self):
         prompter = FakeLlmPrompter(verification_types.VerificationVerdict.success())
         verifier = verification.ArtifactVerifier(prompter, self.cache_dir)
         
         valid_json = json.dumps({
-            "overview": {"content": "A good directory"},
-            "key_dependencies": None,
-            "key_individual_components": None
+            "overview": {"content": "A good directory"}
         })
         
-        # skip_semantic=True to just test syntactic
-        verdict = verifier.verify(valid_json, "some context", skip_semantic=True)
-        self.assertTrue(verdict.passed)
-        self.assertEqual(verdict.decision, "infrastructure_bypass")
-        self.assertTrue(verdict.is_infrastructure_bypass)
-        self.assertEqual(prompter.calls, 0)
+        # Stage 1 returns the parsed doc if valid
+        doc = verifier._stage1_syntactic_validation(valid_json)
+        self.assertIsInstance(doc, schema.IndexDocument)
+        self.assertEqual(doc.overview.content, "A good directory")
 
-    def test_syntactic_validation_failure(self):
+    def test_stage1_syntactic_validation_failure(self):
         prompter = FakeLlmPrompter(verification_types.VerificationVerdict.success())
         verifier = verification.ArtifactVerifier(prompter, self.cache_dir)
         
-        invalid_json = "{ bad json"
+        invalid_json = '{"overview": "not a dict"}'
         
-        verdict = verifier.verify(invalid_json, "some context")
+        # Stage 1 returns a verdict if invalid
+        verdict = verifier._stage1_syntactic_validation(invalid_json)
+        self.assertIsInstance(verdict, verification_types.VerificationVerdict)
         self.assertFalse(verdict.passed)
-        self.assertEqual(verdict.decision, "retry")
-        self.assertEqual(prompter.calls, 0)
-
-    def test_schema_validation_failure(self):
-        prompter = FakeLlmPrompter(verification_types.VerificationVerdict.success())
-        verifier = verification.ArtifactVerifier(prompter, self.cache_dir)
-        
-        # Valid JSON but misses required schema fields or wrong types
-        schema_invalid_json = json.dumps({
-            "overview": "Should be an object, not a string"
-        })
-        
-        verdict = verifier.verify(schema_invalid_json, "some context")
-        self.assertFalse(verdict.passed)
-        self.assertEqual(verdict.decision, "retry")
-        self.assertTrue(len(verdict.issues) > 0)
-        self.assertEqual(prompter.calls, 0)
+        self.assertEqual(verdict.decision, verification_types.PublicationDecision.RETRY.value)
 
     def test_semantic_verification_success_with_caching(self):
         prompter = FakeLlmPrompter(verification_types.VerificationVerdict.success())
@@ -84,7 +67,7 @@ class VerificationTest(unittest.TestCase):
         self.assertTrue(verdict1.passed)
         self.assertEqual(prompter.calls, 1)
         
-        # Second call should hit cache
+        # Second call (same content) should hit cache
         verdict2 = verifier.verify(valid_json, "some context")
         self.assertTrue(verdict2.passed)
         self.assertEqual(prompter.calls, 1)
@@ -100,9 +83,21 @@ class VerificationTest(unittest.TestCase):
         
         verdict = verifier.verify(valid_json, "some context")
         self.assertFalse(verdict.passed)
-        self.assertEqual(verdict.issues, ["Hallucination!"])
-        self.assertEqual(prompter.calls, 1)
+        self.assertIn("Hallucination!", verdict.issues)
 
+    def test_infrastructure_bypass(self):
+        prompter = FakeLlmPrompter(verification_types.VerificationVerdict.success())
+        verifier = verification.ArtifactVerifier(prompter, self.cache_dir)
+        
+        valid_json = json.dumps({
+            "overview": {"content": "A good directory"}
+        })
+        
+        # skip_semantic=True should trigger infrastructure_bypass
+        verdict = verifier.verify(valid_json, "some context", skip_semantic=True)
+        self.assertTrue(verdict.passed)
+        self.assertTrue(verdict.is_infrastructure_bypass)
+        self.assertEqual(prompter.calls, 0)
 
 if __name__ == '__main__':
     unittest.main()

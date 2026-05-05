@@ -504,6 +504,7 @@ class Orchestrator:
         
         This method is exposed for the Harness to manually update stale context.
         Uses fcntl locking to ensure mutual exclusion if called from another process.
+        It also refreshes the global manifest and root map to maintain parity.
         """
         lock_file = self._fs_manager.join(self._root_map_dir, ".reindex.lock")
         self._fs_manager.make_dirs(self._root_map_dir)
@@ -512,7 +513,37 @@ class Orchestrator:
             try:
                 fcntl.flock(lock_fd, fcntl.LOCK_EX)
                 logging.info("Targeted reindex triggered for %s", work_unit.output_path)
-                return self._process_work_unit(work_unit, epoch)
+                success = self._process_work_unit(work_unit, epoch)
+                
+                if success:
+                    # 1. Refresh manifest to record the new indexing info
+                    manifest = self._work_unit_storage.read()
+                    updated_units = []
+                    for wu in manifest.work_units:
+                        if wu.output_path == work_unit.output_path:
+                            updated_units.append(work_unit)
+                        else:
+                            updated_units.append(wu)
+                    
+                    manifest = work_unit_lib.WorkUnitManifest(
+                        work_units=updated_units,
+                        last_indexed_info=manifest.last_indexed_info,
+                        errored_work_units=[wu for wu in manifest.errored_work_units if wu.output_path != work_unit.output_path]
+                    )
+                    self._work_unit_storage.write(manifest)
+                    
+                    # 2. Regenerate the root map to reflect the updated summary
+                    if self._generate_root_map:
+                        root_map.regenerate_root_map(
+                            updated_units,
+                            self._root_map_dir,
+                            self._index_state,
+                            epoch,
+                            self._fs_manager,
+                            self._indexer.llm_prompter,
+                        )
+                
+                return success
             finally:
                 fcntl.flock(lock_fd, fcntl.LOCK_UN)
 

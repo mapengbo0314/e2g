@@ -13,7 +13,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, Protocol, Optional
+from typing import Any, Dict, List, Protocol, Optional
 
 # Optional Pydantic import for schema-driven validation.
 try:
@@ -28,7 +28,13 @@ from indexing import verification_types
 
 class LlmPrompterProtocol(Protocol):
     """Protocol for LLM prompting needed by verification."""
-    def verify_artifact(self, artifact_json: str, source_context: str, is_merger_mode: bool = False) -> verification_types.VerificationVerdict: ...
+    def verify_artifact(
+        self, 
+        artifact_json: str, 
+        source_context: str, 
+        directory_files: Optional[List[str]] = None,
+        is_merger_mode: bool = False
+    ) -> verification_types.VerificationVerdict: ...
 
 
 class VerificationCache:
@@ -144,6 +150,22 @@ class VerificationCache:
 
     def _compute_hash(self, artifact_json: str, source_context: str) -> str:
         """Computes a stable hash of the input and context."""
+        # Normalize the artifact JSON to ensure stable hashing despite non-deterministic
+        # metadata fields (like cost_report or generated_at).
+        try:
+            data = json.loads(artifact_json)
+            if "generation_metadata" in data and isinstance(data["generation_metadata"], dict):
+                meta = data["generation_metadata"]
+                # Selective whitelisting: remove volatile keys before hashing.
+                meta.pop("cost_report", None)
+                meta.pop("generated_at", None)
+            
+            # Re-serialize with sorted keys for canonical representation.
+            artifact_json = json.dumps(data, sort_keys=True)
+        except Exception:
+            # Fallback to raw string if parsing fails (should be rare given Stage 1).
+            pass
+
         # Use SHA-256 for high collision resistance in the verification cache.
         hasher = hashlib.sha256()
         hasher.update(artifact_json.encode("utf-8"))
@@ -301,50 +323,108 @@ class ArtifactVerifier:
         return None
 
     def _check_ast_grounding(self, doc: schema.IndexDocument, source_context: str, ast_grounding: Optional[Dict[str, Any]] = None) -> Optional[verification_types.VerificationVerdict]:
-        """Validates that deterministically extracted AST symbols are present in the blueprint."""
+        """Validates that deterministically extracted AST symbols/invariants are present in the blueprint."""
         try:
             from indexing import ast_extractor
             import re
             
             issues = []
             
-            if ast_grounding:
-                for filename, file_data in ast_grounding.items():
-                    ast_symbols = file_data.get("symbols", [])
-                    if not ast_symbols:
-                        continue
-                        
-                    # Check if the blueprint has these symbols.
-                    blueprint = getattr(doc, "blueprint", None)
-                    llm_symbols = []
-                    if blueprint and blueprint.symbols:
-                        llm_symbols = [s.name for s in blueprint.symbols]
-                        
-                    for expected_sym in ast_symbols:
-                        if expected_sym.name not in llm_symbols:
-                            issues.append(f"AST Grounding Failure: Symbol '{expected_sym.name}' found in {filename} but missing from blueprint symbols.")
-            else:
+            # 1. Prepare Ground Truth (AST)
+            if not ast_grounding:
                 # Fallback to manual extraction if no cache provided
+                ast_grounding = {}
                 files = re.split(r'--- (.*?) ---\n', source_context)
                 if len(files) > 1:
                     for i in range(1, len(files), 2):
                         filename = files[i]
                         content = files[i+1]
-                        
-                        ast_symbols, _ = ast_extractor.extract_ast_grounding(filename, content)
-                        if not ast_symbols:
-                            continue
-                            
-                        # Check if the blueprint has these symbols.
-                        blueprint = getattr(doc, "blueprint", None)
-                        llm_symbols = []
-                        if blueprint and blueprint.symbols:
-                            llm_symbols = [s.name for s in blueprint.symbols]
-                            
-                        for expected_sym in ast_symbols:
-                            if expected_sym.name not in llm_symbols:
-                                issues.append(f"AST Grounding Failure: Symbol '{expected_sym.name}' found in {filename} but missing from blueprint symbols.")
-                            
+                        syms, invs = ast_extractor.extract_ast_grounding(filename, content)
+                        if syms or invs:
+                            ast_grounding[filename] = {"symbols": syms, "invariants": invs}
+
+            if not ast_grounding:
+                return None
+
+            # 2. Build LLM lookup maps
+            # Symbols: (file_path, name) -> ExportedSymbol
+            llm_symbols = {}
+            blueprint = getattr(doc, "blueprint", None)
+            if blueprint and blueprint.symbols:
+                for sym in blueprint.symbols:
+                    key = (sym.file_path, sym.name)
+                    llm_symbols[key] = sym
+            
+            # Invariants: (file_path, primitive) -> List[ImplementationInvariant]
+            llm_invariants = {}
+            inv_section = getattr(doc, "implementation_invariants", None)
+            if inv_section and inv_section.invariants:
+                for inv in inv_section.invariants:
+                    key = (inv.file_path, inv.primitive)
+                    if key not in llm_invariants:
+                        llm_invariants[key] = []
+                    llm_invariants[key].append(inv)
+
+            # 3. Check AST Grounding Evidence
+            def normalize_sig(s):
+                return re.sub(r'\s+', ' ', s).strip().replace("\"", "'")
+
+            for file_path, evidence in ast_grounding.items():
+                # Check Symbols
+                ast_symbols = evidence.get("symbols", [])
+                for ast_sym in ast_symbols:
+                    found_sym = None
+                    key = (file_path, ast_sym.name)
+                    if key in llm_symbols:
+                        found_sym = llm_symbols[key]
+                    else:
+                        # Try suffix match if orchestrator passed relative paths differently
+                        for (l_path, l_name), sym in llm_symbols.items():
+                            if l_name == ast_sym.name and (l_path.endswith(file_path) or file_path.endswith(l_path)):
+                                found_sym = sym
+                                break
+                    
+                    if not found_sym:
+                        issues.append(
+                            f"Missing mandatory AST symbol: '{ast_sym.name}' in '{file_path}'. "
+                            "Every public class/function must be included in the blueprint."
+                        )
+                    else:
+                        ast_sig = normalize_sig(ast_sym.signature)
+                        llm_sig = normalize_sig(found_sym.signature)
+                        if ast_sig != llm_sig:
+                            issues.append(
+                                f"Signature mismatch for '{ast_sym.name}' in '{file_path}'.\n"
+                                f"  AST Ground Truth: {ast_sym.signature}\n"
+                                f"  LLM Implementation: {found_sym.signature}"
+                            )
+
+                # Check Invariants
+                ast_invariants = evidence.get("invariants", [])
+                for ast_inv in ast_invariants:
+                    found_inv = None
+                    key = (file_path, ast_inv.primitive)
+                    if key in llm_invariants:
+                        # Match by line number if multiple primitives of same type in same file
+                        for inv in llm_invariants[key]:
+                            if inv.line_number == ast_inv.line_number:
+                                found_inv = inv
+                                break
+                        if not found_inv:
+                            found_inv = llm_invariants[key][0]
+                    
+                    if not found_inv:
+                         issues.append(
+                            f"Missing mandatory AST invariant: '{ast_inv.primitive}' in '{file_path}' (line {ast_inv.line_number}). "
+                            "Mechanical primitives like locks must be enriched in implementation_invariants."
+                        )
+                    else:
+                        # Ensure intent is enriched
+                        if "AST Discovered" in found_inv.intent or not found_inv.intent.strip():
+                             issues.append(
+                                f"Invariant '{ast_inv.primitive}' in '{file_path}' was not enriched with human-readable intent."
+                            )
+
             if issues:
                 logging.warning("[Verifier] AST Grounding check FAILED: %s", "; ".join(issues))
                 detailed = [
@@ -368,6 +448,7 @@ class ArtifactVerifier:
         self, 
         artifact_json: str, 
         source_context: str,
+        directory_files: Optional[List[str]] = None,
         is_merger_mode: bool = False
     ) -> verification_types.VerificationVerdict:
         """Runs Stage 2: LLM factual grounding check."""
@@ -386,7 +467,12 @@ class ArtifactVerifier:
             len(source_context), len(artifact_json),
         )
         # Delegate the actual semantic checking to the LLM.
-        verdict = self.llm_prompter.verify_artifact(artifact_json, source_context, is_merger_mode=is_merger_mode)
+        verdict = self.llm_prompter.verify_artifact(
+            artifact_json, 
+            source_context, 
+            directory_files=directory_files,
+            is_merger_mode=is_merger_mode
+        )
         logging.info(
             "[Verifier] Stage 2 LLM verdict: passed=%s, confidence=%.2f, "
             "issues=%d, decision=%s.",
@@ -407,7 +493,8 @@ class ArtifactVerifier:
         source_context: str,
         skip_semantic: bool = False,
         is_merger_mode: bool = False,
-        ast_grounding: Optional[Dict[str, Any]] = None
+        ast_grounding: Optional[Dict[str, Any]] = None,
+        directory_files: Optional[List[str]] = None
     ) -> verification_types.VerificationVerdict:
         """Executes the full verification pipeline.
         
@@ -415,6 +502,9 @@ class ArtifactVerifier:
             artifact_json: The generated JSON artifact.
             source_context: The raw source code or context used to generate the artifact.
             skip_semantic: If True, only runs syntactic validation (useful for partial generation).
+            is_merger_mode: Whether we are verifying a merged document.
+            ast_grounding: Optional deterministic AST grounding data.
+            directory_files: Optional list of files in the directory for grounding.
         """
         logging.info(
             "[Verifier] Starting verification pipeline "
@@ -451,4 +541,9 @@ class ArtifactVerifier:
 
         # Stage 2: Semantic (Slow, non-deterministic grounding check).
         # We pass the original JSON for verification against the raw source context.
-        return self._stage2_semantic_verification(artifact_json, source_context, is_merger_mode)
+        return self._stage2_semantic_verification(
+            artifact_json, 
+            source_context, 
+            directory_files=directory_files,
+            is_merger_mode=is_merger_mode
+        )

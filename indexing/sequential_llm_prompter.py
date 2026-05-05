@@ -16,43 +16,36 @@ import random
 import re
 import subprocess
 import time
-from typing import Any, Callable, Protocol
+from typing import Any, Callable, Protocol, Optional, List
 
 import logging
 
+# Stabilization: Use native DNS resolver to prevent ares crashes during fork().
+os.environ.setdefault("GRPC_DNS_RESOLVER", "native")
+
 # Conditional imports for Vertex AI and generative model clients.
 try:
-    import vertexai
-    from vertexai.generative_models import GenerativeModel, ChatSession
-except ImportError:
-    vertexai = None
-
-try:
-    import google.generativeai as genai
+    from google import genai
 except ImportError:
     # Handle environment where genai is not available.
     genai = None
 
 try:
-    
     import pydantic
 except ImportError:  # pragma: no cover
     pydantic = None
 
 try:
-    
     import openai
 except ImportError:
     openai = None
 
 try:
-    
     import anthropic
 except ImportError:
     anthropic = None
 
 try:
-    
     import ollama
 except ImportError:
     ollama = None
@@ -84,7 +77,6 @@ except ImportError:
 
 try:
     from indexing import verification_types
-
 except ImportError:
     import verification_types
 
@@ -163,6 +155,9 @@ class LlmPrompter(abc.ABC):
         initial_user_prompt: str,
         error_prompt_generator_instance: Any,
         verifier: Any = None,
+        directory_files: list[str] | None = None,
+        previous_artifact: schema.IndexDocument | None = None,
+        previous_verdict: verification_types.VerificationVerdict | None = None,
     ) -> schema.IndexDocument:
         """Prompts the LLM to index a directory."""
 
@@ -178,6 +173,7 @@ class LlmPrompter(abc.ABC):
         system_prompt: str,
         initial_user_prompt: str,
         error_prompt_generator_instance: Any,
+        directory_files: list[str] | None = None,
     ) -> schema.IndexDocument:
         """Prompts the LLM to merge summaries."""
 
@@ -186,7 +182,13 @@ class LlmPrompter(abc.ABC):
         """Returns a summary of the root map content."""
 
     @abc.abstractmethod
-    def verify_artifact(self, artifact_json: str, source_context: str, is_merger_mode: bool = False) -> verification_types.VerificationVerdict:
+    def verify_artifact(
+        self, 
+        artifact_json: str, 
+        source_context: str, 
+        directory_files: list[str] | None = None,
+        is_merger_mode: bool = False
+    ) -> verification_types.VerificationVerdict:
         """Runs the verifier prompt and returns a structured verdict."""
 
 
@@ -301,15 +303,21 @@ class VertexAiConversation:
         project_id: str,
         output_schema_type: type[Any] | None = None,
     ):
-        if vertexai is None:
-            raise ImportError("vertexai library not found. Install google-cloud-aiplatform.")
-        vertexai.init(project=project_id)
-        # Instantiate the generative model with the provided system prompt.
-        self.model = GenerativeModel(
-            model_name,
-            system_instruction=[system_prompt] if system_prompt else None,
+        if genai is None:
+            raise ImportError("google-genai library not found. Install google-genai.")
+        
+        # Initialize the GenAI client with Vertex AI enabled.
+        self.client = genai.Client(
+            vertexai=True, 
+            project=project_id, 
+            location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
         )
-        self.chat = self.model.start_chat()
+        # Create chat session with system instruction in the config.
+        self.chat = self.client.chats.create(
+            model=model_name,
+            config={"system_instruction": system_prompt} if system_prompt else None,
+        )
+        self.model_name = model_name
         self.output_schema_type = output_schema_type
 
     def prompt(self, user_prompt: str) -> PromptResult:
@@ -351,14 +359,15 @@ class GoogleAiConversation:
         output_schema_type: type[Any] | None = None,
     ):
         if genai is None:
-            raise ImportError("google.generativeai library not found. Install google-generativeai.")
-        genai.configure(api_key=api_key)
-        # Instantiate the Google AI model with optional system instructions.
-        self.model = genai.GenerativeModel(
-            model_name,
-            system_instruction=system_prompt if system_prompt else None,
+            raise ImportError("google-genai library not found. Install google-genai.")
+        
+        self.client = genai.Client(api_key=api_key)
+        # Create chat session with system instruction in the config.
+        self.chat = self.client.chats.create(
+            model=model_name,
+            config={"system_instruction": system_prompt} if system_prompt else None,
         )
-        self.chat = self.model.start_chat()
+        self.model_name = model_name
         self.output_schema_type = output_schema_type
 
     def prompt(self, user_prompt: str) -> PromptResult:
@@ -445,6 +454,7 @@ class OpenAiConversation:
         return cleaned
 
     def prompt(self, user_prompt: str) -> PromptResult:
+        start_time = time.time()
         self.history.append({"role": "user", "content": user_prompt})
         
         kwargs = {
@@ -701,26 +711,17 @@ class GeminiLlmPrompter(LlmPrompter):
 
     @staticmethod
     def _coerce_for_schema(data: Any, output_schema: type[Any]) -> Any:
-        """Fill in missing/null required fields with defaults before Pydantic validation.
-
-        This prevents weaker LLMs from burning all retry attempts on trivially
-        fixable schema violations (e.g. ``null`` instead of ``""`` on a
-        required string field, or missing ``usage_description`` on a
-        Dependency dict).
-        """
+        """Fill in missing/null required fields with defaults before Pydantic validation."""
         if not isinstance(data, dict):
             return data
 
         # --- Phase -1: Detect and reject schema echoes ---
         if "$defs" in data or "$schema" in data:
             logging.warning("[Coercion] Detected JSON Schema echo instead of instance.")
-            # We strip the metadata but keep the data if it's there.
-            # Often the LLM returns {"$defs": ..., "passed": true, ...}
             data = {k: v for k, v in data.items() if not k.startswith("$")}
 
         # --- VerificationVerdict Specific Coercion ---
         if output_schema is verification_types.VerificationVerdict:
-            # Handle stringified booleans and floats from loose LLMs.
             if "passed" in data and not isinstance(data["passed"], bool):
                 data["passed"] = str(data["passed"]).lower() == "true"
             if "confidence" in data and not isinstance(data["confidence"], (int, float)):
@@ -728,23 +729,17 @@ class GeminiLlmPrompter(LlmPrompter):
                     data["confidence"] = float(data["confidence"])
                 except (ValueError, TypeError):
                     data["confidence"] = 0.5
-            # Ensure detailed_issues is a list
             if "detailed_issues" in data and data["detailed_issues"] is None:
                 data["detailed_issues"] = []
 
         # --- Phase 0: Unwrap 'properties' if the LLM hallucinated it from the schema ---
-        # Weaker LLMs (like Gemma) often wrap their entire response in a 'properties'
-        # key because it's a prominent top-level key in the JSON Schema.
         if "properties" in data and isinstance(data["properties"], dict):
-            # Only unwrap if 'properties' is the ONLY key, or if none of the expected
-            # top-level keys are present in the root but ARE in 'properties'.
             expected_keys = set(GeminiLlmPrompter._LIST_FIELD_MAP.keys()) | set(GeminiLlmPrompter._CONTENT_FIELD_MAP.keys())
             if len(data) == 1 or not any(k in data for k in expected_keys):
                 logging.info("[Coercion] Unwrapped 'properties' container from LLM response.")
                 data = data["properties"]
 
         # --- Phase 0.1: Unwrap class-name wrappers ---
-        # Some models wrap the entire response in a key named after the schema class.
         class_name = getattr(output_schema, "__name__", "")
         if class_name:
             snake_class_name = re.sub(r'(?<!^)(?=[A-Z])', '_', class_name).lower()
@@ -756,9 +751,6 @@ class GeminiLlmPrompter(LlmPrompter):
                 data = data[class_name]
 
         # --- Phase 1: Recursively replace null → "" for all string-typed values ---
-        # Weaker LLMs (especially Ollama/Gemma) frequently output null for
-        # required string fields.  The schema has no intentionally nullable
-        # string fields, so this is always safe.
         data = GeminiLlmPrompter._deep_replace_nulls(data)
 
         # Determine which fields the schema actually expects and which are required.
@@ -766,15 +758,12 @@ class GeminiLlmPrompter(LlmPrompter):
         required_fields = set()
         if hasattr(output_schema, "model_fields"):  # Pydantic v2
             schema_fields = set(output_schema.model_fields.keys())
-            # For Pydantic v2, we check if the field has a default value.
             try:
                 from pydantic_core import PydanticUndefined
                 for name, field in output_schema.model_fields.items():
                     if field.default is PydanticUndefined and field.default_factory is None:
                         required_fields.add(name)
             except ImportError:
-                # If we can't get the sentinel, we'll leave required_fields empty
-                # and skip the greedy remapping phase.
                 pass
         elif hasattr(output_schema, "__fields__"):  # Pydantic v1
             schema_fields = set(output_schema.__fields__.keys())
@@ -783,9 +772,6 @@ class GeminiLlmPrompter(LlmPrompter):
                     required_fields.add(name)
 
         # --- Phase 0.5: Remap Document-level Wrappers ---
-        # Weaker models often mix up text-heavy wrapper keys (e.g. 'overview' vs 'deep_dive').
-        # If the schema requires exactly ONE text-heavy section, we can safely remap 
-        # an incorrectly named wrapper to the required one.
         expected_content_keys = [k for k in required_fields if k in GeminiLlmPrompter._CONTENT_FIELD_MAP]
         if len(expected_content_keys) == 1:
             req_key = expected_content_keys[0]
@@ -796,7 +782,6 @@ class GeminiLlmPrompter(LlmPrompter):
                 data[req_key] = data.pop(wrong_key)
 
         # --- Phase 0.6: Wrap 'unwrapped' content ---
-        # If the LLM returned the inner fields at the root instead of inside the wrapper.
         if len(expected_content_keys) == 1:
             req_key = expected_content_keys[0]
             content_key = GeminiLlmPrompter._CONTENT_FIELD_MAP[req_key]
@@ -805,18 +790,19 @@ class GeminiLlmPrompter(LlmPrompter):
                 data = {req_key: data}
 
         # --- Phase 0.7: Coerce string-valued sections to dicts ---
-        # Handle cases where "overview": "string" instead of "overview": {"content": "string"}.
-        # This occurs when weaker models ignore the schema's nesting requirements and 
-        # return raw text for fields that we expect to be objects with 'content' keys.
-        # We target all standard top-level text-heavy sections here.
         for section_key, content_key in GeminiLlmPrompter._CONTENT_FIELD_MAP.items():
-            if section_key in data and isinstance(data[section_key], str):
-                logging.info("[Coercion] Coerced string value for '%s' to dict with '%s' key.", section_key, content_key)
-                data[section_key] = {content_key: data[section_key]}
+            if section_key in data:
+                val = data[section_key]
+                if isinstance(val, str):
+                    logging.info("[Coercion] Coerced string value for '%s' to dict with '%s' key.", section_key, content_key)
+                    data[section_key] = {content_key: val}
+                elif isinstance(val, dict) and content_key in val:
+                    inner_val = val[content_key]
+                    if isinstance(inner_val, dict) and content_key in inner_val:
+                        logging.warning("[Coercion] Detected double-wrapped '%s' in '%s'. Flattening.", content_key, section_key)
+                        val[content_key] = inner_val[content_key]
 
         # --- Phase 0.8: Inject missing mandatory content sections ---
-        # Inject an empty content dictionary for any text-heavy section (like 'overview')
-        # that is missing from the output but explicitly required by the Pydantic schema.
         for req_key in expected_content_keys:
             if req_key not in data or data[req_key] is None:
                 content_key = GeminiLlmPrompter._CONTENT_FIELD_MAP.get(req_key, "content")
@@ -827,14 +813,11 @@ class GeminiLlmPrompter(LlmPrompter):
         mandatory_sections = section_registry.get_mandatory_sections()
         
         for wrapper_key, (list_key, model_name) in GeminiLlmPrompter._LIST_FIELD_MAP.items():
-            # Only inject if the field is actually expected by the schema.
             if wrapper_key not in schema_fields:
                 continue
 
-            # Check if this is a mandatory section (required_for_code)
             is_mandatory = wrapper_key in mandatory_sections
 
-            # If the wrapper is missing or null, inject an empty container.
             if wrapper_key not in data or data[wrapper_key] is None:
                 data[wrapper_key] = {list_key: []}
                 level = logging.WARNING if is_mandatory else logging.INFO
@@ -843,26 +826,19 @@ class GeminiLlmPrompter(LlmPrompter):
             
             wrapper = data[wrapper_key]
             if isinstance(wrapper, list):
-                # If the LLM returned the list directly instead of the wrapper object.
                 logging.info("[Coercion] Wrapped naked list in '%s' to dict with '%s' key.", wrapper_key, list_key)
                 wrapper = {list_key: wrapper}
                 data[wrapper_key] = wrapper
             elif not isinstance(wrapper, dict):
-                # If the LLM returned something like "" or "none" for the wrapper,
-                # convert it to an empty dict with the required list key.
                 wrapper = {list_key: []}
                 data[wrapper_key] = wrapper
                 logging.info("[Coercion] Coerced malformed wrapper '%s' to dict.", wrapper_key)
 
-            # Ensure the inner list key is present.
             items = wrapper.get(list_key)
             if not isinstance(items, list):
                 items = wrapper[list_key] = []
                 logging.info("[Coercion] Initialized missing list '%s' in %s.", list_key, wrapper_key)
-            # --- Phase 2.1: Item-level patching ---
-            # Iterate through each item in the list and ensure it contains all fields
-            # required by its specific Pydantic model. If a field is missing, we
-            # inject a safe default (e.g. "" or "internal") to prevent validation errors.
+            
             defaults = GeminiLlmPrompter._FIELD_DEFAULTS.get(model_name, {})
             for item in items:
                 if isinstance(item, dict):
@@ -887,13 +863,8 @@ class GeminiLlmPrompter(LlmPrompter):
 
     
     @staticmethod
-    
     def _deep_replace_nulls(obj: Any) -> Any:
-        """Recursively replace null values with empty strings for string fields.
-
-        This handles the common LLM pattern of outputting
-        `{"content": null}` instead of `{"content": ""}`.
-        """
+        """Recursively replace null values with empty strings for string fields."""
         if isinstance(obj, dict):
             return {
                 k: "" if (v is None and k in GeminiLlmPrompter._STRING_KEYS) else GeminiLlmPrompter._deep_replace_nulls(v)
@@ -916,7 +887,6 @@ class GeminiLlmPrompter(LlmPrompter):
         epoch: int = 1,
     ) -> Any:
         """Creates a real LLM conversation for a single step."""
-        # Select the appropriate model based on the current agent's role.
         model_name = (
             self._config.research_gemini_model
             if model_type == "research"
@@ -926,7 +896,6 @@ class GeminiLlmPrompter(LlmPrompter):
         if self._override_conversation_factory:
             return self._override_conversation_factory(system_prompt)
 
-        # 0. Dry Run
         if self._config.dry_run:
             return DryRunConversation(
                 system_prompt=system_prompt,
@@ -935,12 +904,9 @@ class GeminiLlmPrompter(LlmPrompter):
                 dry_run_map=self._config.dry_run_map,
             )
 
-        # --- Backend Detection Logic ---
         if self._config.provider == "gemini":
-            # 1. Try Vertex AI first (requires vertex_ai_project_id and gcloud ADC)
             if self._config.use_vertex_ai and self._config.vertex_ai_project_id:
                 try:
-                    # Initialize a Vertex AI chat session with system instructions.
                     return VertexAiConversation(
                         system_prompt=system_prompt,
                         model_name=model_name,
@@ -948,13 +914,10 @@ class GeminiLlmPrompter(LlmPrompter):
                         output_schema_type=output_schema_type,
                     )
                 except Exception as e:
-                    # Fallback to next backend if Vertex initialization fails.
                     logging.warning("Failed to initialize Vertex AI conversation: %s", e)
 
-            # 2. Try Google AI Studio (requires api_key)
             if self._config.api_key:
                 try:
-                    # Initialize a Google AI Studio chat session using an API key.
                     return GoogleAiConversation(
                         system_prompt=system_prompt,
                         model_name=model_name,
@@ -962,12 +925,10 @@ class GeminiLlmPrompter(LlmPrompter):
                         output_schema_type=output_schema_type,
                     )
                 except Exception as e:
-                    # Fallback to mock or error if API Key initialization fails.
                     logging.warning("Failed to initialize Google AI conversation: %s", e)
 
         elif self._config.provider == "openai":
             if self._config.api_key:
-                
                 try:
                     return OpenAiConversation(
                         system_prompt=system_prompt,
@@ -978,10 +939,8 @@ class GeminiLlmPrompter(LlmPrompter):
                 except Exception as e:
                     logging.warning("Failed to initialize OpenAI conversation: %s", e)
 
-        # Check if the requested provider is Anthropic.
         elif self._config.provider == "anthropic":
             if self._config.api_key:
-                
                 try:
                     return AnthropicConversation(
                         system_prompt=system_prompt,
@@ -993,7 +952,6 @@ class GeminiLlmPrompter(LlmPrompter):
                     logging.warning("Failed to initialize Anthropic conversation: %s", e)
 
         elif self._config.provider == "ollama":
-            
             try:
                 return OllamaConversation(
                     system_prompt=system_prompt,
@@ -1003,15 +961,11 @@ class GeminiLlmPrompter(LlmPrompter):
             except Exception as e:
                 logging.warning("Failed to initialize Ollama conversation: %s", e)
 
-        # 3. Fallback or Fail Fast
         if not self._config.allow_mock_fallback:
-            # Raise error if production environment requires real LLM connectivity.
             raise RuntimeError(
-                "No real LLM backend could be initialized, and allow_mock_fallback is False. "
-                "Check your PROJECT_ID or API_KEY environment variables, or ensure Ollama is running."
+                "No real LLM backend could be initialized, and allow_mock_fallback is False."
             )
 
-        # Silent fallback to mock behavior for local development/testing.
         logging.info("Using mock conversation for %s (no credentials found)", agent_name)
         return _SimpleConversation(
             system_prompt=system_prompt,
@@ -1019,56 +973,32 @@ class GeminiLlmPrompter(LlmPrompter):
             output_schema_type=output_schema_type,
         )
 
-    # Error handling and retry logic for failed LLM calls.
     def _handle_llm_prompt_error(
         self,
         e: Exception,
         directory_path: str,
         conversation: Any,
-        
         error_prompt_generator_instance: Any,
         attempt: int = 1,
     ) -> str:
         """Handles runtime errors from the LLM call."""
-        # Calculate retry delay with exponential backoff and jitter.
         base_delay = min(2**attempt, self._config.delay_on_failure_max_seconds)
-        # Determine the type of failure to apply appropriate retry strategy.
         error_str = str(e).lower()
         
-        # Unrecoverable: Model not found (404)
         if "not_found" in error_str and "model" in error_str:
-            logging.error("[LlmPrompter] UNRECOVERABLE ERROR: Model '%s' not found. Check your provider and model name. Error: %s", self._config.model_name, e)
             raise UnrecoverableLlmError(f"Model '{self._config.model_name}' not found. Stopping run.") from e
             
         if "quota" in error_str:
-            # Handle rate limiting or credit exhaustion specifically.
             self._stats.increment_counter("llm.runtime_quota_errors")
             sleep_duration = random.randint(0, _QUOTA_ERROR_RETRY_JITTER_SECONDS)
-            logging.info(
-                "LLM call failed for %s due to quota issues, retrying in %d seconds: %r",
-                directory_path,
-                sleep_duration,
-                e,
-            )
         else:
-            # Handle generic API failures (timeouts, network drops).
             self._stats.increment_counter("llm.runtime_other_errors")
             jitter = random.uniform(0.4, 0.6 * base_delay)
             sleep_duration = base_delay + jitter
-            logging.exception(
-                "LLM call failed for %s for conversation %r with runtime error. About to retry: %r",
-                directory_path,
-                conversation,
-                e,
-                exc_info=True,
-            )
-        # Apply the sleep delay before the next attempt.
+
         time.sleep(min(sleep_duration, 0.01))
         if hasattr(error_prompt_generator_instance, "generate_error_prompt"):
-            # Provide structured feedback to the LLM about why the previous call failed.
-            return error_prompt_generator_instance.generate_error_prompt(
-                str(e)
-            )
+            return error_prompt_generator_instance.generate_error_prompt(str(e))
         return error_prompt_generator.IndexerErrorPromptGenerator().generate_error_prompt(str(e))
 
     def _handle_pydantic_validation_error(
@@ -1078,13 +1008,8 @@ class GeminiLlmPrompter(LlmPrompter):
         error_prompt_generator_instance: Any,
     ) -> str:
         """Handles validation errors from the LLM call."""
-        # Record schema non-compliance failures.
         self._stats.increment_counter("llm.validation_pydantic_failures")
-        logging.exception(
-            "LLM call failed for %s due to validation error.", directory_path
-        )
         
-        # Extract detailed field-level errors to help the LLM fix itself.
         issues = []
         is_json_invalid = False
         for err in e.errors():
@@ -1093,7 +1018,6 @@ class GeminiLlmPrompter(LlmPrompter):
             loc = ".".join(str(l) for l in err["loc"])
             issues.append(f"Schema violation at '{loc}': {err['msg']}")
             
-        # Detect if the LLM echoed the schema definition instead of an instance.
         is_schema_echo = False
         try:
             for err in e.errors():
@@ -1106,59 +1030,38 @@ class GeminiLlmPrompter(LlmPrompter):
 
         if is_schema_echo:
             error_feedback = (
-                "CRITICAL ERROR: You echoed the JSON Schema definition (including '$defs') "
-                "instead of providing a valid data instance. MUST NOT include schema "
-                "definitions like '$defs' or '$schema' in your output. Provide only "
-                "the JSON object representing the data itself. DO NOT REPEAT THE SCHEMA."
+                "CRITICAL ERROR: You echoed the JSON Schema definition instead of providing a valid instance. "
+                "MUST NOT include schema definitions like '$defs' or '$schema' in your output."
             )
         elif is_json_invalid:
             error_feedback = (
-                "Your response was truncated or contains invalid JSON syntax (e.g. EOF while parsing). "
-                "Please ensure you complete the JSON object, close all brackets/quotes, and do NOT "
-                "include schema definitions like '$defs' in your output."
+                "Your response was truncated or contains invalid JSON syntax. "
+                "Please ensure you complete the JSON object and close all brackets."
             )
         else:
-            error_feedback = (
-                f"Output validation failed with {len(issues)} schema violations. "
-                "Your JSON structure does not match the required Pydantic model."
-            )
+            error_feedback = f"Output validation failed with {len(issues)} schema violations."
 
-        # Instruct the LLM to fix its own formatting in the next turn.
         if hasattr(error_prompt_generator_instance, "generate_error_prompt"):
-            return error_prompt_generator_instance.generate_error_prompt(
-                error_feedback,
-                issues=issues
-            )
+            return error_prompt_generator_instance.generate_error_prompt(error_feedback, issues=issues)
         return f"{error_feedback}\n\nIssues:\n" + "\n".join(issues)
 
     def _handle_json_decoding_error(
         self,
         e: Exception,
         directory_path: str,
-        
         error_prompt_generator_instance: Any,
     ) -> str:
         """Handles JSON decoding errors from the LLM call."""
-        # Record malformed JSON response failures.
-        # Record malformed JSON response failures.
         self._stats.increment_counter("llm.validation_json_failures")
-        logging.exception("LLM call failed for %s.", directory_path)
-        error_feedback = (
-            "Output validation failed: LLM response could not be parsed as JSON."
-        )
-        # Request the LLM to regenerate valid JSON.
+        error_feedback = "Output validation failed: LLM response could not be parsed as JSON."
         if hasattr(error_prompt_generator_instance, "generate_validation_failure_prompt"):
-            return error_prompt_generator_instance.generate_validation_failure_prompt(
-                directory_path,
-                error_feedback,
-            )
+            return error_prompt_generator_instance.generate_validation_failure_prompt(directory_path, error_feedback)
         return error_prompt_generator.IndexerErrorPromptGenerator().generate_error_prompt(error_feedback)
 
     def _execute_single_prompt(
         self,
         directory_path: str,
         initial_user_prompt: str,
-        
         agent_name: str,
         error_prompt_generator_instance: Any,
         conversation_factory: Callable[[], Any],
@@ -1166,46 +1069,30 @@ class GeminiLlmPrompter(LlmPrompter):
         output_schema: type[Any],
     ) -> Any:
         """Executes the prompt loop with retries and error handling."""
-        # Create the initial conversation session for this agent step.
-        # Create the initial conversation session for this agent step.
         conversation = conversation_factory()
         self._stats.increment_counter("llm.conversations_created")
 
         user_prompt = initial_user_prompt
         attempts_this_conversation = 0
         for attempt in range(self._config.max_attempts):
-            # Track retries for monitoring and alerting.
             if attempt > 0:
                 self._stats.increment_counter("llm.retries")
             attempts_this_conversation += 1
 
-            # If a conversation is stuck or repetitive, reset the session state.
-            if (
-                attempts_this_conversation
-                > self._config.max_attempts_per_conversation
-            ):
+            if attempts_this_conversation > self._config.max_attempts_per_conversation:
                 conversation = conversation_factory()
                 self._stats.increment_counter("llm.conversations_reset")
                 attempts_this_conversation = 1
 
             try:
-                # Apply rate limiting/throttling before sending the prompt.
                 start_time = time.time()
-                with self._throttler.acquire(
-                    stringified_system_prompt, user_prompt
-                ) as throttler_ctx:
-                    waited_time = time.time() - start_time
-                    logging.info(
-                        "Waited %f seconds for throttling strategy", waited_time
-                    )
+                with self._throttler.acquire(stringified_system_prompt, user_prompt) as throttler_ctx:
                     self._stats.increment_counter("llm.prompts_sent")
-                    # Send the prompt and capture the raw string response.
                     prompt_result = conversation.prompt(user_prompt)
                     self._stats.add_to_counter("llm.input_tokens", prompt_result.usage.get("input_tokens", 0))
                     self._stats.add_to_counter("llm.output_tokens", prompt_result.usage.get("output_tokens", 0))
                     self._stats.record_latency("llm.latency_ms", prompt_result.latency_ms)
                     
-                    # Record the call for cost tracking.
                     self._call_records.append(schema.LlmCallRecord(
                         agent_name=agent_name,
                         model_name=getattr(conversation, "model_name", "unknown"),
@@ -1220,72 +1107,32 @@ class GeminiLlmPrompter(LlmPrompter):
                     
                     llm_response_text = prompt_result.text
                     throttler_ctx.report_output(llm_response_text)
-                    
-                    preview = llm_response_text[:50] + "..." if len(llm_response_text) > 50 else llm_response_text
-                    logging.info("Received response from %s. Preview: %r", agent_name, preview)
-
-                # Attempt to parse and validate the response against the expected schema.
+                
                 parsed_output = conversation.get_state(agent_name)
                 if isinstance(parsed_output, dict) and pydantic is not None:
-                    # Coerce missing required fields before validation to avoid
-                    # burning retries on trivially fixable schema gaps.
                     parsed_output = self._coerce_for_schema(parsed_output, output_schema)
                     if hasattr(output_schema, 'model_validate'):
                         return output_schema.model_validate(parsed_output)
                     return parsed_output
                 if isinstance(parsed_output, str) and pydantic is not None:
                     if hasattr(output_schema, 'model_validate_json'):
-                        # Clean the string in case it still contains markdown fences.
                         cleaned_output = OpenAiConversation._extract_json(parsed_output)
                         return output_schema.model_validate_json(cleaned_output)
                     return parsed_output
-                # Ensure we don't return None on a successful call that produced no data.
                 if parsed_output is None:
-                    raise ValueError(
-                        f"Agent {agent_name} did not produce any output. This could happen if the LLM called failed."
-                    )
+                    raise ValueError(f"Agent {agent_name} did not produce any output.")
                 return parsed_output
-            except Exception as e:  # broad on purpose to mirror reference flow
-                # Catch validation errors and provide feedback for self-correction.
-                if pydantic is not None and isinstance(
-                    e, getattr(pydantic, "ValidationError", tuple())
-                ):
-                    self._stats.increment_counter("llm.failures.validation_error")
-                    # Extract detailed error information for the LLM's self-healing loop.
-                    user_prompt = self._handle_pydantic_validation_error(
-                        e,
-                        directory_path,
-                        error_prompt_generator_instance,
-                    )
+            except Exception as e:
+                if pydantic is not None and isinstance(e, getattr(pydantic, "ValidationError", tuple())):
+                    user_prompt = self._handle_pydantic_validation_error(e, directory_path, error_prompt_generator_instance)
                     continue
-                # Catch JSON parsing errors and request regeneration.
                 if isinstance(e, json.JSONDecodeError):
-                    self._stats.increment_counter("llm.failures.json_decode_error")
-                    user_prompt = self._handle_json_decoding_error(
-                        e,
-                        directory_path,
-                        
-                        error_prompt_generator_instance,
-                    )
+                    user_prompt = self._handle_json_decoding_error(e, directory_path, error_prompt_generator_instance)
                     continue
-                # Catch generic runtime errors and trigger retry logic.
-                self._stats.increment_counter(f"llm.failures.{type(e).__name__}")
-                user_prompt = self._handle_llm_prompt_error(
-                    e,
-                    directory_path,
-                    conversation,
-                    
-                    error_prompt_generator_instance,
-                    attempt=attempt,
-                )
-                # Retry if any runtime API error occurs.
+                user_prompt = self._handle_llm_prompt_error(e, directory_path, conversation, error_prompt_generator_instance, attempt=attempt)
                 continue
 
-        # Raise error if all retry attempts are exhausted without success.
-        self._stats.increment_counter("llm.max_attempts_reached")
-        raise LlmPrompterOutOfRetriesError(
-            f"Failed to generate for {directory_path} after exhausting retries."
-        )
+        raise LlmPrompterOutOfRetriesError(f"Failed to generate for {directory_path} after exhausting retries.")
 
     def _run_agent_step(
         self,
@@ -1293,7 +1140,6 @@ class GeminiLlmPrompter(LlmPrompter):
         initial_user_prompt: str,
         agent_name: str,
         error_prompt_generator_instance: Any,
-        
         instruction: str,
         output_schema_type: Any,
         model_type: str,
@@ -1301,8 +1147,6 @@ class GeminiLlmPrompter(LlmPrompter):
         tool_executor: Callable[[Any], Any] | None = None,
     ) -> tuple[Any, str]:
         """Runs a single agent step and returns its raw output and JSON string."""
-        # Orchestrate a single agent's execution within the larger pipeline.
-        # Orchestrate a single agent's execution within the larger pipeline.
         plan = self._execute_single_prompt(
             directory_path=directory_path,
             initial_user_prompt=initial_user_prompt,
@@ -1313,16 +1157,12 @@ class GeminiLlmPrompter(LlmPrompter):
                 agent_name=agent_name,
                 output_schema_type=output_schema_type,
                 model_type=model_type,
-                
                 epoch=epoch,
             ),
-            # Instruction and schema definition for the agent.
             stringified_system_prompt=instruction,
             output_schema=output_schema_type,
         )
-        # Execute tools if requested by the agent plan.
         final_output = tool_executor(plan) if tool_executor else plan
-        # Serialize the final output for use by subsequent agents in the chain.
         output_str = (
             final_output.model_dump_json(indent=2)
             if hasattr(final_output, "model_dump_json")
@@ -1344,18 +1184,15 @@ class GeminiLlmPrompter(LlmPrompter):
         deep_dive_summary_str: str,
     ) -> list[Any]:
         """Runs a single synthesis agent to generate all custom sections at once."""
-        # Check if any custom sections were requested for this directory.
         if not getattr(system_prompt, "custom_sections", lambda: [])():
             return []
 
-        # Construct the instruction set for synthesizing custom sections.
         section_instruction = system_prompt.custom_sections_instruction(
             code_search_output=code_search_output_str,
             read_files_output=read_files_output_str,
             key_components_output=key_components_summary_str,
             deep_dive_output=deep_dive_summary_str,
         )
-        # Execute the custom sections synthesis agent.
         section_doc, _ = self._run_agent_step(
             directory_path=directory_path,
             initial_user_prompt=initial_user_prompt,
@@ -1366,8 +1203,6 @@ class GeminiLlmPrompter(LlmPrompter):
             model_type="synthesis",
             epoch=system_prompt.epoch(),
         )
-        
-        # Return the extracted custom sections from the synthesis doc.
         return section_doc.custom_sections
 
     def _aggregate_cost_report(self, directory_path: str, epoch: int) -> schema.CostReport:
@@ -1378,15 +1213,11 @@ class GeminiLlmPrompter(LlmPrompter):
         total_latency = sum(c.latency_ms for c in self._call_records)
         total_calls = len(self._call_records)
         
-        # Simple breakdown by model.
         model_breakdown = {}
         for c in self._call_records:
             if c.model_name not in model_breakdown:
                 model_breakdown[c.model_name] = {
-                    "calls": 0,
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "total_tokens": 0,
+                    "calls": 0, "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
                 }
             stats = model_breakdown[c.model_name]
             stats["calls"] += 1
@@ -1406,7 +1237,6 @@ class GeminiLlmPrompter(LlmPrompter):
             model_breakdown=model_breakdown,
         )
 
-
     def prompt_for_indexing(
         self,
         directory_path: str,
@@ -1414,12 +1244,13 @@ class GeminiLlmPrompter(LlmPrompter):
         initial_user_prompt: str,
         error_prompt_generator_instance: Any,
         verifier: Any = None,
+        directory_files: list[str] | None = None,
+        previous_artifact: schema.IndexDocument | None = None,
+        previous_verdict: verification_types.VerificationVerdict | None = None,
     ) -> schema.IndexDocument:
         """Prompts the LLM, validates the response, and retries on failure."""
         self._call_records.clear()
-        # Handle cases where the conversation flow is completely overridden.
         if self._override_conversation_factory is not None:
-            logging.info("Overriding sequence using custom conversation factory")
             conversation = self._override_conversation_factory(system_prompt)
             prompt_result = conversation.prompt(initial_user_prompt)
             parsed = json.loads(prompt_result.text)
@@ -1427,164 +1258,95 @@ class GeminiLlmPrompter(LlmPrompter):
                 return schema.IndexDocument.model_validate(parsed)
             return parsed
 
-        # Initialize research context tracking to avoid verification false-positives.
         self.last_research_context = ""
 
-        # --- STEP 1: Research Phase (Code Search) ---
-        # Agent plans and executes search queries to find relevant code snippets.
-        if self._config.include_search_tool:
-            def search_tool_wrapper(plan: Any) -> str:
-                # Extract queries from dict or list format.
-                queries = plan if isinstance(plan, list) else plan.get("queries", []) if isinstance(plan, dict) else []
-                return self._execute_code_search(queries)
+        # --- STEP 0: Healing & Taint Analysis ---
+        must_run = {
+            "research": True, "key_components": True, "deep_dive": True, "overview": True, "custom": True,
+        }
 
-            code_search_instruction = system_prompt.research_planner_instruction()
-            _, code_search_output_str = self._run_agent_step(
-                directory_path=directory_path,
-                initial_user_prompt=initial_user_prompt,
-                agent_name="research_planner_agent",
-                error_prompt_generator_instance=error_prompt_generator_instance,
-                instruction=code_search_instruction,
-                output_schema_type=dict,
-                model_type="research",
-                epoch=system_prompt.epoch(),
-                tool_executor=search_tool_wrapper,
-            )
-            self.last_research_context += f"=== CODE SEARCH OUTPUT ===\n{code_search_output_str}\n\n"
-        # Case when code search is intentionally bypassed.
+        if previous_verdict and not previous_verdict.passed:
+            logging.info("[DeltaHealing] Analyzing taint for %s", directory_path)
+            must_run = {k: False for k in must_run}
+            must_run["research"] = True # Always re-run research for ground truth
+
+            failed_sections = set(issue.section for issue in previous_verdict.detailed_issues if issue.section)
+            key_comp_sections = {
+                "key_individual_components", "key_interfaces", "key_dependencies",
+                "configurations", "implementation_invariants", "workflow_patterns",
+                "blueprint", "tech_debt", "architectural_patterns_and_gotchas", "testing_strategy"
+            }
+            
+            if any(s in key_comp_sections for s in failed_sections) or not failed_sections:
+                must_run["key_components"] = True
+                must_run["deep_dive"] = True
+                must_run["overview"] = True
+            if "deep_dive" in failed_sections:
+                must_run["deep_dive"] = True
+                must_run["overview"] = True
+            if "overview" in failed_sections:
+                must_run["overview"] = True
+            if "custom_sections" in failed_sections:
+                must_run["custom"] = True
+
+        # --- STEP 1: Research Phase ---
+        if must_run["research"]:
+            if self._config.include_search_tool:
+                def search_tool_wrapper(p): return self._execute_code_search(p if isinstance(p, list) else p.get("queries", []))
+                _, res_out = self._run_agent_step(directory_path, initial_user_prompt, "research_planner_agent", error_prompt_generator_instance, system_prompt.research_planner_instruction(), dict, "research", system_prompt.epoch(), search_tool_wrapper)
+                self.last_research_context += f"=== CODE SEARCH OUTPUT ===\n{res_out}\n\n"
+            else: res_out = "Code search disabled."
+
+            def read_tool_wrapper(p): return self._execute_read_files(p if isinstance(p, list) else p.get("files", []))
+            _, read_out = self._run_agent_step(directory_path, initial_user_prompt, "read_files_planner_agent", error_prompt_generator_instance, system_prompt.read_files_planner_instruction(code_search_output=res_out), dict, "research", system_prompt.epoch(), read_tool_wrapper)
+            self.last_research_context += f"=== READ FILES OUTPUT ===\n{read_out}\n\n"
         else:
-            code_search_output_str = "Code search is not enabled for this agent."
+            res_out, read_out = "[Skipped]", "[Skipped]"
 
-        # --- STEP 2: Research Phase (Read Files) ---
-        # Agent selects specific files to read based on search results.
-        def read_files_tool_wrapper(plan: Any) -> str:
-            # Extract files from dict or list format.
-            files = plan if isinstance(plan, list) else plan.get("files", []) if isinstance(plan, dict) else []
-            return self._execute_read_files(files)
+        # --- STEP 2: Synthesis Phase ---
+        if must_run["key_components"]:
+            key_components_doc, key_comp_summary = self._run_agent_step(directory_path, initial_user_prompt, "key_components_agent", error_prompt_generator_instance, system_prompt.key_components_instruction(code_search_output=res_out, read_files_output=read_out), schema.KeyComponentsDocument, "synthesis", system_prompt.epoch())
+        else:
+            key_components_doc = schema.KeyComponentsDocument(**section_registry.key_components_payloads(previous_artifact))
+            key_comp_summary = "[Reused]"
 
-        read_files_instruction = system_prompt.read_files_planner_instruction(
-            code_search_output=code_search_output_str
-        )
-        _, read_files_output_str = self._run_agent_step(
-            directory_path=directory_path,
-            initial_user_prompt=initial_user_prompt,
-            agent_name="read_files_planner_agent",
-            error_prompt_generator_instance=error_prompt_generator_instance,
-            instruction=read_files_instruction,
-            output_schema_type=dict,
-            # Execute on research-optimized models for faster iteration.
-            model_type="research",
-            epoch=system_prompt.epoch(),
-            tool_executor=read_files_tool_wrapper,
-        )
-        self.last_research_context += f"=== READ FILES OUTPUT ===\n{read_files_output_str}\n\n"
+        if must_run["deep_dive"]:
+            deep_dive_doc, dd_summary = self._run_agent_step(directory_path, initial_user_prompt, "deep_dive_agent", error_prompt_generator_instance, system_prompt.deep_dive_instruction(code_search_output=res_out, read_files_output=read_out, key_components_output=key_comp_summary), schema.DeepDiveDocument, "synthesis", system_prompt.epoch())
+        else:
+            deep_dive_doc = schema.DeepDiveDocument(deep_dive=previous_artifact.deep_dive)
+            dd_summary = "[Reused]"
 
-        # --- STEP 3: Synthesis Phase (Key Components) ---
-        # Agent identifies critical components, interfaces, and patterns.
-        key_components_instruction = system_prompt.key_components_instruction(
-            code_search_output=code_search_output_str,
-            read_files_output=read_files_output_str,
-        )
-        key_components_doc, key_components_summary_str = self._run_agent_step(
-            directory_path=directory_path,
-            initial_user_prompt=initial_user_prompt,
-            agent_name="key_components_agent",
-            error_prompt_generator_instance=error_prompt_generator_instance,
-            instruction=key_components_instruction,
-            # Synthesis steps require more reasoning capacity; use larger models.
-            output_schema_type=schema.KeyComponentsDocument,
-            model_type="synthesis",
-            epoch=system_prompt.epoch(),
-        )
-        # Generate technical deep dive documentation based on gathered insights.
+        if must_run["overview"]:
+            overview_doc, _ = self._run_agent_step(directory_path, initial_user_prompt, "overview_agent", error_prompt_generator_instance, system_prompt.overview_instruction(code_search_output=res_out, read_files_output=read_out, key_components_output=key_comp_summary, deep_dive_output=dd_summary), schema.OverviewDocument, "synthesis", system_prompt.epoch())
+        else:
+            overview_doc = schema.OverviewDocument(overview=previous_artifact.overview)
 
-        # --- STEP 4: Synthesis Phase (Deep Dive) ---
-        # Agent provides detailed technical analysis of complex logic.
-        deep_dive_instruction = system_prompt.deep_dive_instruction(
-            code_search_output=code_search_output_str,
-            read_files_output=read_files_output_str,
-            key_components_output=key_components_summary_str,
-        )
-        deep_dive_doc, deep_dive_summary_str = self._run_agent_step(
-            directory_path=directory_path,
-            initial_user_prompt=initial_user_prompt,
-            agent_name="deep_dive_agent",
-            error_prompt_generator_instance=error_prompt_generator_instance,
-            # Generate the detailed technical deep dive for core logic.
-            instruction=deep_dive_instruction,
-            output_schema_type=schema.DeepDiveDocument,
-            model_type="synthesis",
-            epoch=system_prompt.epoch(),
-        )
-        # Consolidate findings into a high-level overview section.
+        if must_run["custom"]:
+            custom_sections = self._run_custom_sections_agent(directory_path, initial_user_prompt, system_prompt, error_prompt_generator_instance, res_out, read_out, key_comp_summary, dd_summary)
+        else:
+            custom_sections = previous_artifact.custom_sections
 
-        # --- STEP 5: Synthesis Phase (Overview) ---
-        # Agent generates the high-level summary of the directory.
-        overview_instruction = system_prompt.overview_instruction(
-            code_search_output=code_search_output_str,
-            read_files_output=read_files_output_str,
-            key_components_output=key_components_summary_str,
-            deep_dive_output=deep_dive_summary_str,
-        )
-        overview_doc, _ = self._run_agent_step(
-            directory_path=directory_path,
-            initial_user_prompt=initial_user_prompt,
-            agent_name="overview_agent",
-            # Consolidate all previous findings into a human-readable overview.
-            error_prompt_generator_instance=error_prompt_generator_instance,
-            instruction=overview_instruction,
-            output_schema_type=schema.OverviewDocument,
-            model_type="synthesis",
-            epoch=system_prompt.epoch(),
-        )
-        # Finalize the document with any requested custom sections.
-
-        # --- STEP 6: Synthesis Phase (Custom Sections) ---
-        # Agent generates optional user-defined sections.
-        custom_sections_results = self._run_custom_sections_agent(
-            directory_path=directory_path,
-            initial_user_prompt=initial_user_prompt,
-            system_prompt=system_prompt,
-            error_prompt_generator_instance=error_prompt_generator_instance,
-            code_search_output_str=code_search_output_str,
-            read_files_output_str=read_files_output_str,
-            key_components_summary_str=key_components_summary_str,
-            deep_dive_summary_str=deep_dive_summary_str,
-        )
-
-        # --- STEP 7: Final Assembly ---
-        # Combine all partial agent outputs into the final structured IndexDocument.
+        # --- STEP 3: Assembly & Verification ---
         artifact = schema.IndexDocument(
-            overview=overview_doc.overview,
-            deep_dive=deep_dive_doc.deep_dive,
+            overview=overview_doc.overview, deep_dive=deep_dive_doc.deep_dive,
             **section_registry.key_components_payloads(key_components_doc),
-            custom_sections=custom_sections_results,
-            # --- Phase 4: Metadata Integration ---
-            # Populate the GenerationMetadata sub-model to satisfy SM-101.
-            # This ensures ISO-compliant traceability for trust-oriented audits.
+            custom_sections=custom_sections,
             generation_metadata=schema.GenerationMetadata(
                 generated_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                model_name=self._config.synthesis_gemini_model if hasattr(self, "_config") else "unknown",
-                epoch=system_prompt.epoch() if hasattr(system_prompt, "epoch") else 0,
-                cost_report=self._aggregate_cost_report(directory_path, system_prompt.epoch() if hasattr(system_prompt, "epoch") else 0)
+                model_name=self._config.synthesis_gemini_model,
+                epoch=system_prompt.epoch(),
+                cost_report=schema.CostReport(directory_path=directory_path, epoch=system_prompt.epoch())
             )
         )
 
-        # --- STEP 8: Verification Phase ---
-        # Run automated quality checks on the generated artifact.
         if verifier:
             logging.info("Verifying artifact for %s", directory_path)
-            # Use the provided directory contents as the ground truth for verification,
-            # augmented with any research context gathered during the process.
-            source_context = getattr(system_prompt, "_directory_contents", "No source context available.")
-            full_context = source_context + "\n\n" + self.last_research_context
-            artifact_json = artifact.model_dump_json(indent=2)
-            verdict = verifier.verify(artifact_json, full_context)
-            # Log verification issues for manual review or future self-healing loops.
-            if not verdict.passed:
-                logging.warning("Verification failed for %s: %s", directory_path, verdict.issues)
-        
-        # Return the finalized artifact for storage or further verification.
+            full_context = getattr(system_prompt, "_directory_contents", "") + "\n\n" + self.last_research_context
+            verdict = verifier.verify(artifact.model_dump_json(indent=2), full_context, directory_files=directory_files, ast_grounding=getattr(system_prompt, "_ast_grounding_cache", None))
+            if not verdict.passed: logging.warning("Verification failed for %s: %s", directory_path, verdict.issues)
+
+        final_cost = self._aggregate_cost_report(directory_path, system_prompt.epoch())
+        artifact.generation_metadata.cost_report = final_cost
         return artifact
 
     def prompt_for_merging(
@@ -1593,16 +1355,12 @@ class GeminiLlmPrompter(LlmPrompter):
         system_prompt: str,
         initial_user_prompt: str,
         error_prompt_generator_instance: Any,
+        directory_files: list[str] | None = None,
     ) -> schema.IndexDocument:
-        """Prompts the LLM to merge summaries, validates response, and retries."""
-        if self._override_conversation_factory is not None:
-            pass
-
+        """Prompts the LLM to merge summaries."""
         if pydantic is not None and hasattr(schema.IndexDocument, "model_json_schema"):
             schema_str = json.dumps(schema.IndexDocument.model_json_schema(), indent=2)
-            system_prompt = (
-                f"{system_prompt}\n\nYour output MUST be a JSON object that conforms to the following schema: {schema_str}"
-            )
+            system_prompt = f"{system_prompt}\n\nYour output MUST be a JSON object conforming to: {schema_str}"
 
         return self._execute_single_prompt(
             directory_path=directory_path,
@@ -1610,172 +1368,84 @@ class GeminiLlmPrompter(LlmPrompter):
             agent_name="merging_agent",
             error_prompt_generator_instance=error_prompt_generator_instance,
             conversation_factory=lambda: self._create_single_conversation(
-                system_prompt=system_prompt,
-                agent_name="merging_agent",
-                output_schema_type=schema.IndexDocument,
-                model_type="synthesis",
+                system_prompt=system_prompt, agent_name="merging_agent",
+                output_schema_type=schema.IndexDocument, model_type="synthesis"
             ),
             stringified_system_prompt=system_prompt,
             output_schema=schema.IndexDocument,
         )
 
-    
     def prompt_for_root_map_summary(self, root_map_content: str) -> str:
         """Returns a synthesized summary of the root map content using the LLM."""
-        from indexing import prompt_templates
         system_prompt = prompt_templates.create_root_map_prompt(root_map_content)
-        
-        logging.info("[RootMap] Requesting architectural synthesis (context=%d bytes).", len(root_map_content))
-        
-        # We use 'synthesis' model type for the senior architect persona.
-        conv = self._create_single_conversation(
-            system_prompt=system_prompt,
-            agent_name="root_map_architect",
-            output_schema_type=None,
-            model_type="synthesis"
-        )
-        
+        conv = self._create_single_conversation(system_prompt=system_prompt, agent_name="root_map_architect", output_schema_type=None, model_type="synthesis")
         prompt_result = conv.prompt("Please provide the high-level architectural summary.")
         return prompt_result.text.strip()
 
-    def verify_artifact(self, artifact_json: str, source_context: str, is_merger_mode: bool = False) -> verification_types.VerificationVerdict:
-        """Runs the verifier prompt and returns a structured verdict using a robust loop."""
-        # 1. Prepare prompts
+    def verify_artifact(
+        self, 
+        artifact_json: str, 
+        source_context: str, 
+        directory_files: list[str] | None = None,
+        is_merger_mode: bool = False
+    ) -> verification_types.VerificationVerdict:
+        """Runs the verifier prompt and returns a structured verdict."""
         base_user_prompt = prompt_templates.create_verifier_prompt(artifact_json, source_context)
-        
-        # We augment the system prompt with the schema to ensure structured output,
-        # but the _execute_single_prompt loop will handle the retries and coercion.
         system_prompt = prompt_templates.VERIFIER_SYSTEM_PROMPT
         if pydantic is not None and hasattr(verification_types.VerificationVerdict, "model_json_schema"):
             schema_str = json.dumps(verification_types.VerificationVerdict.model_json_schema(), indent=2)
-            system_prompt = (
-                f"{system_prompt}\n\n"
-                f"Your output MUST be a JSON object conforming to: {schema_str}\n\n"
-                "CRITICAL: Output ONLY the JSON instance. DO NOT echo the '$defs' or the schema itself."
-            )
-            
-        logging.info(
-            "[VerifyArtifact] Requesting structured verification verdict (context=%d bytes).",
-            len(source_context),
-        )
+            system_prompt = f"{system_prompt}\n\nYour output MUST be a JSON object conforming to: {schema_str}"
 
-        # 2. Run prompt using the robust _execute_single_prompt loop.
         try:
             verdict = self._execute_single_prompt(
-                directory_path="verification_step", # Virtual path for logging
+                directory_path="verification_step",
                 initial_user_prompt=base_user_prompt,
-                system_prompt=system_prompt,
-                output_schema=verification_types.VerificationVerdict,
                 agent_name="verifier_agent",
-                model_type="synthesis"
+                error_prompt_generator_instance=error_prompt_generator.IndexerErrorPromptGenerator(),
+                conversation_factory=lambda: self._create_single_conversation(
+                    system_prompt=system_prompt, agent_name="verifier_agent",
+                    output_schema_type=verification_types.VerificationVerdict, model_type="synthesis"
+                ),
+                stringified_system_prompt=system_prompt,
+                output_schema=verification_types.VerificationVerdict,
             )
-            
-            # Ensure model attribution is recorded.
             if hasattr(verdict, "verification_model"):
                 verdict.verification_model = getattr(self._config, "synthesis_gemini_model", "unknown")
-            
             return verdict
-
         except Exception as e:
-            logging.error("[VerifyArtifact] Terminal failure after retries: %s", e)
-            # On terminal failure, we return a pessimistic verdict that passes but with low confidence
-            # to avoid blocking the pipeline while logging the error.
-            return verification_types.VerificationVerdict(
-                passed=True,
-                confidence=0.01,
-                reason=f"Verification failed after all retries: {e}. Bypassing to avoid pipeline stall."
-            )
+            logging.error("[VerifyArtifact] Terminal failure: %s", e)
+            return verification_types.VerificationVerdict.infrastructure_bypass(confidence=0.01, reason=str(e))
 
     def _execute_web_searches(self, queries: list[str]) -> list[dict[str, str]]:
-        """Executes a list of web searches and returns a list of results.
-        
-        This implementation provides a foundation for automated external dependency
-        verification. It can be extended to use official search APIs (SerpApi, Google)
-        or LLM-based grounding features.
-        """
-        results = []
-        for query in queries:
-            logging.info("[WebSearch] Executing research query: %r", query)
-            # In a production environment, this would integrate with a search provider.
-            # Here we provide a structured placeholder that subsequent agents can use.
-            results.append({
-                "query": query,
-                "result": f"Detailed research results for '{query}' would be retrieved here to inform dependency classification."
-            })
-        return results
+        """Placeholder for web search capability."""
+        return [{"query": q, "result": "Research placeholder."} for q in queries]
 
     def _execute_read_files(self, files: list[str]) -> str:
-        """Reads the contents of the specified files from the codebase."""
-        if not files:
-            return "No files requested."
-        
-        if not self._fs_manager:
-            return "File system manager not available for reading files."
-
+        """Reads file contents from the local filesystem."""
+        if not files or not self._fs_manager: return "No files or no FS manager."
         results = []
-        # Limit to 5 files to prevent context explosion.
         for file_path in files[:5]:
-            abs_path = file_path
-            if self._repo_root and not file_path.startswith("/"):
-                abs_path = os.path.join(self._repo_root, file_path)
-            
-            logging.info("[ReadFiles] Reading file: %s", file_path)
+            abs_path = os.path.join(self._repo_root, file_path) if self._repo_root and not file_path.startswith("/") else file_path
             try:
                 if self._fs_manager.exists(abs_path):
-                    content = self._fs_manager.read(abs_path)
-                    results.append(f"--- FILE: {file_path} ---\n{content}")
-                else:
-                    results.append(f"--- FILE: {file_path} ---\n(File not found)")
-            except Exception as e:
-                results.append(f"--- FILE: {file_path} ---\n(Error reading file: {e})")
-        
+                    results.append(f"--- FILE: {file_path} ---\n{self._fs_manager.read(abs_path)}")
+                else: results.append(f"--- FILE: {file_path} ---\n(File not found)")
+            except Exception as e: results.append(f"--- FILE: {file_path} ---\n(Error: {e})")
         return "\n\n".join(results)
 
     def _execute_code_search(self, queries: list[str]) -> str:
-        """Performs a basic grep-like search across the local repository."""
-        if not queries:
-            return "No search queries provided."
-
-        if not self._repo_root:
-            return "Repository root not available for local code search."
-
+        """Performs local code search using grep/find."""
+        if not queries or not self._repo_root: return "No queries or no repo root."
         results = []
-        # Execute up to 5 planned queries to match the planner prompt contract.
         for query in queries[:5]:
-            logging.info("[CodeSearch] Searching for: %r", query)
             try:
-                # Handle special filters in the query.
-                import subprocess
-                
-                # Check for filename filter.
                 if query.startswith("filename:"):
-                    filename = query.split(":", 1)[1].strip()
-                    # Use find to search for the filename relative to repo root.
-                    cmd = ["find", ".", "-name", f"*{filename}*", "-not", "-path", "*/.*", "-not", "-path", "*/node_modules/*"]
-                    process = subprocess.run(cmd, cwd=self._repo_root, capture_output=True, text=True, check=False)
-                    output = process.stdout.strip()
+                    cmd = ["find", ".", "-name", f"*{query.split(':', 1)[1].strip()}*", "-not", "-path", "*/.*", "-not", "-path", "*/node_modules/*"]
                 else:
-                    # Clean the query (remove any leading 'path:' or 'symbol:' which are just hints)
-                    search_term = query
-                    if ":" in query and not query.startswith("http"):
-                         search_term = query.split(":", 1)[1].strip()
-
-                    # Search across all files in the repo root, excluding common noise.
-                    # We limit to 5 matches per query to prevent context overflow.
-                    cmd = [
-                        "grep", "-r", "-n", "-m", "5",
-                        "--exclude-dir=.git", "--exclude-dir=.venv", "--exclude-dir=node_modules",
-                        search_term, "."
-                    ]
-                    process = subprocess.run(cmd, cwd=self._repo_root, capture_output=True, text=True, check=False)
-                    output = process.stdout.strip()
-                
-                if output:
-                    # Clean up absolute paths to be repo-relative for the LLM.
-                    results.append(f"--- SEARCH RESULTS FOR: {query} ---\n{output}")
-                else:
-                    results.append(f"--- SEARCH RESULTS FOR: {query} ---\n(No matches found)")
-            except Exception as e:
-                results.append(f"--- SEARCH RESULTS FOR: {query} ---\n(Search failed: {e})")
-        
+                    search_term = query.split(":", 1)[1].strip() if ":" in query and not query.startswith("http") else query
+                    cmd = ["grep", "-r", "-n", "-m", "5", "--exclude-dir=.git", "--exclude-dir=node_modules", search_term, "."]
+                process = subprocess.run(cmd, cwd=self._repo_root, capture_output=True, text=True, check=False)
+                output = process.stdout.strip()
+                results.append(f"--- SEARCH RESULTS FOR: {query} ---\n{output or '(No matches found)'}")
+            except Exception as e: results.append(f"--- SEARCH RESULTS FOR: {query} ---\n(Search failed: {e})")
         return "\n\n".join(results)

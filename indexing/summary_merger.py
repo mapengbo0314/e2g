@@ -20,12 +20,14 @@ import httpx
 
 from indexing import prompt_templates
 from indexing import schema
+from indexing import section_registry
 
 
 # Template for the final user prompt used during the LLM merge phase.
 USER_PROMPT_TEMPLATE_MERGE = (
     "Please merge the partial summaries above into a single, coherent"
-    " document for the directory {directory_path}."
+    " document for the directory {directory_path}. "
+    "Use the 'PROGRAMMATICALLY MERGED SECTIONS' as the ground truth for structural data."
 )
 
 
@@ -47,6 +49,8 @@ class IndexStateProtocol(Protocol):
     def read_summaries(
         self, path_strs: list[str], epoch: int
     ) -> dict[str, str]: ...
+    
+    def read_latest_summary(self, path: str) -> str: ...
 
 
 class ErrorPromptGenerator:
@@ -75,7 +79,7 @@ def _get_subdirectory_indexes(
     # Filtering configuration for selecting relevant subdirectory data.
     filtering_config: object | None = None,
 ) -> dict[str, str]:
-    """Best-effort local stand-in for file_utils.get_subdirectory_indexes(...)."""
+    """Reads latest available summaries for all immediate subdirectories."""
     path = Path(directory_path)
     if not path.exists() or not path.is_dir():
         return {}
@@ -85,11 +89,15 @@ def _get_subdirectory_indexes(
     if not child_paths:
         return {}
 
-    try:
-        return index_state.read_summaries(child_paths, 0)
-    except Exception:
-        # Fallback to an empty dictionary if the state read fails.
-        return {}
+    results = {}
+    for cp in child_paths:
+        try:
+            # Always use the latest available summary to ensure reindex parity.
+            results[cp] = index_state.read_latest_summary(cp)
+        except Exception:
+            # Skip if no summary exists yet for this child.
+            pass
+    return results
 
 
 class _StatsRecorder:
@@ -132,19 +140,12 @@ class SummaryMerger:
         before_sleep=tenacity.before_sleep_log(logging.getLogger(__name__), logging.WARNING),
         reraise=True
     )
-    def merge(self, docs: list[Any], directory_path: str, error_prompt: str = "") -> Any:
-        """Merges multiple markdown indexes into one using an LLM.
+    def merge(self, docs: list[Any], directory_path: str, epoch: int = 0, error_prompt: str = "", directory_files: list[str] | None = None) -> Any:
+        """Merges multiple markdown indexes into one using a hybrid programmatic/LLM approach.
 
-        Args:
-            docs: The list of markdown indexes to merge.
-            directory_path: The path to the directory being indexed.
-            error_prompt: Optional verification error prompt to pass to the LLM.
-
-        Returns:
-            The merged markdown index.
-
-        Raises:
-            ValueError: If no indexes are provided.
+        This performs programmatic union/accumulation for deterministic sections 
+        (blueprints, interfaces) to ensure zero-loss fidelity, while delegating 
+        synthesis of text-heavy sections (overviews, deep dives) to the LLM.
         """
         self._stats.increment_counter("merges.started")
         if not docs:
@@ -156,11 +157,35 @@ class SummaryMerger:
             self._stats.increment_counter("merges.skipped_single_index")
             return docs[0]
 
-        # Construct the context-heavy system prompt for the merge task.
+        # --- Phase 1: Programmatic Merge (Deterministic) ---
+        deterministic_sections = {}
+        for section_id in section_registry.get_deterministic_section_ids():
+            section_instances = []
+            for doc in docs:
+                # Handle both object and dict forms of partial summaries.
+                inst = getattr(doc, section_id, None) if hasattr(doc, section_id) else doc.get(section_id)
+                if inst:
+                    section_instances.append(inst)
+            
+            if section_instances:
+                merged = section_registry.merge_sections(section_id, section_instances)
+                if merged:
+                    deterministic_sections[section_id] = merged
+        
+        # --- Phase 2: LLM Synthesis (Non-deterministic) ---
+        # Construct the context-heavy system prompt. We include the deterministic 
+        # merges as explicit 'Ground Truth' to guide the LLM's synthesis.
+        evidence_str = ""
+        if deterministic_sections:
+            evidence_str = "\n\n### PROGRAMMATICALLY MERGED SECTIONS (GROUND TRUTH)\n"
+            for sid, inst in deterministic_sections.items():
+                evidence_str += f"\n--- {sid} ---\n{_serialize_doc(inst)}"
+
         system_prompt = (
             prompt_templates.create_merger_prompt()
             + "\n Partial summaries: \n"
             + "\n\n---\n\n".join(_serialize_doc(doc) for doc in docs)
+            + evidence_str
             + "\n Subdirectory Indexes: "
             + json.dumps(
                 # Include nested indexes to help the LLM maintain hierarchical context.
@@ -174,7 +199,7 @@ class SummaryMerger:
             )
         )
 
-        # Prepare the final user prompt directing the LLM to unify the provided docs.
+        # Prepare the final user prompt.
         initial_user_prompt = USER_PROMPT_TEMPLATE_MERGE.format(
             directory_path=directory_path
         )
@@ -182,15 +207,27 @@ class SummaryMerger:
             initial_user_prompt += "\n\n" + error_prompt
 
         logging.info(
-            "Merging index for %s with prompt: %s",
+            "Merging index for %s with programmatic help.",
             directory_path,
-            initial_user_prompt,
         )
 
-        # Delegate the final synthesis to the LLM prompter.
-        return self._llm_prompter.prompt_for_merging(
+        # Delegate the synthesis of text-heavy sections to the LLM.
+        merged_doc = self._llm_prompter.prompt_for_merging(
             directory_path=directory_path,
             system_prompt=system_prompt,
             initial_user_prompt=initial_user_prompt,
             error_prompt_generator_instance=ErrorPromptGenerator(),
+            directory_files=directory_files,
         )
+
+        # --- Phase 3: Final Assembly & Fidelity Patching ---
+        # We overwrite the deterministic fields in the LLM output with our 
+        # programmatically merged data to ensure 100% structural fidelity.
+        if hasattr(merged_doc, "model_copy"): # Pydantic v2
+             for section_id, merged_inst in deterministic_sections.items():
+                 setattr(merged_doc, section_id, merged_inst)
+        elif isinstance(merged_doc, dict):
+             for section_id, merged_inst in deterministic_sections.items():
+                 merged_doc[section_id] = merged_inst
+
+        return merged_doc

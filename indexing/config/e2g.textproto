@@ -20,3 +20,18 @@ input: {
 exclude_pattern: ".*/__pycache__/.*"
 exclude_pattern: ".*\\.pyc"
 exclude_pattern: ".*/\\.pytest_cache/.*"
+
+custom_sections: {
+  title: "DDD Domain Layer"
+  prompt: "Identify and extract all Domain models and data structures. Focus on pure Pydantic models, State classes, data schemas, and enums. Do not include logic that mutates the file system, orchestrates workflows, or handles HTTP/CLI traffic."
+}
+
+custom_sections: {
+  title: "DDD Service Layer"
+  prompt: "Identify and extract all Service and Application logic. Focus on orchestrators (like LangGraph topologies), algorithms (like Waterfall Budgeting), and business rules. Exclude pure data models and external interface handlers."
+}
+
+custom_sections: {
+  title: "DDD Handler Layer"
+  prompt: "Identify and extract all Handlers and Interface Adapters. Focus on MCP tool definitions, CLI argument parsers (argparse/click), and format conversions (e.g., converting pure domain objects to/from JSON strings for protocols)."
+}

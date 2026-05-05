@@ -33,6 +33,21 @@ class SectionSpec:
     render_fn: Callable[[Any], str | None] | None = None
 
 
+import re
+
+def _get_anchor_name(item: Any) -> str:
+    """Generates a stable, unique markdown-safe anchor name for an item."""
+    if hasattr(item, "file_path") and hasattr(item, "name"):
+        safe_path = re.sub(r'[^a-zA-Z0-9]', '_', item.file_path)
+        return f"sym_{safe_path}_{item.name}"
+    if hasattr(item, "file_path") and hasattr(item, "primitive"):
+         safe_path = re.sub(r'[^a-zA-Z0-9]', '_', item.file_path)
+         safe_primitive = re.sub(r'[^a-zA-Z0-9]', '_', item.primitive)
+         line = getattr(item, "line_number", 0)
+         return f"inv_{safe_path}_{safe_primitive}_{line}"
+    return ""
+
+
 def _render_overview(section: schema.Overview) -> str | None:
     return f"# Overview\n\n{section.content}" if section.content else None
 
@@ -46,19 +61,23 @@ def _render_key_individual_components(
 ) -> str | None:
     if not section.components:
         return None
-    items = "\n".join(
-        [f"- **{component.name}**: {component.description}" for component in section.components]
-    )
-    return f"# Key Individual Components\n\n{items}"
+    items = []
+    for component in section.components:
+        anchor = _get_anchor_name(component)
+        anchor_tag = f"<a name=\"{anchor}\"></a>" if anchor else ""
+        items.append(f"- **{component.name}**: {component.description} {anchor_tag}")
+    return f"# Key Individual Components\n\n" + "\n".join(items)
 
 
 def _render_key_interfaces(section: schema.KeyInterfaces) -> str | None:
     if not section.interfaces:
         return None
-    items = "\n".join(
-        [f"- **{interface.name}**: {interface.description}" for interface in section.interfaces]
-    )
-    return f"# Key Interfaces\n\n{items}"
+    items = []
+    for interface in section.interfaces:
+        anchor = _get_anchor_name(interface)
+        anchor_tag = f"<a name=\"{anchor}\"></a>" if anchor else ""
+        items.append(f"- **{interface.name}**: {interface.description} {anchor_tag}")
+    return f"# Key Interfaces\n\n" + "\n".join(items)
 
 
 def _render_key_dependencies(section: schema.KeyDependencies) -> str | None:
@@ -108,22 +127,23 @@ def _render_implementation_invariants(
 ) -> str | None:
     if not section.invariants:
         return None
-    items = "\n".join(
-        [
-            f"- **{invariant.primitive}**: {invariant.intent} ({invariant.usage_context})"
-            for invariant in section.invariants
-        ]
-    )
-    return f"# Implementation Invariants\n\n{items}"
+    items = []
+    for invariant in section.invariants:
+        anchor = _get_anchor_name(invariant)
+        anchor_tag = f"<a name=\"{anchor}\"></a>" if anchor else ""
+        items.append(f"- **{invariant.primitive}**: {invariant.intent} ({invariant.usage_context}) {anchor_tag}")
+    return f"# Implementation Invariants\n\n" + "\n".join(items)
 
 
 def _render_blueprint(section: schema.Blueprint) -> str | None:
     if not section.symbols:
         return None
-    items = "\n".join(
-        [f"- `{symbol.signature}`: {symbol.summary}" for symbol in section.symbols]
-    )
-    return f"# Blueprint\n\n{items}"
+    items = []
+    for symbol in section.symbols:
+        anchor = _get_anchor_name(symbol)
+        anchor_tag = f"<a name=\"{anchor}\"></a>" if anchor else ""
+        items.append(f"- {anchor_tag}`{symbol.signature}`: {symbol.summary}")
+    return f"# Blueprint\n\n" + "\n".join(items)
 
 
 def _render_workflow_patterns(section: schema.WorkflowPatterns) -> str | None:
@@ -389,4 +409,64 @@ def get_mandatory_sections() -> list[str]:
         spec.section_id
         for spec in SECTION_SPECS
         if spec.verification_policy == "required_for_code"
+    ]
+
+
+def merge_sections(section_id: str, instances: list[Any]) -> Any:
+    """Merges multiple instances of a section based on its registered strategy.
+
+    This implements programmatic merges for 'deterministic_union' and 'accumulate'
+    strategies, reducing LLM token usage and improving structural reliability.
+    """
+    spec = _SECTION_BY_ID.get(section_id)
+    if not spec:
+        return instances[0] if instances else None
+
+    # Filter out None instances and empty sections
+    instances = [i for i in instances if i is not None and not is_section_empty(section_id, i)]
+    if not instances:
+        return None
+    if len(instances) == 1:
+        return instances[0]
+
+    if spec.merge_strategy == "deterministic_union" and spec.list_field:
+        # Union of items, deduplicating by a stable key (usually 'name' or 'primitive').
+        all_items = []
+        seen_keys = set()
+        
+        for inst in instances:
+            items = getattr(inst, spec.list_field, [])
+            for item in items:
+                # Determine the primary key for deduplication.
+                # ExportedSymbol uses (name, signature, file_path) for maximum precision.
+                if isinstance(item, schema.ExportedSymbol):
+                    key = (item.name, item.signature, item.file_path)
+                else:
+                    key = getattr(item, "name", getattr(item, "primitive", None))
+                
+                if key not in seen_keys:
+                    all_items.append(item)
+                    seen_keys.add(key)
+        
+        # Return a new instance of the payload model with the merged items.
+        return spec.payload_model(**{spec.list_field: all_items})
+
+    if spec.merge_strategy == "accumulate" and spec.list_field:
+        # Simple concatenation for sections where all evidence is additive (e.g. tech debt).
+        all_items = []
+        for inst in instances:
+            all_items.extend(getattr(inst, spec.list_field, []))
+        return spec.payload_model(**{spec.list_field: all_items})
+
+    # For 'llm_synthesized' or unknown strategies, we return the first one.
+    # The caller (SummaryMerger) is responsible for coordinating LLM-based merges.
+    return instances[0]
+
+
+def get_deterministic_section_ids() -> list[str]:
+    """Returns section IDs that can be merged programmatically."""
+    return [
+        spec.section_id
+        for spec in SECTION_SPECS
+        if spec.merge_strategy in ("deterministic_union", "accumulate")
     ]

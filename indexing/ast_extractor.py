@@ -7,6 +7,7 @@ This serves as the "ground truth" that the LLM will enrich rather than discover.
 
 import ast
 import os
+import re
 from typing import List, Tuple
 
 from indexing.schema import ExportedSymbol, ImplementationInvariant
@@ -61,7 +62,7 @@ def extract_from_python(file_path: str, source_code: str) -> Tuple[List[Exported
                     summary=summary,
                     file_path=file_path,
                     line_number=node.lineno,
-                    end_line_number=node.end_lineno,
+                    end_line_number=getattr(node, "end_lineno", node.lineno),
                     source_kind="ast"
                 )
             )
@@ -82,7 +83,7 @@ def extract_from_python(file_path: str, source_code: str) -> Tuple[List[Exported
                         usage_context="[AST Discovered - LLM must enrich usage context]",
                         file_path=file_path,
                         line_number=node.lineno,
-                        end_line_number=node.end_lineno,
+                        end_line_number=getattr(node, "end_lineno", node.lineno),
                         evidence_origin="ast"
                     )
                 )
@@ -93,13 +94,147 @@ def extract_from_python(file_path: str, source_code: str) -> Tuple[List[Exported
     
     return symbols, invariants
 
+def extract_from_typescript_javascript(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
+    """Regex-based extraction for TS/JS as a fallback for full AST parsing."""
+    symbols: List[ExportedSymbol] = []
+    invariants: List[ImplementationInvariant] = []
+    
+    # 1. Classes: class Name { ... }
+    class_pattern = re.compile(r'^[ \t]*(?:export\s+)?class\s+([a-zA-Z0-9_$]+)(?:\s+extends\s+[^{]+)?\s*\{', re.MULTILINE)
+    for match in class_pattern.finditer(source_code):
+        name = match.group(1)
+        symbols.append(ExportedSymbol(
+            name=name,
+            signature=f"class {name}",
+            summary="",
+            file_path=file_path,
+            line_number=source_code.count('\n', 0, match.start()) + 1,
+            source_kind="ast"
+        ))
+        
+    # 2. Functions: function Name(...) { ... }
+    func_pattern = re.compile(r'^[ \t]*(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)\s*\(([^)]*)\)', re.MULTILINE)
+    for match in func_pattern.finditer(source_code):
+        name = match.group(1)
+        args = match.group(2).replace('\n', ' ').strip()
+        symbols.append(ExportedSymbol(
+            name=name,
+            signature=f"function {name}({args})",
+            summary="",
+            file_path=file_path,
+            line_number=source_code.count('\n', 0, match.start()) + 1,
+            source_kind="ast"
+        ))
+        
+    # 3. Arrow functions assigned to const: const Name = (...) => { ... }
+    arrow_pattern = re.compile(r'^[ \t]*(?:export\s+)?const\s+([a-zA-Z0-9_$]+)\s*=\s*(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>', re.MULTILINE)
+    for match in arrow_pattern.finditer(source_code):
+        name = match.group(1)
+        symbols.append(ExportedSymbol(
+            name=name,
+            signature=f"const {name} = ...",
+            summary="",
+            file_path=file_path,
+            line_number=source_code.count('\n', 0, match.start()) + 1,
+            source_kind="ast"
+        ))
+        
+    # 4. Invariants (heuristics for Mutex, Lock, etc.)
+    invariant_pattern = re.compile(r'(?:new\s+)?(Mutex|Lock|Semaphore|flock|lockf)\(', re.IGNORECASE)
+    for match in invariant_pattern.finditer(source_code):
+        primitive = match.group(1)
+        invariants.append(ImplementationInvariant(
+            primitive=primitive,
+            intent="[AST Discovered - LLM must enrich intent]",
+            usage_context="[AST Discovered - LLM must enrich usage context]",
+            file_path=file_path,
+            line_number=source_code.count('\n', 0, match.start()) + 1,
+            evidence_origin="ast"
+        ))
+
+    # Sort by line number
+    symbols.sort(key=lambda x: x.line_number or 0)
+    invariants.sort(key=lambda x: x.line_number or 0)
+
+    return symbols, invariants
+
+def extract_from_go(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
+    """Regex-based extraction for Go as a fallback for full AST parsing."""
+    symbols: List[ExportedSymbol] = []
+    invariants: List[ImplementationInvariant] = []
+    
+    # 1. Functions: func Name(...) { ... } or func (r *Receiver) Name(...) { ... }
+    # Note: In Go, exported symbols start with an uppercase letter.
+    # We allow optional [ \t]* at start of line and optional receiver.
+    func_pattern = re.compile(r'^[ \t]*func\s+(?:\([^)]+\)\s+)?([A-Z][a-zA-Z0-9_]*)\s*\(([^)]*)\)', re.MULTILINE)
+    for match in func_pattern.finditer(source_code):
+        name = match.group(1)
+        args = match.group(2).replace('\n', ' ').strip()
+        symbols.append(ExportedSymbol(
+            name=name,
+            signature=f"func {name}({args})",
+            summary="",
+            file_path=file_path,
+            line_number=source_code.count('\n', 0, match.start()) + 1,
+            source_kind="ast"
+        ))
+        
+    # 2. Structs: type Name struct { ... }
+    struct_pattern = re.compile(r'^[ \t]*type\s+([A-Z][a-zA-Z0-9_]*)\s+struct', re.MULTILINE)
+    for match in struct_pattern.finditer(source_code):
+        name = match.group(1)
+        symbols.append(ExportedSymbol(
+            name=name,
+            signature=f"type {name} struct",
+            summary="",
+            file_path=file_path,
+            line_number=source_code.count('\n', 0, match.start()) + 1,
+            source_kind="ast"
+        ))
+        
+    # 3. Interfaces: type Name interface { ... }
+    interface_pattern = re.compile(r'^[ \t]*type\s+([A-Z][a-zA-Z0-9_]*)\s+interface', re.MULTILINE)
+    for match in interface_pattern.finditer(source_code):
+        name = match.group(1)
+        symbols.append(ExportedSymbol(
+            name=name,
+            signature=f"type {name} interface",
+            summary="",
+            file_path=file_path,
+            line_number=source_code.count('\n', 0, match.start()) + 1,
+            source_kind="ast"
+        ))
+        
+    # 4. Invariants (Go sync primitives)
+    # sync.Mutex, sync.RWMutex, etc.
+    invariant_pattern = re.compile(r'(sync\.(?:Mutex|RWMutex|WaitGroup|Cond|Pool))', re.IGNORECASE)
+    for match in invariant_pattern.finditer(source_code):
+        primitive = match.group(1)
+        invariants.append(ImplementationInvariant(
+            primitive=primitive,
+            intent="[AST Discovered - LLM must enrich intent]",
+            usage_context="[AST Discovered - LLM must enrich usage context]",
+            file_path=file_path,
+            line_number=source_code.count('\n', 0, match.start()) + 1,
+            evidence_origin="ast"
+        ))
+
+    # Sort by line number
+    symbols.sort(key=lambda x: x.line_number or 0)
+    invariants.sort(key=lambda x: x.line_number or 0)
+
+    return symbols, invariants
+
 def extract_ast_grounding(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
     """Entry point for AST extraction. Dispatches to the appropriate parser based on file extension."""
     _, ext = os.path.splitext(file_path)
     
     if ext == '.py':
         return extract_from_python(file_path, source_code)
+    elif ext in ('.ts', '.tsx', '.js', '.jsx'):
+        return extract_from_typescript_javascript(file_path, source_code)
+    elif ext == '.go':
+        return extract_from_go(file_path, source_code)
     
     # Fallback for unsupported languages: return empty lists. 
-    # Can be extended with tree-sitter for other languages.
     return [], []

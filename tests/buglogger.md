@@ -12,6 +12,7 @@ The `verify_artifact` method was using a brittle, manual prompt-and-parse loop t
 
 ### Resolution
 1.  **Pipeline Migration**: Refactored `verify_artifact` to use the robust `_execute_single_prompt` infrastructure, enabling automatic retries and standardized error handling.
+    *   **FIX**: Resolved a signature mismatch where `verify_artifact` was passing `system_prompt` and `model_type` as direct keyword arguments to `_execute_single_prompt`.
 2.  **Schema Hardening**:
     *   Updated `_coerce_for_schema` to detect and strip schema metadata (`$defs`, `$schema`) before validation.
     *   Implemented specific coercion for `VerificationVerdict` to handle stringified booleans and malformed list types.
@@ -69,4 +70,25 @@ The `OverviewAgent` occasionally omits the top-level `overview` field in its JSO
 - [x] Code inspection of `sequential_llm_prompter.py`
 - [x] Code inspection of `prompt_templates.py`
 - [x] Functional tests running successfully
+
+## [2026-05-04] `KeyComponentsDocument` Pydantic ValidationError (Nested `content` dict)
+
+### Description
+The `key_components_agent` failed validation with a `pydantic_core._pydantic_core.ValidationError`. Specifically, `architectural_patterns_and_gotchas.content` received a dictionary `{'content': '...'}` instead of a string. This occurred during a retry triggered by a gRPC failure.
+
+### Status: RESOLVED (2026-05-04)
+
+### Root Cause
+1.  **gRPC Instability**: A gRPC `Stream removed` error and a subsequent fatal C++ crash occurred during `subprocess.run` (fork) while gRPC threads were active.
+2.  **Double-Wrapping on Retry**: The retry logic produced a double-wrapped `content` structure: `{"architectural_patterns_and_gotchas": {"content": {"content": "..."}}}`.
+3.  **Coercion Gap**: `_coerce_for_schema` only handled string-to-dict coercion, not dict-to-dict flattening for content fields.
+
+### Resolution
+1.  **gRPC Stabilization**: Set `GRPC_DNS_RESOLVER=native` in `sequential_llm_prompter.py` to use a fork-safe DNS resolver.
+2.  **Coercion Hardening**: Enhanced Phase 0.7 of `_coerce_for_schema` to detect and flatten double-wrapped `content` fields in all text-heavy sections.
+3.  **Verification**: Verified with `scratch/repro_key_components.py` that double-wrapped inputs are now correctly flattened and pass validation.
+
+### Verified By
+- [x] Code inspection of `sequential_llm_prompter.py`
+- [x] Functional verification with `scratch/repro_key_components.py`
 
