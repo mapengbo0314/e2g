@@ -12,6 +12,8 @@ re-verifying unmodified outputs.
 import hashlib
 import json
 import logging
+import re
+import ast
 from pathlib import Path
 from typing import Any, Dict, List, Protocol, Optional
 
@@ -24,6 +26,54 @@ except ImportError:
 from indexing import schema
 from indexing import section_registry
 from indexing import verification_types
+
+
+def normalize_sig(sig: str, language: str = "python") -> str:
+    """Normalizes a signature to prevent false-positives during comparison.
+    
+    For Python, it uses AST to strip type annotations and return a canonical 
+    representation. For other languages, it performs basic whitespace/quote normalization.
+    """
+    # Basic whitespace and quote normalization
+    sig = re.sub(r'\s+', ' ', sig).strip().replace("\"", "'")
+    
+    if language == "python" and (sig.startswith("def ") or sig.startswith("async def ") or sig.startswith("class ")):
+        try:
+            # Wrap in dummy body for parsing if needed
+            parseable_sig = sig
+            if ":" not in sig:
+                parseable_sig += ":"
+            if "pass" not in parseable_sig:
+                parseable_sig += "\n    pass"
+
+            tree = ast.parse(parseable_sig)
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    # Strip annotations from args
+                    for arg in (node.args.posonlyargs + node.args.args + node.args.kwonlyargs):
+                        arg.annotation = None
+                    if node.args.vararg:
+                        node.args.vararg.annotation = None
+                    if node.args.kwarg:
+                        node.args.kwarg.annotation = None
+                    node.returns = None
+                    
+                    # Re-unparse the signature part
+                    args_str = ast.unparse(node.args)
+                    prefix = "async def " if isinstance(node, ast.AsyncFunctionDef) else "def "
+                    return f"{prefix}{node.name}({args_str})"
+                
+                elif isinstance(node, ast.ClassDef):
+                    bases = ", ".join([ast.unparse(b) for b in node.bases])
+                    res = f"class {node.name}"
+                    if bases:
+                        res += f"({bases})"
+                    return res
+        except Exception:
+            # Fallback to basic normalization on parse error
+            pass
+            
+    return sig
 
 
 class LlmPrompterProtocol(Protocol):
@@ -258,20 +308,26 @@ class ArtifactVerifier:
             logging.warning("[Verifier] Stage 1 FAILED (unexpected): %s", e)
             return verification_types.VerificationVerdict.syntactic_failure(str(e))
 
-    def _check_mandatory_sections(self, doc: schema.IndexDocument, source_context: str, ast_grounding: Optional[Dict[str, Any]] = None) -> Optional[verification_types.VerificationVerdict]:
+    def _check_mandatory_sections(self, doc: schema.IndexDocument, source_context: str, ast_grounding: Optional[Dict[str, Any]] = None, directory_files: Optional[List[str]] = None) -> Optional[verification_types.VerificationVerdict]:
         """Enforces presence of mandatory sections (blueprint, invariants) for non-trivial codebases."""
         issues = []
         
-        # Heuristic: Is this a directory with source code?
+        # SM-5 Deterministic Verification: Use directory_files for robust code detection.
         code_extensions = {".py", ".ts", ".js", ".go", ".rs", ".c", ".cpp", ".h", ".java", ".kt", ".swift", ".rb"}
-        has_code = any(ext in source_context for ext in code_extensions)
+        mandatory_extensions = {".py", ".ts", ".js", ".go"}
         
-        if not has_code:
+        if directory_files:
+            has_any_code = any(any(f.endswith(ext) for ext in code_extensions) for f in directory_files)
+            has_mandatory_code = any(any(f.endswith(ext) for ext in mandatory_extensions) for f in directory_files)
+        else:
+            has_any_code = any(ext in source_context for ext in code_extensions)
+            has_mandatory_code = any(ext in source_context for ext in mandatory_extensions)
+        
+        if not has_any_code:
             return None
 
         # Pre-extract all AST symbols and invariants to see what is TRULY mandatory.
         from indexing import ast_extractor
-        import re
         all_ast_symbols = []
         all_ast_invariants = []
         
@@ -293,13 +349,14 @@ class ArtifactVerifier:
         for spec in section_registry.SECTION_SPECS:
             if spec.verification_policy == "required_for_code":
                 # Only enforce if we have deterministic evidence that the section SHOULD be populated.
-                if spec.section_id == "blueprint" and not all_ast_symbols:
-                    continue
+                if spec.section_id == "blueprint":
+                    if not has_mandatory_code or not all_ast_symbols:
+                        continue
                 if spec.section_id == "implementation_invariants" and not all_ast_invariants:
                     continue
-                if spec.section_id == "key_interfaces" and not all_ast_symbols:
-                    # Usually if there are no symbols, there are no meaningful interfaces.
-                    continue
+                if spec.section_id == "key_interfaces":
+                    if not has_mandatory_code or not all_ast_symbols:
+                        continue
 
                 section_instance = getattr(doc, spec.section_id, None)
                 if section_registry.is_section_empty(spec.section_id, section_instance):
@@ -326,7 +383,6 @@ class ArtifactVerifier:
         """Validates that deterministically extracted AST symbols/invariants are present in the blueprint."""
         try:
             from indexing import ast_extractor
-            import re
             
             issues = []
             
@@ -366,19 +422,23 @@ class ArtifactVerifier:
                     llm_invariants[key].append(inv)
 
             # 3. Check AST Grounding Evidence
-            def normalize_sig(s):
-                return re.sub(r'\s+', ' ', s).strip().replace("\"", "'")
-
             for file_path, evidence in ast_grounding.items():
+                # Skip AST Grounding checks if the pipeline already guarantees it via merging
+                if llm_symbols and any(sym.source_kind == "merged" for sym in llm_symbols.values()):
+                    continue
+
+                language = "python" if file_path.endswith(".py") else "other"
+                
                 # Check Symbols
                 ast_symbols = evidence.get("symbols", [])
                 for ast_sym in ast_symbols:
                     found_sym = None
+                    # Primary lookup: Exact (file_path, name) compound key
                     key = (file_path, ast_sym.name)
                     if key in llm_symbols:
                         found_sym = llm_symbols[key]
                     else:
-                        # Try suffix match if orchestrator passed relative paths differently
+                        # Secondary lookup: Try suffix match for path robustness
                         for (l_path, l_name), sym in llm_symbols.items():
                             if l_name == ast_sym.name and (l_path.endswith(file_path) or file_path.endswith(l_path)):
                                 found_sym = sym
@@ -390,8 +450,9 @@ class ArtifactVerifier:
                             "Every public class/function must be included in the blueprint."
                         )
                     else:
-                        ast_sig = normalize_sig(ast_sym.signature)
-                        llm_sig = normalize_sig(found_sym.signature)
+                        # Semantic Signature Normalization: prevent false-positives on type hints
+                        ast_sig = normalize_sig(ast_sym.signature, language=language)
+                        llm_sig = normalize_sig(found_sym.signature, language=language)
                         if ast_sig != llm_sig:
                             issues.append(
                                 f"Signature mismatch for '{ast_sym.name}' in '{file_path}'.\n"
@@ -519,7 +580,12 @@ class ArtifactVerifier:
             logging.warning("[Verifier] Pipeline aborted at Stage 1 (syntactic).")
             return stage1_result
             
-        mandatory_result = self._check_mandatory_sections(stage1_result, source_context, ast_grounding=ast_grounding)
+        mandatory_result = self._check_mandatory_sections(
+            stage1_result, 
+            source_context, 
+            ast_grounding=ast_grounding,
+            directory_files=directory_files
+        )
         if mandatory_result:
             logging.warning("[Verifier] Pipeline aborted at Stage 1.5 (mandatory sections).")
             return mandatory_result
