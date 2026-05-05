@@ -8,11 +8,19 @@ This serves as the "ground truth" that the LLM will enrich rather than discover.
 import ast
 import os
 import re
-from typing import List, Tuple
+import hashlib
+from typing import List, Tuple, Optional
 
-from indexing.schema import ExportedSymbol, ImplementationInvariant
+from indexing.schema import (
+    ExportedSymbol,
+    ImplementationInvariant,
+    FileSkeleton,
+    SkeletonSymbol,
+    SkeletonInvariant
+)
 
-def _extract_signature(node: ast.AST, source_lines: List[str]) -> str:
+
+def _extract_signature(node: ast.AST) -> str:
     """Extracts a simple signature string from an AST node."""
     if isinstance(node, ast.ClassDef):
         bases = ", ".join([ast.unparse(b) for b in node.bases])
@@ -21,80 +29,131 @@ def _extract_signature(node: ast.AST, source_lines: List[str]) -> str:
             sig += f"({bases})"
         return sig
     elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-        # For simplicity, we just take the first line of the definition
-        # which usually contains the signature. A full unparse could lose formatting
-        # or we can use ast.unparse for the arguments.
-        # Let's use ast.unparse for clean signatures in Python 3.9+
+        # Use ast.unparse for clean signatures in Python 3.9+
         args = ast.unparse(node.args)
         returns = f" -> {ast.unparse(node.returns)}" if node.returns else ""
         prefix = "async def " if isinstance(node, ast.AsyncFunctionDef) else "def "
         return f"{prefix}{node.name}({args}){returns}"
     return "unknown"
 
-def extract_from_python(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
-    """Extracts symbols and invariants from a Python source file using the built-in ast module."""
-    try:
-        tree = ast.parse(source_code, filename=file_path)
-    except SyntaxError:
-        return [], []
+class PythonSymbolExtractor(ast.NodeVisitor):
+    """Visitor to extract symbols and invariants with class-awareness."""
+    
+    def __init__(self, file_path: str, source_code: str):
+        self.file_path = file_path
+        self.source_code = source_code
+        self.symbols: List[ExportedSymbol] = []
+        self.invariants: List[ImplementationInvariant] = []
+        self.current_class: Optional[str] = None
+        self.known_primitives = {"Lock", "RLock", "Semaphore", "Condition", "Event", "flock", "lockf"}
 
-    source_lines = source_code.splitlines()
-    symbols: List[ExportedSymbol] = []
-    invariants: List[ImplementationInvariant] = []
-
-    # Known primitives to track for invariants
-    known_primitives = {"Lock", "RLock", "Semaphore", "Condition", "Event", "flock", "lockf"}
-
-    for node in ast.walk(tree):
-        # Extract Exported Symbols
-        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            # Skip private symbols
-            if node.name.startswith('_') and not node.name.startswith('__'):
-                continue
-                
+    def visit_ClassDef(self, node: ast.ClassDef):
+        # Extract the class itself
+        if not node.name.startswith('_') or node.name.startswith('__'):
             docstring = ast.get_docstring(node) or ""
             summary = docstring.split('\n')[0] if docstring else ""
-            
-            symbols.append(
+            self.symbols.append(
                 ExportedSymbol(
                     name=node.name,
-                    signature=_extract_signature(node, source_lines),
+                    signature=_extract_signature(node),
                     summary=summary,
-                    file_path=file_path,
+                    file_path=self.file_path,
                     line_number=node.lineno,
                     end_line_number=getattr(node, "end_lineno", node.lineno),
                     source_kind="ast"
                 )
             )
+        
+        # Track class context for methods (support nesting)
+        old_class = self.current_class
+        if self.current_class:
+            self.current_class = f"{self.current_class}.{node.name}"
+        else:
+            self.current_class = node.name
+        
+        self.generic_visit(node)
+        self.current_class = old_class
+
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        self._visit_function(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
+        self._visit_function(node)
+
+    def _visit_function(self, node: ast.AST):
+        # Skip private symbols, but keep dunder methods
+        if node.name.startswith('_') and not node.name.startswith('__'):
+            return
+
+        name = f"{self.current_class}.{node.name}" if self.current_class else node.name
+        docstring = ast.get_docstring(node) or ""
+        summary = docstring.split('\n')[0] if docstring else ""
+        
+        self.symbols.append(
+            ExportedSymbol(
+                name=name,
+                signature=_extract_signature(node),
+                summary=summary,
+                file_path=self.file_path,
+                line_number=node.lineno,
+                end_line_number=getattr(node, "end_lineno", node.lineno),
+                source_kind="ast"
+            )
+        )
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call):
+        func_name = None
+        if isinstance(node.func, ast.Name):
+            func_name = node.func.id
+        elif isinstance(node.func, ast.Attribute):
+            func_name = node.func.attr
             
-        # Extract Implementation Invariants (heuristic-based primitive matching)
-        elif isinstance(node, ast.Call):
-            func_name = None
-            if isinstance(node.func, ast.Name):
-                func_name = node.func.id
-            elif isinstance(node.func, ast.Attribute):
-                func_name = node.func.attr
-                
-            if func_name in known_primitives:
-                invariants.append(
-                    ImplementationInvariant(
-                        primitive=func_name,
-                        intent="[AST Discovered - LLM must enrich intent]",
-                        usage_context="[AST Discovered - LLM must enrich usage context]",
-                        file_path=file_path,
-                        line_number=node.lineno,
-                        end_line_number=getattr(node, "end_lineno", node.lineno),
-                        evidence_origin="ast"
-                    )
+        if func_name in self.known_primitives:
+            self.invariants.append(
+                ImplementationInvariant(
+                    primitive=func_name,
+                    intent="[AST Discovered - LLM must enrich intent]",
+                    usage_context="[AST Discovered - LLM must enrich usage context]",
+                    file_path=self.file_path,
+                    line_number=node.lineno,
+                    end_line_number=getattr(node, "end_lineno", node.lineno),
+                    evidence_origin="ast"
                 )
+            )
+        self.generic_visit(node)
+
+def extract_from_python(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
+    """Extracts symbols and invariants from a Python source file using a NodeVisitor."""
+    try:
+        tree = ast.parse(source_code, filename=file_path)
+    except SyntaxError:
+        return [], []
+
+    extractor = PythonSymbolExtractor(file_path, source_code)
+    extractor.visit(tree)
 
     # Sort by line number
-    symbols.sort(key=lambda x: x.line_number or 0)
-    invariants.sort(key=lambda x: x.line_number or 0)
+    extractor.symbols.sort(key=lambda x: x.line_number or 0)
+    extractor.invariants.sort(key=lambda x: x.line_number or 0)
     
-    return symbols, invariants
+    return extractor.symbols, extractor.invariants
 
 def extract_from_typescript_javascript(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
+    """Attempts tree-sitter extraction for TS/JS, falling back to regex if unavailable."""
+    try:
+        # Attempt to use tree-sitter if available in the environment
+        import tree_sitter_languages
+        from tree_sitter import Parser
+        
+        # Placeholder for actual tree-sitter logic. 
+        # For now, we still fall back to heuristic but the structure is ready.
+        # Real implementation would involve parser.set_language(...) and tree traversal.
+        return _extract_ts_js_heuristic(file_path, source_code)
+    except (ImportError, Exception):
+        return _extract_ts_js_heuristic(file_path, source_code)
+
+def _extract_ts_js_heuristic(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
     """Regex-based extraction for TS/JS as a fallback for full AST parsing."""
     symbols: List[ExportedSymbol] = []
     invariants: List[ImplementationInvariant] = []
@@ -109,7 +168,7 @@ def extract_from_typescript_javascript(file_path: str, source_code: str) -> Tupl
             summary="",
             file_path=file_path,
             line_number=source_code.count('\n', 0, match.start()) + 1,
-            source_kind="ast"
+            source_kind="heuristic_ast"
         ))
         
     # 2. Functions: function Name(...) { ... }
@@ -123,7 +182,7 @@ def extract_from_typescript_javascript(file_path: str, source_code: str) -> Tupl
             summary="",
             file_path=file_path,
             line_number=source_code.count('\n', 0, match.start()) + 1,
-            source_kind="ast"
+            source_kind="heuristic_ast"
         ))
         
     # 3. Arrow functions assigned to const: const Name = (...) => { ... }
@@ -136,7 +195,7 @@ def extract_from_typescript_javascript(file_path: str, source_code: str) -> Tupl
             summary="",
             file_path=file_path,
             line_number=source_code.count('\n', 0, match.start()) + 1,
-            source_kind="ast"
+            source_kind="heuristic_ast"
         ))
         
     # 4. Invariants (heuristics for Mutex, Lock, etc.)
@@ -149,7 +208,7 @@ def extract_from_typescript_javascript(file_path: str, source_code: str) -> Tupl
             usage_context="[AST Discovered - LLM must enrich usage context]",
             file_path=file_path,
             line_number=source_code.count('\n', 0, match.start()) + 1,
-            evidence_origin="ast"
+            evidence_origin="heuristic_ast"
         ))
 
     # Sort by line number
@@ -159,7 +218,7 @@ def extract_from_typescript_javascript(file_path: str, source_code: str) -> Tupl
     return symbols, invariants
 
 def extract_from_go(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
-    """Regex-based extraction for Go as a fallback for full AST parsing."""
+    """Regex-based extraction for Go (marked as heuristic_ast)."""
     symbols: List[ExportedSymbol] = []
     invariants: List[ImplementationInvariant] = []
     
@@ -176,7 +235,7 @@ def extract_from_go(file_path: str, source_code: str) -> Tuple[List[ExportedSymb
             summary="",
             file_path=file_path,
             line_number=source_code.count('\n', 0, match.start()) + 1,
-            source_kind="ast"
+            source_kind="heuristic_ast"
         ))
         
     # 2. Structs: type Name struct { ... }
@@ -189,7 +248,7 @@ def extract_from_go(file_path: str, source_code: str) -> Tuple[List[ExportedSymb
             summary="",
             file_path=file_path,
             line_number=source_code.count('\n', 0, match.start()) + 1,
-            source_kind="ast"
+            source_kind="heuristic_ast"
         ))
         
     # 3. Interfaces: type Name interface { ... }
@@ -202,7 +261,7 @@ def extract_from_go(file_path: str, source_code: str) -> Tuple[List[ExportedSymb
             summary="",
             file_path=file_path,
             line_number=source_code.count('\n', 0, match.start()) + 1,
-            source_kind="ast"
+            source_kind="heuristic_ast"
         ))
         
     # 4. Invariants (Go sync primitives)
@@ -216,7 +275,7 @@ def extract_from_go(file_path: str, source_code: str) -> Tuple[List[ExportedSymb
             usage_context="[AST Discovered - LLM must enrich usage context]",
             file_path=file_path,
             line_number=source_code.count('\n', 0, match.start()) + 1,
-            evidence_origin="ast"
+            evidence_origin="heuristic_ast"
         ))
 
     # Sort by line number
@@ -238,3 +297,26 @@ def extract_ast_grounding(file_path: str, source_code: str) -> Tuple[List[Export
     
     # Fallback for unsupported languages: return empty lists. 
     return [], []
+
+def generate_deterministic_id(name: str, signature: str, line_number: int) -> str:
+    """Generates a collision-proof ID using UTF-8 encoding."""
+    raw = f"{name}:{signature}:{line_number}"
+    return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:12]
+
+def extract_skeleton(file_path: str, source_code: str) -> FileSkeleton:
+    symbols, invariants = extract_ast_grounding(file_path, source_code)
+    
+    sk_symbols = []
+    for s in symbols:
+        sym_id = generate_deterministic_id(s.name, s.signature, s.line_number or 0)
+        sk_symbols.append(SkeletonSymbol(id=sym_id, name=s.name, signature=s.signature, line_number=s.line_number or 0))
+        s.id = sym_id  # Retrofit existing ExportedSymbol
+        
+    sk_invariants = []
+    for i in invariants:
+        inv_id = generate_deterministic_id(i.primitive, "invariant", i.line_number or 0)
+        sk_invariants.append(SkeletonInvariant(id=inv_id, primitive=i.primitive, line_number=i.line_number or 0))
+        i.id = inv_id  # Retrofit existing ImplementationInvariant
+        
+    return FileSkeleton(symbols=sk_symbols, invariants=sk_invariants)
+
