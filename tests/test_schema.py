@@ -19,6 +19,8 @@ from indexing.schema import (
     Overview,
     TestingStrategy,
     VerificationState,
+    WorkflowPattern,
+    WorkflowPatterns,
     from_json,
     to_json,
 )
@@ -161,6 +163,32 @@ class TestMarkdownRendering:
         assert "# Key Individual Components" in md
         assert "**auth.py**" in md
 
+    def test_workflow_patterns_round_trip_and_render(self):
+        doc = IndexDocument(
+            overview=Overview(content="Harness workflow."),
+            workflow_patterns=WorkflowPatterns(
+                patterns=[
+                    WorkflowPattern(
+                        name="Agent graph",
+                        framework="LangGraph",
+                        summary="Routes work through planner and verifier nodes.",
+                        nodes=["planner", "verifier"],
+                        edges=["planner", "verifier"],
+                        entry_point="planner",
+                    )
+                ]
+            ),
+        )
+
+        restored = from_json(to_json(doc))
+        assert restored.workflow_patterns.patterns[0].summary == (
+            "Routes work through planner and verifier nodes."
+        )
+
+        md = to_markdown(restored)
+        assert "# Workflow Patterns" in md
+        assert "Routes work through planner and verifier nodes." in md
+
 
 class TestSanitizeUnicode:
     def test_removes_control_characters(self):
@@ -181,6 +209,17 @@ class TestVerificationVerdict:
         assert v.confidence == 0.9
         assert v.issues == []
         assert v.decision == "publish"
+
+    def test_infrastructure_bypass_factory(self):
+        v = VerificationVerdict.infrastructure_bypass(
+            confidence=0.3,
+            reason="Verifier context overflow.",
+        )
+        assert v.passed is True
+        assert v.confidence == 0.3
+        assert v.issues == ["Verifier context overflow."]
+        assert v.decision == "infrastructure_bypass"
+        assert v.is_infrastructure_bypass is True
 
     def test_failure_factory(self):
         v = VerificationVerdict.failure(

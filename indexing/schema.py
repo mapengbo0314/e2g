@@ -48,7 +48,8 @@ if pydantic is None:  # pragma: no cover
 
 else:
     # Use real Pydantic if available.
-    _BaseModel = pydantic.BaseModel
+    class _BaseModel(pydantic.BaseModel):
+        model_config = {"protected_namespaces": ()}
     _field = pydantic.Field
 
 
@@ -91,8 +92,17 @@ class ExportedSymbol(_BaseModel):
         description="The exact structural signature (e.g., 'def run(p: str) -> int')."
     )
     summary: str = _field(description="A brief description of its intent.")
+    file_path: str = _field(
+        default="", description="The path to the file where the symbol is defined."
+    )
     line_number: Optional[int] = _field(
         default=None, description="The starting line number in the source file."
+    )
+    end_line_number: Optional[int] = _field(
+        default=None, description="The ending line number in the source file."
+    )
+    source_kind: str = _field(
+        default="ast", description="The origin of this symbol's data: ast, llm_enriched, or merged."
     )
 
 
@@ -107,6 +117,18 @@ class ImplementationInvariant(_BaseModel):
     )
     usage_context: str = _field(
         description="Where or how it is used within this directory."
+    )
+    file_path: str = _field(
+        default="", description="The path to the file where the primitive is used."
+    )
+    line_number: Optional[int] = _field(
+        default=None, description="The starting line number in the source file."
+    )
+    end_line_number: Optional[int] = _field(
+        default=None, description="The ending line number in the source file."
+    )
+    evidence_origin: str = _field(
+        default="ast", description="The origin of this invariant's evidence: ast, llm_enriched, or merged."
     )
 
 
@@ -143,6 +165,10 @@ class WorkflowPattern(_BaseModel):
     )
     framework: str = _field(
         description="The framework used (e.g., LangGraph, Temporal, StateMachine)."
+    )
+    summary: str = _field(
+        default="",
+        description="A brief description of the workflow pattern.",
     )
     nodes: List[str] = _field(
         default_factory=list,
@@ -428,11 +454,35 @@ class OverviewDocument(_BaseModel):
 # Trust metadata
 # ---------------------------------------------------------------------------
 
+class LlmCallRecord(_BaseModel):
+    agent_name: str = _field(default="", description="The name of the agent or pipeline component making the call.")
+    model_name: str = _field(default="", description="The specific LLM model used.")
+    provider: str = _field(default="", description="The API provider (e.g., openai, anthropic).")
+    input_tokens: int = _field(default=0)
+    output_tokens: int = _field(default=0)
+    total_tokens: int = _field(default=0)
+    latency_ms: int = _field(default=0)
+    attempt: int = _field(default=1)
+    cached_tokens: int = _field(default=0)
+    timestamp: str = _field(default="")
+
+class CostReport(_BaseModel):
+    directory_path: str = _field(default="")
+    epoch: int = _field(default=0)
+    total_input_tokens: int = _field(default=0)
+    total_output_tokens: int = _field(default=0)
+    total_tokens: int = _field(default=0)
+    total_calls: int = _field(default=0)
+    total_retries: int = _field(default=0)
+    total_latency_ms: int = _field(default=0)
+    estimated_cost_usd: float = _field(default=0.0)
+    calls: List[LlmCallRecord] = _field(default_factory=list)
+    model_breakdown: Dict[str, Dict] = _field(default_factory=dict)
+
+
+
 class GenerationMetadata(_BaseModel):
     """Metadata about how an artifact was generated."""
-
-    if pydantic is not None:
-        model_config = {"protected_namespaces": ()}
 
     # Model and epoch information.
     model_name: Optional[str] = _field(
@@ -456,6 +506,11 @@ class GenerationMetadata(_BaseModel):
     retry_count: int = _field(
         default=0,
         description="Number of verification retries before this version was accepted.",
+    )
+    # Cost & Token Tracking.
+    cost_report: Optional[CostReport] = _field(
+        default=None,
+        description="Token usage and cost tracking for the generation of this artifact.",
     )
 
 
@@ -488,6 +543,10 @@ class VerificationState(_BaseModel):
     is_empty_bypass: bool = _field(
         default=False,
         description="True if this index bypassed LLM generation because the directory was empty.",
+    )
+    is_infrastructure_bypass: bool = _field(
+        default=False,
+        description="True if verification was bypassed due to verifier infrastructure limits or failures.",
     )
 
 

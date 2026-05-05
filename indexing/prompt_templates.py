@@ -502,18 +502,21 @@ Read files results:
         )
 
         task = textwrap.dedent("""\
-Your task:
-
-1. Inspect the directory contents and any subdirectory summaries.
-2. Inspect the additional context from the previous research.
-3. Summarize the following sections for the directory: 
-   - **Key Components**: Files and Subdirectories.
-   - **Key Interfaces**: Conceptual abstractions.
-   - **Key Dependencies**: Internal vs External.
-   - **Configuration and Flags**: System controls.
-   - **Implementation Invariants**: Mechanical primitives (locking, atomicity, concurrency) that define the system's reliability.
-   - **Blueprint**: Exact structural signatures (e.g., `def foo(a: int) -> str`) for all public symbols. Ensure signatures are extracted exactly from the source code.
-   - **Workflow Patterns**: Orchestration flows, LangGraph nodes/edges, or Temporal state machines.
+ Your task:
+ 
+ 1. Inspect the directory contents and any subdirectory summaries.
+ 2. Inspect the additional context from the previous research.
+ 3. Summarize the following sections for the directory: 
+    - **Key Components**: Files and Subdirectories.
+    - **Key Interfaces (MANDATORY if code present)**: Conceptual abstractions and public-facing APIs.
+    - **Key Dependencies**: Internal vs External.
+    - **Configuration and Flags**: System controls.
+    - **Implementation Invariants (MANDATORY if code present)**: Mechanical primitives (locking, atomicity, concurrency, resource management) that define the system's reliability.
+    - **Blueprint (MANDATORY if code present)**: Exact structural signatures (e.g., `def foo(a: int) -> str`) for all public symbols.
+    - **Workflow Patterns**: Orchestration flows, LangGraph nodes/edges, or Temporal state machines.
+ 
+ 4. **BLUEPRINT FIDELITY MANDATE**: If the `extra_context` section contains "AST Deterministic Grounding", you MUST include every symbol listed there in your `blueprint` section. Copy signatures exactly. Do NOT omit them. This is the source of truth for coding agents.
+ 5. **INVARIANT MANDATE**: If the `extra_context` contains "AST Discovered Invariants", you MUST enrich these primitives with their intent and usage context in the `implementation_invariants` section.
 
 """)
         return textwrap.dedent("""\
@@ -648,6 +651,7 @@ the current directory's overall purpose.
 3. Provide the final response according to the output goals and format. Do not repeat the previous summaries. Focus
 on synthesizing a higher-level overview.
 
+CRITICAL MANDATE: You MUST include the `overview` section in your final output. It is a strictly required field.
 IMPORTANT: keep the overview under 2 paragraphs (1000 words) and do not include any extra markdown formatting.
 """)
         return textwrap.dedent("""\
@@ -761,6 +765,24 @@ partial summaries. Do not mention the partial summaries in the final summary.
 """).format(output_format=_output_format(schema.IndexDocument))
 
 
+VERIFIER_SYSTEM_PROMPT: Final[str] = textwrap.dedent("""\
+You are an expert factual verifier for a codebase indexing system.
+Your job is to read the generated artifact JSON and verify that EVERY claim made in it is explicitly supported by the source code context provided.
+
+Rule 1: If the artifact claims a dependency, interface, or component exists, it SHOULD be visible in the source context.
+Rule 2: If the artifact makes a claim about how something works, it MUST be supported by the code or comments in the source context.
+Rule 3: You must NOT verify if the JSON structure is valid. Assume it is syntactically correct. Your job is ONLY semantic factual verification.
+Rule 4: If you find a dependency or configuration that is documented in a README/MD file but not found in the actual source code, do NOT mark `passed` as false. Instead, mark it as an `info` severity issue with category `unsupported_claim`.
+Rule 5: Distinguish between Hallucinations (things that don't exist anywhere) and Documentation Claims (things documented but not yet implemented/visible in code). Only Hallucinations should block publication.
+Rule 6: If the source context was truncated, do NOT fail verification just because a claimed file is not visible. Only fail if a claim directly contradicts what IS visible.
+Rule 7: Large external libraries (e.g., react, vite, tailwind) found in package.json/lock files are 'external' dependencies. Do not flag them as issues if they are listed as such.
+Rule 8: The provided source context includes both the immediate directory contents and 'RESEARCH CONTEXT' gathered from across the codebase. Use both as valid grounds for verification.
+
+Return your verdict in the requested JSON format (VerificationVerdict).
+If there are unverified documentation claims, set `passed=True` but list them in `detailed_issues` with `severity='info'`.
+""")
+
+
 def create_verifier_prompt(artifact_json: str, source_context: str) -> str:
     # Safety cap to avoid exceeding model context limits.  Gemma 4 supports
     # ~200K tokens; 400K chars is approximately 100K tokens which fits
@@ -777,26 +799,13 @@ def create_verifier_prompt(artifact_json: str, source_context: str) -> str:
         truncated_context = source_context
 
     return textwrap.dedent(f"""\
-You are an expert factual verifier for a codebase indexing system.
-Your job is to read the generated artifact JSON and verify that EVERY claim made in it is explicitly supported by the source code context provided.
-
-Rule 1: If the artifact claims a dependency, interface, or component exists, it SHOULD be visible in the source context.
-Rule 2: If the artifact makes a claim about how something works, it MUST be supported by the code or comments in the source context.
-Rule 3: You must NOT verify if the JSON structure is valid. Assume it is syntactically correct. Your job is ONLY semantic factual verification.
-Rule 4: If you find a dependency or configuration that is documented in a README/MD file but not found in the actual source code, do NOT mark `passed` as false. Instead, mark it as an `info` severity issue with category `unsupported_claim`.
-Rule 5: Distinguish between Hallucinations (things that don't exist anywhere) and Documentation Claims (things documented but not yet implemented/visible in code). Only Hallucinations should block publication.
-Rule 6: If the source context was truncated, do NOT fail verification just because a claimed file is not visible. Only fail if a claim directly contradicts what IS visible.
-Rule 7: Large external libraries (e.g., react, vite, tailwind) found in package.json/lock files are 'external' dependencies. Do not flag them as issues if they are listed as such.
-Rule 8: The provided source context includes both the immediate directory contents and 'RESEARCH CONTEXT' gathered from across the codebase. Use both as valid grounds for verification.
-
 === SOURCE CONTEXT ===
 {truncated_context}
 
 === GENERATED ARTIFACT ===
 {artifact_json}
 
-Return your verdict in the requested JSON format (VerificationVerdict).
-If there are unverified documentation claims, set `passed=True` but list them in `detailed_issues` with `severity='info'`.
+Please verify the artifact against the source context and provide your structured verdict.
 """)
 
 

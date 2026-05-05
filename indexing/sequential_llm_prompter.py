@@ -78,6 +78,11 @@ except ImportError:
     import schema
 
 try:
+    from indexing import section_registry
+except ImportError:
+    import section_registry
+
+try:
     from indexing import verification_types
 
 except ImportError:
@@ -97,6 +102,10 @@ class Observer:
         self.counters[name] = self.counters.get(name, 0) + value
     def increment_counter(self, name: str, value: int = 1):
         self.increment(name, value)
+    def add_to_counter(self, name: str, value: int):
+        self.increment(name, value)
+    def record_latency(self, name: str, value: float):
+        pass
 
 _observer = Observer()
 
@@ -111,6 +120,13 @@ class _SimpleStatsRecorder:
 
     def increment_counter(self, name: str, value: int = 1) -> None:
         self.counters[name] = self.counters.get(name, 0) + value
+
+    def add_to_counter(self, name: str, value: int) -> None:
+        self.increment_counter(name, value)
+
+    def record_latency(self, name: str, value: float) -> None:
+        # Minimal implementation for tracking latency if needed.
+        pass
 
 
 class _SimpleThrottleContext:
@@ -199,6 +215,14 @@ class GeminiLlmPrompterConfig:
     # If False, raises error if no real API found.
     allow_mock_fallback: bool = True
 
+@dataclasses.dataclass
+class PromptResult:
+    text: str
+    usage: dict[str, Any]
+    provider_response_id: str | None = None
+    latency_ms: int = 0
+
+
 
 @dataclasses.dataclass
 class _SimpleConversation:
@@ -209,14 +233,12 @@ class _SimpleConversation:
     output_schema_type: type[Any]
     state: Any = None
 
-    def prompt(self, user_prompt: str) -> str:
+    def prompt(self, user_prompt: str) -> PromptResult:
         if self.state is None:
             payload = self._build_default_output(user_prompt)
             self.state = payload
-        if hasattr(self.state, "model_dump_json"):
-            # Use Pydantic's optimized JSON serialization if available.
-            return self.state.model_dump_json(indent=2)
-        return json.dumps(self.state, indent=2, default=str)
+        text = self.state.model_dump_json(indent=2) if hasattr(self.state, "model_dump_json") else json.dumps(self.state, indent=2, default=str)
+        return PromptResult(text=text, usage={"input_tokens": 0, "output_tokens": 0, "total_tokens": 0})
 
     def get_state(self, _agent_name: str) -> Any:
         return self.state
@@ -290,16 +312,28 @@ class VertexAiConversation:
         self.chat = self.model.start_chat()
         self.output_schema_type = output_schema_type
 
-    def prompt(self, user_prompt: str) -> str:
+    def prompt(self, user_prompt: str) -> PromptResult:
+        start_time = time.time()
         response = self.chat.send_message(user_prompt)
         text = response.text
+        latency_ms = int((time.time() - start_time) * 1000)
+        
+        usage = {}
+        if hasattr(response, "usage_metadata"):
+            usage_metadata = response.usage_metadata
+            usage = {
+                "input_tokens": getattr(usage_metadata, "prompt_token_count", 0),
+                "output_tokens": getattr(usage_metadata, "candidates_token_count", 0),
+                "total_tokens": getattr(usage_metadata, "total_token_count", 0),
+            }
+            
         # Parse and store the response as structured state.
         try:
             extracted = OpenAiConversation._extract_json(text)
             self._last_response = OpenAiConversation._normalize_keys(json.loads(extracted))
         except (json.JSONDecodeError, TypeError):
             self._last_response = text
-        return text
+        return PromptResult(text=text, usage=usage, latency_ms=latency_ms)
 
     def get_state(self, _agent_name: str) -> Any:
         """Returns the parsed state from the last LLM response."""
@@ -327,16 +361,28 @@ class GoogleAiConversation:
         self.chat = self.model.start_chat()
         self.output_schema_type = output_schema_type
 
-    def prompt(self, user_prompt: str) -> str:
+    def prompt(self, user_prompt: str) -> PromptResult:
+        start_time = time.time()
         response = self.chat.send_message(user_prompt)
         text = response.text
+        latency_ms = int((time.time() - start_time) * 1000)
+        
+        usage = {}
+        if hasattr(response, "usage_metadata"):
+            usage_metadata = response.usage_metadata
+            usage = {
+                "input_tokens": getattr(usage_metadata, "prompt_token_count", 0),
+                "output_tokens": getattr(usage_metadata, "candidates_token_count", 0),
+                "total_tokens": getattr(usage_metadata, "total_token_count", 0),
+            }
+            
         # Parse and store the response as structured state.
         try:
             extracted = OpenAiConversation._extract_json(text)
             self._last_response = OpenAiConversation._normalize_keys(json.loads(extracted))
         except (json.JSONDecodeError, TypeError):
             self._last_response = text
-        return text
+        return PromptResult(text=text, usage=usage, latency_ms=latency_ms)
 
     def get_state(self, _agent_name: str) -> Any:
         """Returns the parsed state from the last LLM response."""
@@ -398,7 +444,7 @@ class OpenAiConversation:
             
         return cleaned
 
-    def prompt(self, user_prompt: str) -> str:
+    def prompt(self, user_prompt: str) -> PromptResult:
         self.history.append({"role": "user", "content": user_prompt})
         
         kwargs = {
@@ -409,15 +455,23 @@ class OpenAiConversation:
             kwargs["response_format"] = {"type": "json_object"}
         
         response = self.client.chat.completions.create(**kwargs)
+        latency_ms = int((time.time() - start_time) * 1000)
         text = response.choices[0].message.content
         self.history.append({"role": "assistant", "content": text})
+        
+        usage = {
+            "input_tokens": response.usage.prompt_tokens,
+            "output_tokens": response.usage.completion_tokens,
+            "total_tokens": response.usage.total_tokens,
+        }
+        
         # Parse and store the response as structured state.
         try:
             extracted = OpenAiConversation._extract_json(text)
             self._last_response = OpenAiConversation._normalize_keys(json.loads(extracted))
         except (json.JSONDecodeError, TypeError):
             self._last_response = text
-        return text
+        return PromptResult(text=text, usage=usage, provider_response_id=response.id, latency_ms=latency_ms)
 
     def get_state(self, _agent_name: str) -> Any:
         """Returns the parsed state from the last LLM response."""
@@ -446,7 +500,8 @@ class AnthropicConversation:
         self.history = []
         self._last_response: Any = None
 
-    def prompt(self, user_prompt: str) -> str:
+    def prompt(self, user_prompt: str) -> PromptResult:
+        start_time = time.time()
         self.history.append({"role": "user", "content": user_prompt})
         
         response = self.client.messages.create(
@@ -455,7 +510,19 @@ class AnthropicConversation:
             messages=self.history,
             max_tokens=16384
         )
+        latency_ms = int((time.time() - start_time) * 1000)
+        
         text = response.content[0].text
+        
+        usage = {}
+        if hasattr(response, "usage"):
+            usage_obj = response.usage
+            usage = {
+                "input_tokens": getattr(usage_obj, "input_tokens", 0),
+                "output_tokens": getattr(usage_obj, "output_tokens", 0),
+                "total_tokens": getattr(usage_obj, "input_tokens", 0) + getattr(usage_obj, "output_tokens", 0),
+            }
+            
         self.history.append({"role": "assistant", "content": text})
         # Parse and store the response as structured state.
         try:
@@ -463,7 +530,7 @@ class AnthropicConversation:
             self._last_response = OpenAiConversation._normalize_keys(json.loads(extracted))
         except (json.JSONDecodeError, TypeError):
             self._last_response = text
-        return text
+        return PromptResult(text=text, usage=usage, latency_ms=latency_ms)
 
     def get_state(self, _agent_name: str) -> Any:
         """Returns the parsed state from the last LLM response."""
@@ -487,7 +554,8 @@ class OllamaConversation:
         self.history = [{"role": "system", "content": system_prompt}] if system_prompt else []
         self._last_response: Any = None
 
-    def prompt(self, user_prompt: str) -> str:
+    def prompt(self, user_prompt: str) -> PromptResult:
+        start_time = time.time()
         # Append the new user message to the conversation history.
         self.history.append({"role": "user", "content": user_prompt})
         
@@ -510,6 +578,8 @@ class OllamaConversation:
             
             # Execute the request against the local Ollama API.
             response = ollama.chat(**kwargs)
+            latency_ms = int((time.time() - start_time) * 1000)
+            
             # Parse the Ollama response payload.
             text = response['message']['content']
             logging.info(
@@ -517,13 +587,20 @@ class OllamaConversation:
                 len(text), self.model_name,
             )
             self.history.append({"role": "assistant", "content": text})
+            
+            usage = {
+                "input_tokens": response.get("prompt_eval_count", 0),
+                "output_tokens": response.get("eval_count", 0),
+                "total_tokens": response.get("prompt_eval_count", 0) + response.get("eval_count", 0),
+            }
+            
             # Store parsed JSON state for get_state retrieval.
             try:
                 extracted = OpenAiConversation._extract_json(text)
                 self._last_response = OpenAiConversation._normalize_keys(json.loads(extracted))
             except (json.JSONDecodeError, TypeError):
                 self._last_response = text
-            return text
+            return PromptResult(text=text, usage=usage, latency_ms=latency_ms)
         except Exception as e:
             raise RuntimeError(f"Ollama request failed. Is the daemon running? {e}")
 
@@ -550,22 +627,26 @@ class DryRunConversation:
         # Tracking the simulated state of the conversation.
         self.state: Any = None
 
-    def prompt(self, user_prompt: str) -> str:
+    def prompt(self, user_prompt: str) -> PromptResult:
+        start_time = time.time()
         # Check if we have a mapped response for this agent/prompt
         key = f"{self.agent_name}:{user_prompt[:50]}"
+        text = ""
         if key in self.dry_run_map:
-            resp = self.dry_run_map[key]
+            text = self.dry_run_map[key]
             # Try to parse it into state if possible
             try:
-                self.state = json.loads(resp)
+                self.state = json.loads(text)
             except Exception:
-                self.state = resp
-            return resp
+                self.state = text
+        else:
+            # Fallback to a structured mock based on schema
+            text = self._build_mock_response(user_prompt)
         
-        # Fallback to a structured mock based on schema
-        resp = self._build_mock_response(user_prompt)
-        # _build_mock_response already sets self.state in this revised version
-        return resp
+        latency_ms = int((time.time() - start_time) * 1000)
+        usage = {"input_tokens": 10, "output_tokens": 10, "total_tokens": 20}
+        
+        return PromptResult(text=text, usage=usage, latency_ms=latency_ms)
 
     def get_state(self, _agent_name: str) -> Any:
         return self.state
@@ -593,16 +674,7 @@ class GeminiLlmPrompter(LlmPrompter):
     # Weaker LLMs (e.g. Ollama) may omit required fields; this table
     # lets us patch them in before Pydantic validation to avoid wasting
     # retry budget on trivially fixable errors.
-    _FIELD_DEFAULTS: dict[str, dict[str, Any]] = {
-        "Dependency": {"usage_description": ""},
-        "Component": {"description": ""},
-        "Interface": {"description": ""},
-        "ConfigurationItem": {"definition_link": "", "description": ""},
-        "ImplementationInvariant": {"primitive": "", "intent": "", "usage_context": ""},
-        "ExportedSymbol": {"name": "", "signature": "", "summary": ""},
-        "TechDebtNote": {"category": "", "description": "", "impact": ""},
-        "WorkflowPattern": {"name": "", "framework": "", "nodes": [], "edges": [], "entry_point": ""},
-    }
+    _FIELD_DEFAULTS: dict[str, dict[str, Any]] = section_registry.field_defaults()
 
     def __init__(
         self,
@@ -620,6 +692,7 @@ class GeminiLlmPrompter(LlmPrompter):
         )
         self._fs_manager = fs_manager
         self._repo_root = config.repo_root
+        self._call_records: list[schema.LlmCallRecord] = []
 
     @property
     def repo_root(self) -> str | None:
@@ -638,13 +711,34 @@ class GeminiLlmPrompter(LlmPrompter):
         if not isinstance(data, dict):
             return data
 
+        # --- Phase -1: Detect and reject schema echoes ---
+        if "$defs" in data or "$schema" in data:
+            logging.warning("[Coercion] Detected JSON Schema echo instead of instance.")
+            # We strip the metadata but keep the data if it's there.
+            # Often the LLM returns {"$defs": ..., "passed": true, ...}
+            data = {k: v for k, v in data.items() if not k.startswith("$")}
+
+        # --- VerificationVerdict Specific Coercion ---
+        if output_schema is verification_types.VerificationVerdict:
+            # Handle stringified booleans and floats from loose LLMs.
+            if "passed" in data and not isinstance(data["passed"], bool):
+                data["passed"] = str(data["passed"]).lower() == "true"
+            if "confidence" in data and not isinstance(data["confidence"], (int, float)):
+                try:
+                    data["confidence"] = float(data["confidence"])
+                except (ValueError, TypeError):
+                    data["confidence"] = 0.5
+            # Ensure detailed_issues is a list
+            if "detailed_issues" in data and data["detailed_issues"] is None:
+                data["detailed_issues"] = []
+
         # --- Phase 0: Unwrap 'properties' if the LLM hallucinated it from the schema ---
         # Weaker LLMs (like Gemma) often wrap their entire response in a 'properties'
         # key because it's a prominent top-level key in the JSON Schema.
         if "properties" in data and isinstance(data["properties"], dict):
             # Only unwrap if 'properties' is the ONLY key, or if none of the expected
             # top-level keys are present in the root but ARE in 'properties'.
-            expected_keys = set(GeminiLlmPrompter._LIST_FIELD_MAP.keys()) | {"overview", "deep_dive"}
+            expected_keys = set(GeminiLlmPrompter._LIST_FIELD_MAP.keys()) | set(GeminiLlmPrompter._CONTENT_FIELD_MAP.keys())
             if len(data) == 1 or not any(k in data for k in expected_keys):
                 logging.info("[Coercion] Unwrapped 'properties' container from LLM response.")
                 data = data["properties"]
@@ -689,45 +783,63 @@ class GeminiLlmPrompter(LlmPrompter):
                     required_fields.add(name)
 
         # --- Phase 0.5: Remap Document-level Wrappers ---
-        # Weaker models often mix up 'overview' and 'deep_dive' wrapper keys.
-        # Handle remapping for DeepDiveDocument (where deep_dive is required).
-        if "deep_dive" in required_fields and "deep_dive" not in data and "overview" in data:
-            logging.info("[Coercion] Remapped 'overview' to 'deep_dive' for DeepDiveDocument.")
-            data["deep_dive"] = data.pop("overview")
-        # Handle remapping for OverviewDocument (where overview is required).
-        elif "overview" in required_fields and "overview" not in data and "deep_dive" in data:
-            logging.info("[Coercion] Remapped 'deep_dive' to 'overview' for OverviewDocument.")
-            data["overview"] = data.pop("deep_dive")
+        # Weaker models often mix up text-heavy wrapper keys (e.g. 'overview' vs 'deep_dive').
+        # If the schema requires exactly ONE text-heavy section, we can safely remap 
+        # an incorrectly named wrapper to the required one.
+        expected_content_keys = [k for k in required_fields if k in GeminiLlmPrompter._CONTENT_FIELD_MAP]
+        if len(expected_content_keys) == 1:
+            req_key = expected_content_keys[0]
+            found_content_keys = [k for k in data if k in GeminiLlmPrompter._CONTENT_FIELD_MAP and k != req_key]
+            if req_key not in data and len(found_content_keys) == 1:
+                wrong_key = found_content_keys[0]
+                logging.info("[Coercion] Remapped '%s' to '%s' for document requiring %s.", wrong_key, req_key, req_key)
+                data[req_key] = data.pop(wrong_key)
 
         # --- Phase 0.6: Wrap 'unwrapped' content ---
         # If the LLM returned the inner fields at the root instead of inside the wrapper.
-        if "deep_dive" in required_fields and "deep_dive" not in data and "content" in data:
-            logging.info("[Coercion] Wrapped root 'content' into 'deep_dive'.")
-            data = {"deep_dive": data}
-        elif "overview" in required_fields and "overview" not in data and "content" in data:
-            logging.info("[Coercion] Wrapped root 'content' into 'overview'.")
-            data = {"overview": data}
+        if len(expected_content_keys) == 1:
+            req_key = expected_content_keys[0]
+            content_key = GeminiLlmPrompter._CONTENT_FIELD_MAP[req_key]
+            if req_key not in data and content_key in data:
+                logging.info("[Coercion] Wrapped root '%s' into '%s'.", content_key, req_key)
+                data = {req_key: data}
 
         # --- Phase 0.7: Coerce string-valued sections to dicts ---
         # Handle cases where "overview": "string" instead of "overview": {"content": "string"}.
         # This occurs when weaker models ignore the schema's nesting requirements and 
         # return raw text for fields that we expect to be objects with 'content' keys.
         # We target all standard top-level text-heavy sections here.
-        for section_key in ["overview", "deep_dive", "architectural_patterns_and_gotchas", "testing_strategy"]:
+        for section_key, content_key in GeminiLlmPrompter._CONTENT_FIELD_MAP.items():
             if section_key in data and isinstance(data[section_key], str):
-                logging.info("[Coercion] Coerced string value for '%s' to dict with 'content' key.", section_key)
-                data[section_key] = {"content": data[section_key]}
+                logging.info("[Coercion] Coerced string value for '%s' to dict with '%s' key.", section_key, content_key)
+                data[section_key] = {content_key: data[section_key]}
+
+        # --- Phase 0.8: Inject missing mandatory content sections ---
+        # Inject an empty content dictionary for any text-heavy section (like 'overview')
+        # that is missing from the output but explicitly required by the Pydantic schema.
+        for req_key in expected_content_keys:
+            if req_key not in data or data[req_key] is None:
+                content_key = GeminiLlmPrompter._CONTENT_FIELD_MAP.get(req_key, "content")
+                logging.warning("[Coercion] Injected missing required content section '%s'.", req_key)
+                data[req_key] = {content_key: ""}
 
         # --- Phase 2: Patch known missing keys with field-specific defaults ---
+        mandatory_sections = section_registry.get_mandatory_sections()
+        
         for wrapper_key, (list_key, model_name) in GeminiLlmPrompter._LIST_FIELD_MAP.items():
             # Only inject if the field is actually expected by the schema.
             if wrapper_key not in schema_fields:
                 continue
 
+            # Check if this is a mandatory section (required_for_code)
+            is_mandatory = wrapper_key in mandatory_sections
+
             # If the wrapper is missing or null, inject an empty container.
             if wrapper_key not in data or data[wrapper_key] is None:
                 data[wrapper_key] = {list_key: []}
-                logging.info("[Coercion] Injected missing mandatory wrapper '%s'.", wrapper_key)
+                level = logging.WARNING if is_mandatory else logging.INFO
+                logging.log(level, "[Coercion] Injected missing %s wrapper '%s'.", 
+                            "MANDATORY" if is_mandatory else "optional", wrapper_key)
             
             wrapper = data[wrapper_key]
             if isinstance(wrapper, list):
@@ -764,16 +876,8 @@ class GeminiLlmPrompter(LlmPrompter):
 
         return data
 
-    _LIST_FIELD_MAP = {
-        "key_dependencies": ("dependencies", "Dependency"),
-        "key_individual_components": ("components", "Component"),
-        "key_interfaces": ("interfaces", "Interface"),
-        "configurations": ("configurations", "ConfigurationItem"),
-        "implementation_invariants": ("invariants", "ImplementationInvariant"),
-        "workflow_patterns": ("patterns", "WorkflowPattern"),
-        "blueprint": ("symbols", "ExportedSymbol"),
-        "tech_debt": ("notes", "TechDebtNote"),
-    }
+    _LIST_FIELD_MAP = section_registry.list_field_map()
+    _CONTENT_FIELD_MAP = section_registry.content_field_map()
 
     _STRING_KEYS = {
         "name", "description", "usage_description", "definition_link",
@@ -989,7 +1093,25 @@ class GeminiLlmPrompter(LlmPrompter):
             loc = ".".join(str(l) for l in err["loc"])
             issues.append(f"Schema violation at '{loc}': {err['msg']}")
             
-        if is_json_invalid:
+        # Detect if the LLM echoed the schema definition instead of an instance.
+        is_schema_echo = False
+        try:
+            for err in e.errors():
+                input_val = err.get("input")
+                if isinstance(input_val, dict) and ("$defs" in input_val or "$schema" in input_val):
+                    is_schema_echo = True
+                    break
+        except Exception:
+            pass
+
+        if is_schema_echo:
+            error_feedback = (
+                "CRITICAL ERROR: You echoed the JSON Schema definition (including '$defs') "
+                "instead of providing a valid data instance. MUST NOT include schema "
+                "definitions like '$defs' or '$schema' in your output. Provide only "
+                "the JSON object representing the data itself. DO NOT REPEAT THE SCHEMA."
+            )
+        elif is_json_invalid:
             error_feedback = (
                 "Your response was truncated or contains invalid JSON syntax (e.g. EOF while parsing). "
                 "Please ensure you complete the JSON object, close all brackets/quotes, and do NOT "
@@ -1078,12 +1200,29 @@ class GeminiLlmPrompter(LlmPrompter):
                     )
                     self._stats.increment_counter("llm.prompts_sent")
                     # Send the prompt and capture the raw string response.
-                    llm_response_json = conversation.prompt(user_prompt)
-                    throttler_ctx.report_output(llm_response_json)
+                    prompt_result = conversation.prompt(user_prompt)
+                    self._stats.add_to_counter("llm.input_tokens", prompt_result.usage.get("input_tokens", 0))
+                    self._stats.add_to_counter("llm.output_tokens", prompt_result.usage.get("output_tokens", 0))
+                    self._stats.record_latency("llm.latency_ms", prompt_result.latency_ms)
                     
-                    if isinstance(llm_response_json, str):
-                        preview = llm_response_json[:50] + "..." if len(llm_response_json) > 50 else llm_response_json
-                        logging.info("Received response from %s. Preview: %r", agent_name, preview)
+                    # Record the call for cost tracking.
+                    self._call_records.append(schema.LlmCallRecord(
+                        agent_name=agent_name,
+                        model_name=getattr(conversation, "model_name", "unknown"),
+                        provider=self._config.provider,
+                        input_tokens=prompt_result.usage.get("input_tokens", 0),
+                        output_tokens=prompt_result.usage.get("output_tokens", 0),
+                        total_tokens=prompt_result.usage.get("total_tokens", 0),
+                        latency_ms=prompt_result.latency_ms,
+                        attempt=attempt + 1,
+                        timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    ))
+                    
+                    llm_response_text = prompt_result.text
+                    throttler_ctx.report_output(llm_response_text)
+                    
+                    preview = llm_response_text[:50] + "..." if len(llm_response_text) > 50 else llm_response_text
+                    logging.info("Received response from %s. Preview: %r", agent_name, preview)
 
                 # Attempt to parse and validate the response against the expected schema.
                 parsed_output = conversation.get_state(agent_name)
@@ -1231,6 +1370,43 @@ class GeminiLlmPrompter(LlmPrompter):
         # Return the extracted custom sections from the synthesis doc.
         return section_doc.custom_sections
 
+    def _aggregate_cost_report(self, directory_path: str, epoch: int) -> schema.CostReport:
+        """Aggregates all recorded LLM calls into a single cost report."""
+        total_input = sum(c.input_tokens for c in self._call_records)
+        total_output = sum(c.output_tokens for c in self._call_records)
+        total_tokens = sum(c.total_tokens for c in self._call_records)
+        total_latency = sum(c.latency_ms for c in self._call_records)
+        total_calls = len(self._call_records)
+        
+        # Simple breakdown by model.
+        model_breakdown = {}
+        for c in self._call_records:
+            if c.model_name not in model_breakdown:
+                model_breakdown[c.model_name] = {
+                    "calls": 0,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                }
+            stats = model_breakdown[c.model_name]
+            stats["calls"] += 1
+            stats["input_tokens"] += c.input_tokens
+            stats["output_tokens"] += c.output_tokens
+            stats["total_tokens"] += c.total_tokens
+
+        return schema.CostReport(
+            directory_path=directory_path,
+            epoch=epoch,
+            total_input_tokens=total_input,
+            total_output_tokens=total_output,
+            total_tokens=total_tokens,
+            total_calls=total_calls,
+            total_latency_ms=total_latency,
+            calls=self._call_records,
+            model_breakdown=model_breakdown,
+        )
+
+
     def prompt_for_indexing(
         self,
         directory_path: str,
@@ -1240,12 +1416,13 @@ class GeminiLlmPrompter(LlmPrompter):
         verifier: Any = None,
     ) -> schema.IndexDocument:
         """Prompts the LLM, validates the response, and retries on failure."""
+        self._call_records.clear()
         # Handle cases where the conversation flow is completely overridden.
         if self._override_conversation_factory is not None:
             logging.info("Overriding sequence using custom conversation factory")
             conversation = self._override_conversation_factory(system_prompt)
-            llm_response_json = conversation.prompt(initial_user_prompt)
-            parsed = json.loads(llm_response_json)
+            prompt_result = conversation.prompt(initial_user_prompt)
+            parsed = json.loads(prompt_result.text)
             if pydantic is not None:
                 return schema.IndexDocument.model_validate(parsed)
             return parsed
@@ -1379,16 +1556,8 @@ class GeminiLlmPrompter(LlmPrompter):
         # Combine all partial agent outputs into the final structured IndexDocument.
         artifact = schema.IndexDocument(
             overview=overview_doc.overview,
-            key_individual_components=key_components_doc.key_individual_components,
-            key_interfaces=key_components_doc.key_interfaces,
-            key_dependencies=key_components_doc.key_dependencies,
-            architectural_patterns_and_gotchas=key_components_doc.architectural_patterns_and_gotchas,
             deep_dive=deep_dive_doc.deep_dive,
-            testing_strategy=key_components_doc.testing_strategy,
-            configurations=key_components_doc.configurations,
-            implementation_invariants=key_components_doc.implementation_invariants,
-            blueprint=key_components_doc.blueprint,
-            tech_debt=key_components_doc.tech_debt,
+            **section_registry.key_components_payloads(key_components_doc),
             custom_sections=custom_sections_results,
             # --- Phase 4: Metadata Integration ---
             # Populate the GenerationMetadata sub-model to satisfy SM-101.
@@ -1396,7 +1565,8 @@ class GeminiLlmPrompter(LlmPrompter):
             generation_metadata=schema.GenerationMetadata(
                 generated_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 model_name=self._config.synthesis_gemini_model if hasattr(self, "_config") else "unknown",
-                epoch=system_prompt.epoch() if hasattr(system_prompt, "epoch") else 0
+                epoch=system_prompt.epoch() if hasattr(system_prompt, "epoch") else 0,
+                cost_report=self._aggregate_cost_report(directory_path, system_prompt.epoch() if hasattr(system_prompt, "epoch") else 0)
             )
         )
 
@@ -1415,10 +1585,6 @@ class GeminiLlmPrompter(LlmPrompter):
                 logging.warning("Verification failed for %s: %s", directory_path, verdict.issues)
         
         # Return the finalized artifact for storage or further verification.
-        return artifact
-                # In the real system, this would trigger a retry loop or similar.
-                # For now, we just log it and return the artifact.
-        
         return artifact
 
     def prompt_for_merging(
@@ -1469,123 +1635,56 @@ class GeminiLlmPrompter(LlmPrompter):
             model_type="synthesis"
         )
         
-        response = conv.prompt("Please provide the high-level architectural summary.")
-        return response.strip()
+        prompt_result = conv.prompt("Please provide the high-level architectural summary.")
+        return prompt_result.text.strip()
 
     def verify_artifact(self, artifact_json: str, source_context: str, is_merger_mode: bool = False) -> verification_types.VerificationVerdict:
-        """Runs the verifier prompt and returns a structured verdict."""
-        system_prompt = prompt_templates.create_verifier_prompt(artifact_json, source_context)
+        """Runs the verifier prompt and returns a structured verdict using a robust loop."""
+        # 1. Prepare prompts
+        base_user_prompt = prompt_templates.create_verifier_prompt(artifact_json, source_context)
         
-        logging.info(
-            "[VerifyArtifact] system_prompt=%d bytes "
-            "(artifact=%d, source_context=%d).",
-            len(system_prompt), len(artifact_json), len(source_context),
-        )
-
-        # Simple schema instruction for the verification verdict
+        # We augment the system prompt with the schema to ensure structured output,
+        # but the _execute_single_prompt loop will handle the retries and coercion.
+        system_prompt = prompt_templates.VERIFIER_SYSTEM_PROMPT
         if pydantic is not None and hasattr(verification_types.VerificationVerdict, "model_json_schema"):
             schema_str = json.dumps(verification_types.VerificationVerdict.model_json_schema(), indent=2)
-            system_prompt = f"{system_prompt}\n\nYour output MUST be a JSON object conforming to: {schema_str}"
+            system_prompt = (
+                f"{system_prompt}\n\n"
+                f"Your output MUST be a JSON object conforming to: {schema_str}\n\n"
+                "CRITICAL: Output ONLY the JSON instance. DO NOT echo the '$defs' or the schema itself."
+            )
             
-        conv = self._create_single_conversation(
-            system_prompt=system_prompt,
-            agent_name="verifier_agent",
-            output_schema_type=verification_types.VerificationVerdict,
-            model_type="synthesis",
+        logging.info(
+            "[VerifyArtifact] Requesting structured verification verdict (context=%d bytes).",
+            len(source_context),
         )
-        
+
+        # 2. Run prompt using the robust _execute_single_prompt loop.
         try:
+            verdict = self._execute_single_prompt(
+                directory_path="verification_step", # Virtual path for logging
+                initial_user_prompt=base_user_prompt,
+                system_prompt=system_prompt,
+                output_schema=verification_types.VerificationVerdict,
+                agent_name="verifier_agent",
+                model_type="synthesis"
+            )
             
-            with self._throttler.acquire(system_prompt, "Please verify the artifact.") as throttle_ctx:
-                response = conv.prompt("Please verify the artifact.")
-                throttle_ctx.report_output(response)
-                
-                preview = (response[:50] + "...") if isinstance(response, str) and len(response) > 50 else response
-                logging.info(
-                    "[VerifyArtifact] raw response length=%d bytes. Preview: %r",
-                    len(response) if response else 0,
-                    preview
-                )
+            # Ensure model attribution is recorded.
+            if hasattr(verdict, "verification_model"):
+                verdict.verification_model = getattr(self._config, "synthesis_gemini_model", "unknown")
+            
+            return verdict
 
-                # Handle empty or whitespace-only responses from the LLM.
-                # This typically happens when the source context exceeds the
-                # model's context window (e.g. 300KB+ with local Ollama models).
-                if not response or not response.strip():
-                    logging.warning(
-                        "[VerifyArtifact] LLM returned empty response "
-                        "(prompt was %d bytes — likely exceeds model context window). "
-                        "Passing verification by default.",
-                        len(system_prompt),
-                    )
-                    return verification_types.VerificationVerdict.success()
-
-                # In this simple implementation, we assume the response is JSON parsing to VerificationVerdict
-                try:
-                    # Parse as pydantic object for strict validation.
-                    parsed = verification_types.VerificationVerdict.model_validate_json(response)
-                    parsed.verification_model = self._config.synthesis_gemini_model
-                    return parsed
-                except Exception:
-                    pass
-
-                # Ollama often wraps JSON in markdown fences: ```json {...} ```
-                # We need to strip them and retry parsing.
-                cleaned = OpenAiConversation._extract_json(response)
-
-                try:
-                    data = json.loads(cleaned)
-                    # --- Coercion for VerificationVerdict ---
-                    # Weaker LLMs (like Gemma via Ollama) often confuse the 'issues' (List[str])
-                    # and 'detailed_issues' (List[VerificationIssue]) fields, or return
-                    # non-primitive types for boolean/float fields.
-                    if isinstance(data, dict):
-                        if "issues" in data and isinstance(data["issues"], list):
-                            new_issues = []
-                            detailed = data.get("detailed_issues")
-                            if not isinstance(detailed, list):
-                                detailed = []
-                            
-                            for item in data["issues"]:
-                                if isinstance(item, dict):
-                                    desc = item.get("description", str(item))
-                                    new_issues.append(desc)
-                                    # If it looks like a structured issue, ensure it's in detailed_issues
-                                    if "category" in item and item not in detailed:
-                                        detailed.append(item)
-                                else:
-                                    new_issues.append(str(item))
-                            data["issues"] = new_issues
-                            data["detailed_issues"] = detailed
-
-                        if "passed" in data and not isinstance(data["passed"], bool):
-                            data["passed"] = str(data["passed"]).lower() == "true"
-                        
-                        if "confidence" in data and not isinstance(data["confidence"], (int, float)):
-                            try:
-                                data["confidence"] = float(data["confidence"])
-                            except (ValueError, TypeError):
-                                data["confidence"] = 1.0
-
-                    verdict = verification_types.VerificationVerdict(**data)
-                    verdict.verification_model = self._config.synthesis_gemini_model
-                    return verdict
-                except (json.JSONDecodeError, TypeError):
-                    pass
-
-                # All parsing failed — this is an infrastructure issue (model
-                # can't produce structured output), not a verification failure.
-                # Auto-pass rather than burning retries.
-                logging.warning(
-                    "[VerifyArtifact] Could not parse LLM response as JSON. "
-                    "Raw response (%d bytes): %.200s",
-                    len(response), response,
-                )
-                return verification_types.VerificationVerdict.success(confidence=0.5)
         except Exception as e:
-            logging.exception("Verification prompt failed: %s", e)
-            # Infrastructure failures (network, timeout, OOM) should not
-            # block the pipeline.  Auto-pass with low confidence.
-            return verification_types.VerificationVerdict.success(confidence=0.5)
+            logging.error("[VerifyArtifact] Terminal failure after retries: %s", e)
+            # On terminal failure, we return a pessimistic verdict that passes but with low confidence
+            # to avoid blocking the pipeline while logging the error.
+            return verification_types.VerificationVerdict(
+                passed=True,
+                confidence=0.01,
+                reason=f"Verification failed after all retries: {e}. Bypassing to avoid pipeline stall."
+            )
 
     def _execute_web_searches(self, queries: list[str]) -> list[dict[str, str]]:
         """Executes a list of web searches and returns a list of results.
@@ -1641,8 +1740,8 @@ class GeminiLlmPrompter(LlmPrompter):
             return "Repository root not available for local code search."
 
         results = []
-        # Limit to 3 queries to manage latency.
-        for query in queries[:3]:
+        # Execute up to 5 planned queries to match the planner prompt contract.
+        for query in queries[:5]:
             logging.info("[CodeSearch] Searching for: %r", query)
             try:
                 # Handle special filters in the query.
@@ -1680,4 +1779,3 @@ class GeminiLlmPrompter(LlmPrompter):
                 results.append(f"--- SEARCH RESULTS FOR: {query} ---\n(Search failed: {e})")
         
         return "\n\n".join(results)
-

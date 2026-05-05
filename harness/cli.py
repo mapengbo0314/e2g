@@ -115,7 +115,15 @@ def main() -> None:
                         help="List all tracked threads from the registry.")
     parser.add_argument("--prune", action="store_true",
                         help="Prune old terminal task records (>24h).")
+    parser.add_argument("--reload-agents", action="store_true",
+                        help="Regenerate agent documentation and clear caches.")
     args = parser.parse_args()
+
+    # Reload mode: sync agent docs and exit
+    if args.reload_agents:
+        from _agents.reload_agents import reload_agents as run_reload
+        run_reload()
+        return
 
     # MCP mode: delegate to the FastMCP server and exit
     if args.mcp:

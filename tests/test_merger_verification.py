@@ -87,6 +87,7 @@ class TestMergerVerification(unittest.TestCase):
         
         self.assertTrue(result.verification_state.verified)
         self.assertEqual(result.verification_state.confidence, 0.5)
+        self.assertTrue(result.verification_state.is_infrastructure_bypass)
         self.assertIn("skipped", result.verification_state.issues[0])
         mock_verifier.verify.assert_not_called()
 

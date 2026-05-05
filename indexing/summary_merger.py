@@ -98,8 +98,14 @@ class _StatsRecorder:
     def __init__(self) -> None:
         self.counters: dict[str, int] = {}
 
-    def increment_counter(self, name: str) -> None:
-        self.counters[name] = self.counters.get(name, 0) + 1
+    def increment_counter(self, name: str, value: int = 1) -> None:
+        self.counters[name] = self.counters.get(name, 0) + value
+
+    def add_to_counter(self, name: str, value: int) -> None:
+        self.increment_counter(name, value)
+
+    def record_latency(self, name: str, value: float) -> None:
+        pass
 
 
 class SummaryMerger:

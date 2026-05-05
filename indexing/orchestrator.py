@@ -44,6 +44,10 @@ class Observer:
     def increment_counter(self, name: str, value: int = 1):
         """Compatibility alias for orchestrator calls."""
         self.counters[name] += value
+    def add_to_counter(self, name: str, value: int):
+        self.counters[name] += value
+    def record_latency(self, name: str, value: float):
+        pass
     def reset_counter(self, name: str):
         self.counters[name] = 0
     def set_gauge(self, name: str, value: Any):
@@ -534,6 +538,7 @@ class Orchestrator:
                 for epoch in range(self._num_epochs):
                     # Clean up both summaries and artifacts across all epochs.
                     self._index_state.delete_summary(str(path), epoch)
+                    self._index_state.delete_artifact(str(path), epoch)
 
         # Aggregate all work units that encountered failures during indexing.
         errored_work_units: list[WorkUnit] = []

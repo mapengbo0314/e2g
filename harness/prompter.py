@@ -36,6 +36,10 @@ class AgentConfigLoader:
             
         self._configs[agent_name] = config
         return config
+
+    def clear_cache(self):
+        """Clears the cached configurations, forcing a reload from disk on next access."""
+        self._configs.clear()
         
     def get_system_prompt(self, agent_name: str) -> str:
         """Extracts the system prompt from the agent configuration."""

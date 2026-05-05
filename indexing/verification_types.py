@@ -54,6 +54,7 @@ class IssueCategory(str, enum.Enum):
     MALFORMED_JSON = "malformed_json"
     SCHEMA_VIOLATION = "schema_violation"
     EMPTY_MANDATORY_SECTION = "empty_mandatory_section"
+    MISSING_GROUNDED_SYMBOL = "missing_grounded_symbol"
 
 
 class PublicationDecision(str, enum.Enum):
@@ -124,6 +125,10 @@ class VerificationVerdict(_BaseModel):
         default=False,
         description="True if this verdict bypassed LLM verification because the directory was empty.",
     )
+    is_infrastructure_bypass: bool = _field(
+        default=False,
+        description="True if verification was bypassed due to verifier infrastructure limits or failures.",
+    )
 
     @classmethod
     def success(cls, confidence: float = 1.0) -> "VerificationVerdict":
@@ -135,6 +140,23 @@ class VerificationVerdict(_BaseModel):
             issues=[],
             detailed_issues=[],
             decision=PublicationDecision.PUBLISH.value,
+        )
+
+    @classmethod
+    def infrastructure_bypass(
+        cls,
+        confidence: float = 0.3,
+        reason: str = "",
+    ) -> "VerificationVerdict":
+        """Factory for an explicit low-confidence infrastructure bypass."""
+        return cls(
+            passed=True,
+            confidence=confidence,
+            issues=[reason] if reason else [],
+            detailed_issues=[],
+            decision="infrastructure_bypass",
+            auto_pass_reason=reason or "infrastructure_bypass",
+            is_infrastructure_bypass=True,
         )
 
     @classmethod

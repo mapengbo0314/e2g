@@ -198,6 +198,21 @@ async def trigger_reindex(index_dir: Optional[str] = None) -> str:
     except Exception as e:
         return json.dumps({"status": "failed", "error": str(e)}, indent=2)
 
+@mcp.tool()
+async def reload_agents() -> str:
+    """Regenerates .gemini/agents/*.md documentation and clears agent caches.
+    
+    This synchronizes the formal agent definitions in _agents/agents/ with 
+    the rendered documentation used by the system.
+    """
+    try:
+        from _agents.reload_agents import reload_agents as run_reload
+        run_reload()
+        return json.dumps({"status": "success", "message": "Agents reloaded and documentation updated."}, indent=2)
+    except Exception as e:
+        logger.error(f"Reload failed: {e}")
+        return json.dumps({"status": "failed", "error": str(e)}, indent=2)
+
 if __name__ == "__main__":
     # FastMCP handles the stdio server setup automatically
     mcp.run()

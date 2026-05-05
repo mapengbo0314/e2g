@@ -81,6 +81,9 @@ class State(Protocol):
     def delete_summary(self, path: str, epoch: int) -> None:
         """Deletes an index/summary for the given path and epoch from storage."""
 
+    def delete_artifact(self, path: str, epoch: int) -> None:
+        """Deletes a JSON artifact for the given path and epoch from storage."""
+
     def delete_rootmap(self, epoch: int) -> None:
         """Deletes the root map for the given epoch from storage."""
 
@@ -248,6 +251,12 @@ class LocalState(State):
     def delete_summary(self, path: str, epoch: int) -> None:
         """Deletes an index/summary for the given path and epoch from storage."""
         full_path = self._get_path(path, epoch)
+        if full_path.exists():
+            full_path.unlink()
+
+    def delete_artifact(self, path: str, epoch: int) -> None:
+        """Deletes a JSON artifact for the given path and epoch from storage."""
+        full_path = self._get_path(path, epoch, extension="json")
         if full_path.exists():
             full_path.unlink()
 
@@ -430,6 +439,13 @@ class ShadowState(State):
             self._secondary.delete_summary(path, epoch)
         except Exception:
             logging.exception("ShadowState: Failed to delete from secondary state.")
+
+    def delete_artifact(self, path: str, epoch: int) -> None:
+        self._primary.delete_artifact(path, epoch)
+        try:
+            self._secondary.delete_artifact(path, epoch)
+        except Exception:
+            logging.exception("ShadowState: Failed to delete artifact from secondary state.")
 
     def delete_rootmap(self, epoch: int) -> None:
         self._primary.delete_rootmap(epoch)

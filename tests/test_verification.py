@@ -41,6 +41,8 @@ class VerificationTest(unittest.TestCase):
         # skip_semantic=True to just test syntactic
         verdict = verifier.verify(valid_json, "some context", skip_semantic=True)
         self.assertTrue(verdict.passed)
+        self.assertEqual(verdict.decision, "infrastructure_bypass")
+        self.assertTrue(verdict.is_infrastructure_bypass)
         self.assertEqual(prompter.calls, 0)
 
     def test_syntactic_validation_failure(self):

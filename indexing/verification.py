@@ -13,7 +13,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Protocol, Optional
+from typing import Any, Dict, Protocol, Optional
 
 # Optional Pydantic import for schema-driven validation.
 try:
@@ -22,6 +22,7 @@ except ImportError:
     pydantic = None
 
 from indexing import schema
+from indexing import section_registry
 from indexing import verification_types
 
 
@@ -235,7 +236,7 @@ class ArtifactVerifier:
             logging.warning("[Verifier] Stage 1 FAILED (unexpected): %s", e)
             return verification_types.VerificationVerdict.syntactic_failure(str(e))
 
-    def _check_mandatory_sections(self, doc: schema.IndexDocument, source_context: str) -> Optional[verification_types.VerificationVerdict]:
+    def _check_mandatory_sections(self, doc: schema.IndexDocument, source_context: str, ast_grounding: Optional[Dict[str, Any]] = None) -> Optional[verification_types.VerificationVerdict]:
         """Enforces presence of mandatory sections (blueprint, invariants) for non-trivial codebases."""
         issues = []
         
@@ -246,15 +247,41 @@ class ArtifactVerifier:
         if not has_code:
             return None
 
-        # 1. Enforce Blueprint (Symbols)
-        if not doc.blueprint or not doc.blueprint.symbols:
-            issues.append("Mandatory section 'blueprint.symbols' is empty despite source code presence. Extract exact function/class signatures.")
+        # Pre-extract all AST symbols and invariants to see what is TRULY mandatory.
+        from indexing import ast_extractor
+        import re
+        all_ast_symbols = []
+        all_ast_invariants = []
         
-        # 2. Enforce Implementation Invariants
-        if not doc.implementation_invariants or not doc.implementation_invariants.invariants:
-             # We might want to be slightly more lenient here, but let's at least warn or fail if it's totally empty.
-             # For Zero-Discovery, invariants are crucial.
-             issues.append("Mandatory section 'implementation_invariants' is empty. Document mechanical primitives (locking, atomicity, etc.).")
+        if ast_grounding:
+            for file_data in ast_grounding.values():
+                all_ast_symbols.extend(file_data.get("symbols", []))
+                all_ast_invariants.extend(file_data.get("invariants", []))
+        else:
+            files = re.split(r'--- (.*?) ---\n', source_context)
+            if len(files) > 1:
+                for i in range(1, len(files), 2):
+                    filename = files[i]
+                    content = files[i+1]
+                    syms, invs = ast_extractor.extract_ast_grounding(filename, content)
+                    all_ast_symbols.extend(syms)
+                    all_ast_invariants.extend(invs)
+
+        # 1. Enforce Registry-driven mandatory sections
+        for spec in section_registry.SECTION_SPECS:
+            if spec.verification_policy == "required_for_code":
+                # Only enforce if we have deterministic evidence that the section SHOULD be populated.
+                if spec.section_id == "blueprint" and not all_ast_symbols:
+                    continue
+                if spec.section_id == "implementation_invariants" and not all_ast_invariants:
+                    continue
+                if spec.section_id == "key_interfaces" and not all_ast_symbols:
+                    # Usually if there are no symbols, there are no meaningful interfaces.
+                    continue
+
+                section_instance = getattr(doc, spec.section_id, None)
+                if section_registry.is_section_empty(spec.section_id, section_instance):
+                    issues.append(f"Mandatory section '{spec.section_id}' is empty despite evidence in source code.")
 
         if issues:
             logging.warning("[Verifier] Mandatory section check FAILED: %s", "; ".join(issues))
@@ -271,6 +298,70 @@ class ArtifactVerifier:
                 can_retry=True
             )
         
+        return None
+
+    def _check_ast_grounding(self, doc: schema.IndexDocument, source_context: str, ast_grounding: Optional[Dict[str, Any]] = None) -> Optional[verification_types.VerificationVerdict]:
+        """Validates that deterministically extracted AST symbols are present in the blueprint."""
+        try:
+            from indexing import ast_extractor
+            import re
+            
+            issues = []
+            
+            if ast_grounding:
+                for filename, file_data in ast_grounding.items():
+                    ast_symbols = file_data.get("symbols", [])
+                    if not ast_symbols:
+                        continue
+                        
+                    # Check if the blueprint has these symbols.
+                    blueprint = getattr(doc, "blueprint", None)
+                    llm_symbols = []
+                    if blueprint and blueprint.symbols:
+                        llm_symbols = [s.name for s in blueprint.symbols]
+                        
+                    for expected_sym in ast_symbols:
+                        if expected_sym.name not in llm_symbols:
+                            issues.append(f"AST Grounding Failure: Symbol '{expected_sym.name}' found in {filename} but missing from blueprint symbols.")
+            else:
+                # Fallback to manual extraction if no cache provided
+                files = re.split(r'--- (.*?) ---\n', source_context)
+                if len(files) > 1:
+                    for i in range(1, len(files), 2):
+                        filename = files[i]
+                        content = files[i+1]
+                        
+                        ast_symbols, _ = ast_extractor.extract_ast_grounding(filename, content)
+                        if not ast_symbols:
+                            continue
+                            
+                        # Check if the blueprint has these symbols.
+                        blueprint = getattr(doc, "blueprint", None)
+                        llm_symbols = []
+                        if blueprint and blueprint.symbols:
+                            llm_symbols = [s.name for s in blueprint.symbols]
+                            
+                        for expected_sym in ast_symbols:
+                            if expected_sym.name not in llm_symbols:
+                                issues.append(f"AST Grounding Failure: Symbol '{expected_sym.name}' found in {filename} but missing from blueprint symbols.")
+                            
+            if issues:
+                logging.warning("[Verifier] AST Grounding check FAILED: %s", "; ".join(issues))
+                detailed = [
+                    verification_types.VerificationIssue(
+                        category=verification_types.IssueCategory.MISSING_GROUNDED_SYMBOL.value,
+                        severity=verification_types.IssueSeverity.CRITICAL.value,
+                        description=i
+                    ) for i in issues
+                ]
+                return verification_types.VerificationVerdict.failure(
+                    issues=issues,
+                    detailed_issues=detailed,
+                    can_retry=True
+                )
+        except Exception as e:
+            logging.warning("[Verifier] AST Grounding check crashed (ignoring): %s", e)
+            
         return None
 
     def _stage2_semantic_verification(
@@ -315,7 +406,8 @@ class ArtifactVerifier:
         artifact_json: str, 
         source_context: str,
         skip_semantic: bool = False,
-        is_merger_mode: bool = False
+        is_merger_mode: bool = False,
+        ast_grounding: Optional[Dict[str, Any]] = None
     ) -> verification_types.VerificationVerdict:
         """Executes the full verification pipeline.
         
@@ -337,16 +429,25 @@ class ArtifactVerifier:
             logging.warning("[Verifier] Pipeline aborted at Stage 1 (syntactic).")
             return stage1_result
             
-        # Stage 1.5: Mandatory Section Enforcement (NEW)
-        mandatory_result = self._check_mandatory_sections(stage1_result, source_context)
+        mandatory_result = self._check_mandatory_sections(stage1_result, source_context, ast_grounding=ast_grounding)
         if mandatory_result:
             logging.warning("[Verifier] Pipeline aborted at Stage 1.5 (mandatory sections).")
             return mandatory_result
             
+        # Stage 1.6: AST Grounding Enforcement (NEW)
+        # Prevents LLM from silently dropping deterministic structural facts.
+        ast_result = self._check_ast_grounding(stage1_result, source_context, ast_grounding=ast_grounding)
+        if ast_result:
+            logging.warning("[Verifier] Pipeline aborted at Stage 1.6 (AST grounding).")
+            return ast_result
+            
         if skip_semantic:
-            # Return success if Stage 1 passes and semantic verification is disabled.
+            # Return an explicit bypass if Stage 1 passes and semantic verification is disabled.
             logging.info("[Verifier] Pipeline complete (semantic skipped).")
-            return verification_types.VerificationVerdict.success()
+            return verification_types.VerificationVerdict.infrastructure_bypass(
+                confidence=0.5,
+                reason="Semantic verification skipped by caller.",
+            )
 
         # Stage 2: Semantic (Slow, non-deterministic grounding check).
         # We pass the original JSON for verification against the raw source context.

@@ -48,6 +48,16 @@ def get_index_file_name(epoch: int) -> str:
     return f"llm_index_v{epoch}.md"
 
 
+def _optional_str_attr(obj: Any, name: str) -> str | None:
+    value = getattr(obj, name, None)
+    return value if isinstance(value, str) else None
+
+
+def _bool_attr(obj: Any, name: str) -> bool:
+    value = getattr(obj, name, False)
+    return value if isinstance(value, bool) else False
+
+
 USER_PROMPT_TEMPLATE = "Summarize the contents of {directory_path}"
 PARTIAL_SUMMARY_PROMPT_ADDITION = (
     "(this is a partial summary, you are only seeing a subset of the files in"
@@ -134,6 +144,31 @@ class LlmIndexer:
                 display_path = self._config.index_state.get_display_path(str(directory_path))
                 str_directory_contents = {str(k): v for k, v in directory_contents_chunk.items()}
                 extra_ctx = ""
+                
+                # --- AST Grounding Phase ---
+                ast_grounding_cache = {}
+                try:
+                    from indexing import ast_extractor
+                    ast_context_lines = []
+                    for filepath, content in directory_contents_chunk.items():
+                        symbols, invariants = ast_extractor.extract_ast_grounding(str(filepath), content)
+                        if symbols or invariants:
+                            ast_grounding_cache[str(filepath)] = {"symbols": symbols, "invariants": invariants}
+                            ast_context_lines.append(f"AST Deterministic Grounding for {filepath}:")
+                            if symbols:
+                                ast_context_lines.append("  Exported Symbols (Mandatory to include in blueprint with matching provenance):")
+                                for sym in symbols:
+                                    ast_context_lines.append(f"  - name: {sym.name}, signature: {sym.signature}, lines: {sym.line_number}-{sym.end_line_number}")
+                            if invariants:
+                                ast_context_lines.append("  Implementation Invariants (Mandatory to enrich in blueprint with matching provenance):")
+                                for inv in invariants:
+                                    ast_context_lines.append(f"  - primitive: {inv.primitive}, lines: {inv.line_number}-{inv.end_line_number}")
+                            ast_context_lines.append("")
+                    if ast_context_lines:
+                        extra_ctx += "\n".join(ast_context_lines) + "\n"
+                except Exception as e:
+                    logging.warning(f"AST extraction failed: {e}")
+
                 if existing_index:
                     extra_ctx += f"existing_index:\n{existing_index}\n"
 
@@ -193,7 +228,7 @@ class LlmIndexer:
 
                 if verifier:
                     source_context = "\n\n".join([f"--- {k} ---\n{v}" for k, v in directory_contents_chunk.items()])
-                    verdict = verifier.verify(artifact_chunk.model_dump_json(), source_context)
+                    verdict = verifier.verify(artifact_chunk.model_dump_json(), source_context, ast_grounding=ast_grounding_cache)
                     if not verdict.passed:
                         raise VerificationFailedError("Chunk failed", result=artifact_chunk, issues=verdict.issues)
                     
@@ -209,8 +244,9 @@ class LlmIndexer:
                         verified=True, 
                         confidence=getattr(verdict, 'confidence', 1.0), 
                         issues=verdict.issues,
-                        is_empty_bypass=getattr(verdict, 'is_empty_bypass', False),
-                        verification_model=getattr(verdict, 'verification_model', None),
+                        is_empty_bypass=_bool_attr(verdict, 'is_empty_bypass'),
+                        is_infrastructure_bypass=_bool_attr(verdict, 'is_infrastructure_bypass'),
+                        verification_model=_optional_str_attr(verdict, 'verification_model'),
                         verified_at=datetime.datetime.now(datetime.timezone.utc).isoformat()
                     )
                 return artifact_chunk
@@ -286,8 +322,12 @@ class LlmIndexer:
                             len(chunk_context)
                         )
                         merged_doc.verification_state = schema.VerificationState(
-                            verified=True, confidence=0.5, issues=["Verification skipped due to context size"],
-                            is_empty_bypass=False
+                            verified=True,
+                            confidence=0.5,
+                            issues=["Verification skipped due to context size"],
+                            is_empty_bypass=False,
+                            is_infrastructure_bypass=True,
+                            verified_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                         )
                         return merged_doc
 
@@ -307,8 +347,9 @@ class LlmIndexer:
                         verified=True, 
                         confidence=getattr(verdict, 'confidence', 1.0), 
                         issues=verdict.issues,
-                        is_empty_bypass=getattr(verdict, 'is_empty_bypass', False),
-                        verification_model=getattr(verdict, 'verification_model', None),
+                        is_empty_bypass=_bool_attr(verdict, 'is_empty_bypass'),
+                        is_infrastructure_bypass=_bool_attr(verdict, 'is_infrastructure_bypass'),
+                        verification_model=_optional_str_attr(verdict, 'verification_model'),
                         verified_at=datetime.datetime.now(datetime.timezone.utc).isoformat()
                     )
                 return merged_doc
