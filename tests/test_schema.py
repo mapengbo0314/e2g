@@ -23,6 +23,10 @@ from indexing.schema import (
     WorkflowPatterns,
     from_json,
     to_json,
+    FileSkeleton,
+    FileEnrichment,
+    SkeletonSymbol,
+    SymbolEnrichment
 )
 from indexing.rendering import sanitize_unicode, to_markdown
 from indexing.verification_types import (
@@ -37,6 +41,18 @@ from indexing.verification_types import (
 # ---------------------------------------------------------------------------
 # Schema tests
 # ---------------------------------------------------------------------------
+
+def test_ast_enrichment_schemas():
+    skeleton = FileSkeleton(
+        symbols=[SkeletonSymbol(id="hash1", name="Foo", signature="class Foo", line_number=10)],
+        invariants=[]
+    )
+    enrichment = FileEnrichment(
+        symbols={"hash1": SymbolEnrichment(summary="A foo class")},
+        invariants={}
+    )
+    assert skeleton.symbols[0].id == "hash1"
+    assert enrichment.symbols["hash1"].summary == "A foo class"
 
 class TestIndexDocumentSerialization:
     """Tests for IndexDocument JSON round-trip."""

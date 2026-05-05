@@ -87,6 +87,7 @@ class Interface(_BaseModel):
 class ExportedSymbol(_BaseModel):
     """Represents a public symbol with its structural signature."""
 
+    id: str = _field(default="", description="The collision-proof hash ID.")
     name: str = _field(description="The name of the symbol.")
     signature: str = _field(
         description="The exact structural signature (e.g., 'def run(p: str) -> int')."
@@ -109,6 +110,7 @@ class ExportedSymbol(_BaseModel):
 class ImplementationInvariant(_BaseModel):
     """Represents a mechanical invariant or primitive (locking, atomicity)."""
 
+    id: str = _field(default="", description="The collision-proof hash ID.")
     primitive: str = _field(
         description="The underlying primitive (e.g., 'fcntl.flock', 'threading.Lock')."
     )
@@ -553,6 +555,32 @@ class VerificationState(_BaseModel):
 # ---------------------------------------------------------------------------
 # Top-level document
 # ---------------------------------------------------------------------------
+
+class SkeletonSymbol(_BaseModel):
+    id: str = _field(description="Collision-proof hash ID")
+    name: str = _field(description="Symbol name")
+    signature: str = _field(description="Exact signature")
+    line_number: int = _field(description="Starting line number")
+
+class SkeletonInvariant(_BaseModel):
+    id: str = _field(description="Collision-proof hash ID")
+    primitive: str = _field(description="Primitive type")
+    line_number: int = _field(description="Line number")
+
+class FileSkeleton(_BaseModel):
+    symbols: List[SkeletonSymbol] = _field(default_factory=list)
+    invariants: List[SkeletonInvariant] = _field(default_factory=list)
+
+class SymbolEnrichment(_BaseModel):
+    summary: str = _field(description="Semantic summary of the symbol")
+
+class InvariantEnrichment(_BaseModel):
+    intent: str = _field(description="Intent behind the primitive")
+    usage_context: str = _field(description="How it is used")
+
+class FileEnrichment(_BaseModel):
+    symbols: Dict[str, SymbolEnrichment] = _field(default_factory=dict)
+    invariants: Dict[str, InvariantEnrichment] = _field(default_factory=dict)
 
 class IndexDocument(_BaseModel):
     """The top-level model for the LLM indexer output.
