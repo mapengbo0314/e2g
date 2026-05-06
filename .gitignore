@@ -15,6 +15,7 @@ root_map_*
 verification_cache/
 __pycache__/
 *.pyc
+.DS_Store
 
 # Virtual environments
 .venv/
@@ -28,6 +29,9 @@ WORKSPACE
 WORKSPACE.bazel
 MODULE.bazel
 MODULE.bazel.lock
+
+# Requirements
+requirements_lock.txt
 
 # Design documentation
 designs/

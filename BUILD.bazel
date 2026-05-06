@@ -1,2 +1,0 @@
-# Root build file
-exports_files(["requirements.txt", "requirements_lock.txt"])
