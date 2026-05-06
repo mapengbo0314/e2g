@@ -11,6 +11,8 @@ backed `root_map.py`. The key responsibilities preserved here are:
 # Core library and typing imports for root map generation.
 from __future__ import annotations
 from collections.abc import Sequence
+from datetime import datetime
+import json
 import logging
 from pathlib import Path
 from typing import Protocol, TypedDict
@@ -260,5 +262,26 @@ def regenerate_root_map(
     )
 
     root_map_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Task 4: Metadata JSON
+    total_tokens = 0
+    for work_unit in work_units:
+        unit_id = str(getattr(work_unit, "output_path", getattr(work_unit, "unit_id", "")))
+        try:
+            artifact_json = index_state.read_artifact(unit_id, epoch)
+            doc = schema.IndexDocument.model_validate_json(artifact_json)
+            if doc.generation_metadata and doc.generation_metadata.cost_report:
+                total_tokens += doc.generation_metadata.cost_report.total_tokens
+        except Exception as e:
+            logging.debug("Could not read token usage for %s: %s", unit_id, e)
+
+    metadata = {
+        "timestamp": datetime.now().isoformat(),
+        "total_tokens": total_tokens,
+        "total_files_indexed": len(work_units),
+    }
+    metadata_file = Path(output_dir) / "metadata.json"
+    metadata_file.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
     root_map_file.write_text(content, encoding="utf-8")
     logging.info("Successfully wrote root map to %s", root_map_file)

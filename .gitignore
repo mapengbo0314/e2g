@@ -3,6 +3,7 @@
 # Auto-generated outputs and pipelines
 local_index_output/
 github_index_output/
+scratch/
 .index_output/
 .indexing-reference/
 .designs/

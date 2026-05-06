@@ -137,8 +137,8 @@ def create_llm_prompter(
     """Creates an LLM prompter for a bundle."""
     llm_cfg = shared_flags.config.llm
     # Return the configured prompter instance for the indexing lifecycle.
-    return sequential_llm_prompter.GeminiLlmPrompter(
-        sequential_llm_prompter.GeminiLlmPrompterConfig(
+    return sequential_llm_prompter.UniversalLlmPrompter(
+        sequential_llm_prompter.UniversalLlmConfig(
             bundle_name=bundle.bundle_name,
             throttling_strategy=throttling_strategy,
             # Retry limits and conversation thresholds.

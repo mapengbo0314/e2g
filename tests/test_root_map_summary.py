@@ -64,9 +64,9 @@ class TestRootMapSummary(unittest.TestCase):
         
         # Mock index_state.read_artifact to return valid JSON
         mock_state.read_artifact.side_effect = [
-            '{"overview": {"content": "overview a"}, "verification_state": {"verified": true, "confidence": 1.0, "issues": []}}',
-            '{"overview": {"content": "overview b"}, "verification_state": {"verified": true, "confidence": 1.0, "issues": []}}'
-        ]
+            '{"overview": {"content": "overview a"}, "verification_state": {"verified": true, "confidence": 1.0, "issues": []}, "generation_metadata": {"epoch": 0, "chunk_count": 1, "cost_report": {"total_tokens": 150}}}',
+            '{"overview": {"content": "overview b"}, "verification_state": {"verified": true, "confidence": 1.0, "issues": []}, "generation_metadata": {"epoch": 0, "chunk_count": 1, "cost_report": {"total_tokens": 250}}}'
+        ] * 2  # *2 because read_artifact is called in collect_overviews and again in metadata generation
         mock_state.get_display_path.side_effect = ["dir/a", "dir/b"]
         mock_prompter.prompt_for_root_map_summary.return_value = "final project summary"
         
@@ -74,12 +74,19 @@ class TestRootMapSummary(unittest.TestCase):
             with patch("pathlib.Path.mkdir"):
                 root_map.regenerate_root_map([wu1, wu2], "/out", mock_state, 0, mock_fs, mock_prompter)
                 
-                # Check that final content contains the health bar and summary
-                args, _ = mock_write.call_args
-                content = args[0]
-                self.assertIn("Root Map - Epoch 0", content)
-                self.assertIn("final project summary", content)
-                self.assertIn("100%", content) # Health bar
+                # We expect 2 writes: metadata.json and root_map_v0.md
+                self.assertEqual(mock_write.call_count, 2)
+                
+                metadata_args, _ = mock_write.call_args_list[0]
+                metadata_content = metadata_args[0]
+                self.assertIn('"total_tokens": 400', metadata_content)
+                self.assertIn('"total_files_indexed": 2', metadata_content)
+                
+                md_args, _ = mock_write.call_args_list[1]
+                md_content = md_args[0]
+                self.assertIn("Root Map - Epoch 0", md_content)
+                self.assertIn("final project summary", md_content)
+                self.assertIn("100%", md_content) # Health bar
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,0 +1,7 @@
+{
+  "name": "platform-initializer",
+  "description": "Initializes the Harness environment by adapting Superpower tools for the specific LLM platform being used (Claude, Gemini, Copilot).",
+  "type": "management",
+  "version": "1.0",
+  "entrypoint": "config.yaml"
+}

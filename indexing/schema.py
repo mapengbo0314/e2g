@@ -31,9 +31,42 @@ if pydantic is None:  # pragma: no cover
 
     class _BaseModel:
         def __init__(self, **kwargs):
+            annotations = getattr(self.__class__, "__annotations__", {})
+            for key, value in kwargs.items():
+                ann_str = str(annotations.get(key, ""))
+
+                # Recursive instantiation for nested models
+                if isinstance(value, (dict, list)):
+                    matches = re.findall(r"\b([A-Z][a-zA-Z0-9_]*)\b", ann_str)
+                    for cls_name in matches:
+                        target_cls = globals().get(cls_name)
+                        if (
+                            target_cls
+                            and isinstance(target_cls, type)
+                            and issubclass(target_cls, _BaseModel)
+                        ):
+                            if isinstance(value, dict):
+                                value = target_cls(**value)
+                            elif isinstance(value, list):
+                                value = [
+                                    target_cls(**v) if isinstance(v, dict) else v
+                                    for v in value
+                                ]
+                            kwargs[key] = value
+                            break
+
+                # Strict string coercion
+                if re.search(r"\bstr\b", ann_str):
+                    if isinstance(value, list):
+                        kwargs[key] = [
+                            "" if v is None or v == "N/A" else v for v in value
+                        ]
+                    elif value is None or value == "N/A":
+                        kwargs[key] = ""
+
             # Initialize defaults
             for key in dir(self.__class__):
-                if not key.startswith('_'):
+                if not key.startswith("_"):
                     val = getattr(self.__class__, key)
                     if isinstance(val, _FieldInfo):
                         if val.default_factory is not None:
@@ -78,6 +111,24 @@ else:
     # Use real Pydantic if available.
     class _BaseModel(pydantic.BaseModel):
         model_config = {"protected_namespaces": ()}
+        
+        @pydantic.model_validator(mode="before")
+        @classmethod
+        def _coerce_strings(cls, data: Any) -> Any:
+            if not isinstance(data, dict):
+                return data
+            for field_name, field in cls.model_fields.items():
+                if field_name not in data:
+                    continue
+                val = data[field_name]
+                ann = str(field.annotation)
+                if "str" in ann:
+                    if isinstance(val, list):
+                        data[field_name] = ["" if v is None or v == "N/A" else v for v in val]
+                    elif val is None or val == "N/A":
+                        data[field_name] = ""
+            return data
+            
     _field = pydantic.Field
 
 

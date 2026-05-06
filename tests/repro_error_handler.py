@@ -1,9 +1,9 @@
 import unittest
-from indexing.sequential_llm_prompter import GeminiLlmPrompter, GeminiLlmPrompterConfig
+from indexing.sequential_llm_prompter import UniversalLlmPrompter, UniversalLlmConfig
 
 class TestErrorHandler(unittest.TestCase):
     def test_model_not_found_error(self):
-        prompter = GeminiLlmPrompter(GeminiLlmPrompterConfig(bundle_name="test", research_gemini_model="my-model"), None)
+        prompter = UniversalLlmPrompter(UniversalLlmConfig(bundle_name="test", research_gemini_model="my-model"), None)
         
         # Simulate a "model not found" error
         class MockError(Exception):

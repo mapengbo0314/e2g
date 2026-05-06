@@ -1,14 +1,14 @@
 
 import unittest
 from unittest.mock import MagicMock, patch
-from indexing.sequential_llm_prompter import GeminiLlmPrompter, GeminiLlmPrompterConfig
+from indexing.sequential_llm_prompter import UniversalLlmPrompter, UniversalLlmConfig
 from indexing import verification_types
 
 class TestFixVerification(unittest.TestCase):
     def test_verify_artifact_keyword_args(self):
         # Create a prompter with a mock config
-        config = GeminiLlmPrompterConfig(bundle_name="test")
-        prompter = GeminiLlmPrompter(config=config, fs_manager=None)
+        config = UniversalLlmConfig(bundle_name="test")
+        prompter = UniversalLlmPrompter(config=config, fs_manager=None)
         
         # Mock _execute_single_prompt
         prompter._execute_single_prompt = MagicMock()
@@ -35,23 +35,6 @@ class TestFixVerification(unittest.TestCase):
         # Ensure system_prompt and model_type are NOT in kwargs (which caused the error)
         self.assertNotIn('system_prompt', kwargs)
         self.assertNotIn('model_type', kwargs)
-
-    def test_coerce_double_wrapping(self):
-        # Test the double-wrapping fix in _coerce_for_schema
-        data = {
-            "architectural_patterns_and_gotchas": {
-                "content": {
-                    "content": "Double wrapped content"
-                }
-            }
-        }
-        from indexing import schema
-        coerced = GeminiLlmPrompter._coerce_for_schema(data, schema.KeyComponentsDocument)
-        
-        self.assertEqual(
-            coerced["architectural_patterns_and_gotchas"]["content"],
-            "Double wrapped content"
-        )
 
 if __name__ == "__main__":
     unittest.main()

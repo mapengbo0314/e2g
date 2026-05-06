@@ -214,17 +214,20 @@ class LlmPrompter(abc.ABC):
         source_code: str,
     ) -> schema.FileEnrichment:
         """Prompts the LLM to enrich a file skeleton. Implements chunking if symbols > 40."""
-        if len(skeleton.symbols) <= 40:
+        if len(skeleton.symbols) <= 40 and len(skeleton.invariants) <= 40:
             return self._execute_enrichment_chunk(file_path, skeleton, source_code)
         
+        import math
         # Symbol Chunking
         merged_enrichment = schema.FileEnrichment(symbols={}, invariants={})
-        num_chunks = (len(skeleton.symbols) + 39) // 40
-        inv_per_chunk = (len(skeleton.invariants) + num_chunks - 1) // num_chunks if num_chunks > 0 else 0
+        num_chunks = max(1, math.ceil((len(skeleton.symbols) + len(skeleton.invariants)) / 40.0))
+        sym_per_chunk = math.ceil(len(skeleton.symbols) / num_chunks)
+        inv_per_chunk = math.ceil(len(skeleton.invariants) / num_chunks)
         
-        for i in range(0, len(skeleton.symbols), 40):
-            chunk_idx = i // 40
-            chunk_symbols = skeleton.symbols[i:i+40]
+        for chunk_idx in range(num_chunks):
+            sym_start = chunk_idx * sym_per_chunk
+            sym_end = min(sym_start + sym_per_chunk, len(skeleton.symbols))
+            chunk_symbols = skeleton.symbols[sym_start:sym_end]
             
             inv_start = chunk_idx * inv_per_chunk
             inv_end = min(inv_start + inv_per_chunk, len(skeleton.invariants))
@@ -320,7 +323,7 @@ class LlmPrompter(abc.ABC):
 
 
 @dataclasses.dataclass
-class GeminiLlmPrompterConfig:
+class UniversalLlmConfig:
     """Configuration for the LLM prompter."""
 
     bundle_name: str
@@ -821,23 +824,17 @@ class DryRunConversation:
 
 
 
-class GeminiLlmPrompter(LlmPrompter):
+class UniversalLlmPrompter(LlmPrompter):
     """LLM prompter for Gemini with multi-stage agent support."""
-
-    # Maps schema field paths to their default values for coercion.
-    # Weaker LLMs (e.g. Ollama) may omit required fields; this table
-    # lets us patch them in before Pydantic validation to avoid wasting
-    # retry budget on trivially fixable errors.
-    _FIELD_DEFAULTS: dict[str, dict[str, Any]] = section_registry.field_defaults()
 
     def __init__(
         self,
-        config: GeminiLlmPrompterConfig,
+        config: UniversalLlmConfig,
         fs_manager: object | None,
         
         override_conversation_factory: Callable[[Any], Any] | None = None,
     ):
-        """Initializes the GeminiLlmPrompter."""
+        """Initializes the UniversalLlmPrompter."""
         self._config = config
         self._stats = _SimpleStatsRecorder()
         self._override_conversation_factory = override_conversation_factory
@@ -852,177 +849,6 @@ class GeminiLlmPrompter(LlmPrompter):
     def repo_root(self) -> str | None:
         """Returns the repository root path."""
         return self._repo_root
-
-    @staticmethod
-    def _coerce_for_schema(data: Any, output_schema: type[Any]) -> Any:
-        """Fill in missing/null required fields with defaults before Pydantic validation."""
-        if not isinstance(data, dict):
-            return data
-
-        # --- Phase -1: Detect and reject schema echoes ---
-        if "$defs" in data or "$schema" in data:
-            logging.warning("[Coercion] Detected JSON Schema echo instead of instance.")
-            data = {k: v for k, v in data.items() if not k.startswith("$")}
-
-        # --- VerificationVerdict Specific Coercion ---
-        if output_schema is verification_types.VerificationVerdict:
-            if "passed" in data and not isinstance(data["passed"], bool):
-                data["passed"] = str(data["passed"]).lower() == "true"
-            if "confidence" in data and not isinstance(data["confidence"], (int, float)):
-                try:
-                    data["confidence"] = float(data["confidence"])
-                except (ValueError, TypeError):
-                    data["confidence"] = 0.5
-            if "detailed_issues" in data and data["detailed_issues"] is None:
-                data["detailed_issues"] = []
-
-        # --- Phase 0: Unwrap 'properties' if the LLM hallucinated it from the schema ---
-        if "properties" in data and isinstance(data["properties"], dict):
-            expected_keys = set(GeminiLlmPrompter._LIST_FIELD_MAP.keys()) | set(GeminiLlmPrompter._CONTENT_FIELD_MAP.keys())
-            if len(data) == 1 or not any(k in data for k in expected_keys):
-                logging.info("[Coercion] Unwrapped 'properties' container from LLM response.")
-                data = data["properties"]
-
-        # --- Phase 0.1: Unwrap class-name wrappers ---
-        class_name = getattr(output_schema, "__name__", "")
-        if class_name:
-            snake_class_name = re.sub(r'(?<!^)(?=[A-Z])', '_', class_name).lower()
-            if snake_class_name in data and isinstance(data[snake_class_name], dict) and len(data) == 1:
-                logging.info("[Coercion] Unwrapping '%s' root key.", snake_class_name)
-                data = data[snake_class_name]
-            elif class_name in data and isinstance(data[class_name], dict) and len(data) == 1:
-                logging.info("[Coercion] Unwrapping '%s' root key.", class_name)
-                data = data[class_name]
-
-        # --- Phase 1: Recursively replace null → "" for all string-typed values ---
-        data = GeminiLlmPrompter._deep_replace_nulls(data)
-
-        # Determine which fields the schema actually expects and which are required.
-        schema_fields = set()
-        required_fields = set()
-        if hasattr(output_schema, "model_fields"):  # Pydantic v2
-            schema_fields = set(output_schema.model_fields.keys())
-            try:
-                from pydantic_core import PydanticUndefined
-                for name, field in output_schema.model_fields.items():
-                    if field.default is PydanticUndefined and field.default_factory is None:
-                        required_fields.add(name)
-            except ImportError:
-                pass
-        elif hasattr(output_schema, "__fields__"):  # Pydantic v1
-            schema_fields = set(output_schema.__fields__.keys())
-            for name, field in output_schema.__fields__.items():
-                if getattr(field, "required", False):
-                    required_fields.add(name)
-
-        # --- Phase 0.5: Remap Document-level Wrappers ---
-        expected_content_keys = [k for k in required_fields if k in GeminiLlmPrompter._CONTENT_FIELD_MAP]
-        if len(expected_content_keys) == 1:
-            req_key = expected_content_keys[0]
-            found_content_keys = [k for k in data if k in GeminiLlmPrompter._CONTENT_FIELD_MAP and k != req_key]
-            if req_key not in data and len(found_content_keys) == 1:
-                wrong_key = found_content_keys[0]
-                logging.info("[Coercion] Remapped '%s' to '%s' for document requiring %s.", wrong_key, req_key, req_key)
-                data[req_key] = data.pop(wrong_key)
-
-        # --- Phase 0.6: Wrap 'unwrapped' content ---
-        if len(expected_content_keys) == 1:
-            req_key = expected_content_keys[0]
-            content_key = GeminiLlmPrompter._CONTENT_FIELD_MAP[req_key]
-            if req_key not in data and content_key in data:
-                logging.info("[Coercion] Wrapped root '%s' into '%s'.", content_key, req_key)
-                data = {req_key: data}
-
-        # --- Phase 0.7: Coerce string-valued sections to dicts ---
-        for section_key, content_key in GeminiLlmPrompter._CONTENT_FIELD_MAP.items():
-            if section_key in data:
-                val = data[section_key]
-                if isinstance(val, str):
-                    logging.info("[Coercion] Coerced string value for '%s' to dict with '%s' key.", section_key, content_key)
-                    data[section_key] = {content_key: val}
-                elif isinstance(val, dict) and content_key in val:
-                    inner_val = val[content_key]
-                    if isinstance(inner_val, dict) and content_key in inner_val:
-                        logging.warning("[Coercion] Detected double-wrapped '%s' in '%s'. Flattening.", content_key, section_key)
-                        val[content_key] = inner_val[content_key]
-
-        # --- Phase 0.8: Inject missing mandatory content sections ---
-        for req_key in expected_content_keys:
-            if req_key not in data or data[req_key] is None:
-                content_key = GeminiLlmPrompter._CONTENT_FIELD_MAP.get(req_key, "content")
-                logging.warning("[Coercion] Injected missing required content section '%s'.", req_key)
-                data[req_key] = {content_key: ""}
-
-        # --- Phase 2: Patch known missing keys with field-specific defaults ---
-        mandatory_sections = section_registry.get_mandatory_sections()
-        
-        for wrapper_key, (list_key, model_name) in GeminiLlmPrompter._LIST_FIELD_MAP.items():
-            if wrapper_key not in schema_fields:
-                continue
-
-            is_mandatory = wrapper_key in mandatory_sections
-
-            if wrapper_key not in data or data[wrapper_key] is None:
-                data[wrapper_key] = {list_key: []}
-                level = logging.WARNING if is_mandatory else logging.INFO
-                logging.log(level, "[Coercion] Injected missing %s wrapper '%s'.", 
-                            "MANDATORY" if is_mandatory else "optional", wrapper_key)
-            
-            wrapper = data[wrapper_key]
-            if isinstance(wrapper, list):
-                logging.info("[Coercion] Wrapped naked list in '%s' to dict with '%s' key.", wrapper_key, list_key)
-                wrapper = {list_key: wrapper}
-                data[wrapper_key] = wrapper
-            elif not isinstance(wrapper, dict):
-                wrapper = {list_key: []}
-                data[wrapper_key] = wrapper
-                logging.info("[Coercion] Coerced malformed wrapper '%s' to dict.", wrapper_key)
-
-            items = wrapper.get(list_key)
-            if not isinstance(items, list):
-                items = wrapper[list_key] = []
-                logging.info("[Coercion] Initialized missing list '%s' in %s.", list_key, wrapper_key)
-            
-            defaults = GeminiLlmPrompter._FIELD_DEFAULTS.get(model_name, {})
-            for item in items:
-                if isinstance(item, dict):
-                    for field, default_val in defaults.items():
-                        if field not in item:
-                            item[field] = default_val
-                            logging.info(
-                                "[Coercion] Patched missing '%s' on %s (name=%s) with default=%r.",
-                                field, model_name, item.get("name", "<unknown>"), default_val,
-                            )
-
-        return data
-
-    _LIST_FIELD_MAP = section_registry.list_field_map()
-    _CONTENT_FIELD_MAP = section_registry.content_field_map()
-
-    _STRING_KEYS = {
-        "name", "description", "usage_description", "definition_link",
-        "comments", "content", "title", "model_name", "generated_at",
-        "verified_at", "summary", "signature", "file_path", "intent",
-        "primitive", "usage_context", "category", "impact", "id",
-        "framework", "entry_point"
-    }
-
-
-    @staticmethod
-    def _deep_replace_nulls(obj: Any) -> Any:
-        """Recursively replace null values (or 'N/A') with empty strings for string fields."""
-        if isinstance(obj, dict):
-            return {
-                k: "" if ((v is None or v == "N/A") and k in GeminiLlmPrompter._STRING_KEYS) else GeminiLlmPrompter._deep_replace_nulls(v)
-                for k, v in obj.items()
-            }
-        if isinstance(obj, list):
-            return [
-                "" if (item is None or item == "N/A") else GeminiLlmPrompter._deep_replace_nulls(item)
-                for item in obj
-            ]
-
-        return obj
     def _create_single_conversation(
         self,
         system_prompt: str,
@@ -1141,7 +967,7 @@ class GeminiLlmPrompter(LlmPrompter):
             jitter = random.uniform(0.4, 0.6 * base_delay)
             sleep_duration = base_delay + jitter
 
-        time.sleep(min(sleep_duration, 0.01))
+        time.sleep(max(sleep_duration, 0.01))
         if hasattr(error_prompt_generator_instance, "generate_error_prompt"):
             return error_prompt_generator_instance.generate_error_prompt(str(e))
         return error_prompt_generator.IndexerErrorPromptGenerator().generate_error_prompt(str(e))
@@ -1255,7 +1081,6 @@ class GeminiLlmPrompter(LlmPrompter):
                 
                 parsed_output = conversation.get_state(agent_name)
                 if isinstance(parsed_output, dict) and pydantic is not None:
-                    parsed_output = self._coerce_for_schema(parsed_output, output_schema)
                     if hasattr(output_schema, 'model_validate'):
                         return output_schema.model_validate(parsed_output)
                     return parsed_output
@@ -1489,6 +1314,57 @@ class GeminiLlmPrompter(LlmPrompter):
             full_context = getattr(system_prompt, "_directory_contents", "") + "\n\n" + self.last_research_context
             verdict = verifier.verify(artifact.model_dump_json(indent=2), full_context, directory_files=directory_files, ast_grounding=getattr(system_prompt, "_ast_grounding_cache", None))
             if not verdict.passed: logging.warning("Verification failed for %s: %s", directory_path, verdict.issues)
+
+        if directory_files:
+            import indexing.ast_extractor as ast_extractor
+            from indexing.ast_merger import ASTMerger
+            all_symbols = []
+            all_invariants = []
+            sk_symbols = []
+            sk_invariants = []
+            combined_source = ""
+            for filepath in directory_files:
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    combined_source += f"\n--- FILE: {filepath} ---\n{content}\n"
+                    symbols, invariants = ast_extractor.extract_ast_grounding(filepath, content)
+                    
+                    for s in symbols:
+                        s.id = ast_extractor.generate_deterministic_id(filepath, s.name, s.signature)
+                        sk_symbols.append(schema.SkeletonSymbol(
+                            id=s.id, name=s.name, is_private=s.is_private, signature=s.signature, line_number=s.line_number or 0
+                        ))
+                    
+                    inv_counts = {}
+                    for i in invariants:
+                        inv_counts[i.primitive] = inv_counts.get(i.primitive, 0) + 1
+                        count = inv_counts[i.primitive]
+                        i.id = ast_extractor.generate_deterministic_id(filepath, i.primitive, f"invariant-{count}")
+                        sk_invariants.append(schema.SkeletonInvariant(
+                            id=i.id, primitive=i.primitive, line_number=i.line_number or 0
+                        ))
+
+                    all_symbols.extend(symbols)
+                    all_invariants.extend(invariants)
+                except Exception as e:
+                    logging.warning(f"Failed to extract AST grounding for {filepath}: {e}")
+            
+            skeleton = schema.FileSkeleton(symbols=sk_symbols, invariants=sk_invariants)
+            try:
+                enrichment = self.prompt_for_enrichment(directory_path, skeleton, combined_source)
+                merged_symbols, merged_invariants = ASTMerger.merge(directory_path, skeleton, enrichment)
+            except Exception as e:
+                logging.warning(f"Enrichment failed for {directory_path}: {e}")
+                merged_symbols, merged_invariants = all_symbols, all_invariants
+
+            if artifact.blueprint is None:
+                artifact.blueprint = schema.Blueprint(symbols=[])
+            artifact.blueprint.symbols = merged_symbols
+            
+            if artifact.implementation_invariants is None:
+                artifact.implementation_invariants = schema.ImplementationInvariants(invariants=[])
+            artifact.implementation_invariants.invariants = merged_invariants
 
         final_cost = self._aggregate_cost_report(directory_path, system_prompt.epoch())
         artifact.generation_metadata.cost_report = final_cost

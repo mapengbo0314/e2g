@@ -11,7 +11,7 @@ from indexing import planner
 from indexing import state
 from indexing import work_unit
 from indexing.fs_manager import RealFsManager
-from harness.prompter import GeminiLlmPrompter
+from harness.prompter import UniversalLlmPrompter
 
 def run_reindex(index_dir: str):
     logging.basicConfig(level=logging.INFO)
@@ -22,9 +22,9 @@ def run_reindex(index_dir: str):
         storage_dir=index_dir, fs_manager=fs_manager
     )
     
-    # We use the GeminiLlmPrompter as the default for indexing
+    # We use the UniversalLlmPrompter as the default for indexing
     # This expects GOOGLE_API_KEY to be set.
-    prompter = GeminiLlmPrompter()
+    prompter = UniversalLlmPrompter()
     indexer = llm_indexer.LlmIndexer(llm_prompter=prompter, index_state=index_state)
     
     # The default planner walks the directory tree

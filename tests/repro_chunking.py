@@ -1,10 +1,10 @@
 import unittest
 from indexing.schema import FileSkeleton, SkeletonSymbol, SkeletonInvariant
-from indexing.sequential_llm_prompter import GeminiLlmPrompter, GeminiLlmPrompterConfig
+from indexing.sequential_llm_prompter import UniversalLlmPrompter, UniversalLlmConfig
 
 class TestChunking(unittest.TestCase):
     def test_invariant_chunking(self):
-        prompter = GeminiLlmPrompter(GeminiLlmPrompterConfig(bundle_name="test"), None)
+        prompter = UniversalLlmPrompter(UniversalLlmConfig(bundle_name="test"), None)
         
         # We need to mock _execute_enrichment_chunk to see what it receives
         received_chunks = []

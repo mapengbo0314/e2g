@@ -1,7 +1,0 @@
-bundle_name: "test_local"
-input {
-  directory: "indexing"
-}
-custom_output {
-  output_directory: "local_outputs/dry_run_test"
-}

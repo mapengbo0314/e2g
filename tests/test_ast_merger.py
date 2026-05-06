@@ -12,6 +12,6 @@ def test_ast_merger_success():
 def test_ast_merger_missing_id():
     skeleton = FileSkeleton(symbols=[SkeletonSymbol(id="h1", name="Foo", signature="class Foo", line_number=1)])
     enrichment = FileEnrichment(symbols={})
-    with pytest.raises(MissingEnrichmentError) as exc:
-        ASTMerger.merge("test.py", skeleton, enrichment)
-    assert "h1" in str(exc.value)
+    symbols, _ = ASTMerger.merge("test.py", skeleton, enrichment)
+    assert symbols[0].summary == ""
+    assert symbols[0].source_kind == "ast_fallback"

@@ -20,18 +20,27 @@ from indexing.schema import (
 )
 
 
+import sys
+
 def _extract_signature(node: ast.AST) -> str:
     """Extracts a simple signature string from an AST node."""
     if isinstance(node, ast.ClassDef):
-        bases = ", ".join([ast.unparse(b) for b in node.bases])
+        if sys.version_info >= (3, 9):
+            bases = ", ".join([ast.unparse(b) for b in node.bases])
+        else:
+            bases = ", ".join([getattr(b, 'id', getattr(b, 'name', 'unknown')) for b in node.bases])
         sig = f"class {node.name}"
         if bases:
             sig += f"({bases})"
         return sig
     elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
         # Use ast.unparse for clean signatures in Python 3.9+
-        args = ast.unparse(node.args)
-        returns = f" -> {ast.unparse(node.returns)}" if node.returns else ""
+        if sys.version_info >= (3, 9):
+            args = ast.unparse(node.args)
+            returns = f" -> {ast.unparse(node.returns)}" if node.returns else ""
+        else:
+            args = ", ".join([getattr(a, 'arg', 'unknown') for a in getattr(node.args, 'args', [])])
+            returns = ""
         prefix = "async def " if isinstance(node, ast.AsyncFunctionDef) else "def "
         return f"{prefix}{node.name}({args}){returns}"
     return "unknown"
