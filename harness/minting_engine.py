@@ -3,11 +3,9 @@ import shutil
 import json
 from pathlib import Path
 
-def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: str, platform_choice: str):
-    """Clones boilerplate, injects configs with MCP, and writes setup prerequisites."""
+def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: str, platform_choice: str, model_choice: str = None, bundle_override: str = None, boilerplate_dir: str = None):
+    """Copies boilerplate, injects styled configs, and writes setup prerequisites."""
     target_path = Path(target_dir)
-    # The source is boilerplate-agent in the current workspace
-    source_dir = Path("boilerplate-agent") 
     
     if target_path.exists():
         print(f"Warning: Target directory {target_dir} already exists. Minting may overwrite files.")
@@ -16,17 +14,51 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
         ignored = ['.git', '__pycache__', '.DS_Store']
         return [i for i in contents if i in ignored or i.endswith('.log')]
         
-    shutil.copytree(source_dir, target_path, ignore=ignore_patterns, dirs_exist_ok=True)
-    
+    if boilerplate_dir and os.path.exists(boilerplate_dir):
+        shutil.copytree(boilerplate_dir, target_path, ignore=ignore_patterns, dirs_exist_ok=True)
+    else:
+        print("Error: Boilerplate directory not found.")
+        return
+
+    # Remove internal discovery agents from the final workspace
+    discovery_path = target_path / "agents" / "discovery"
+    if discovery_path.exists():
+        shutil.rmtree(discovery_path)
+
+    # Handle existing bundle / wiki migration
+    existing_wiki = False
+    if bundle_override:
+        # Determine where the .indxr folder is located based on the bundle argument
+        if os.path.isdir(bundle_override) and os.path.basename(bundle_override) == ".indxr":
+            source_indxr = bundle_override
+        elif os.path.isdir(bundle_override):
+            source_indxr = os.path.join(bundle_override, ".indxr")
+        else:
+            source_indxr = os.path.join(os.path.dirname(bundle_override), ".indxr")
+            
+        target_indxr = os.path.join(project_path, ".indxr")
+        
+        if os.path.exists(source_indxr) and os.path.abspath(source_indxr) != os.path.abspath(target_indxr):
+            print(f"Migrating existing wiki database from {source_indxr} to {target_indxr}...")
+            if os.path.exists(target_indxr):
+                shutil.rmtree(target_indxr)
+            shutil.copytree(source_indxr, target_indxr)
+            
+        if os.path.exists(os.path.join(target_indxr, "wiki")):
+            existing_wiki = True
+            
     # Generate specialized setup_harness.sh (Prerequisites)
+    indxr_init_flag = ""
     if platform_choice == "1":
         platform_name = "Gemini CLI"
     elif platform_choice == "2":
         platform_name = "Claude Code"
+        indxr_init_flag = " --claude"
     elif platform_choice == "3":
         platform_name = "Copilot CLI"
     elif platform_choice == "4":
         platform_name = "Cursor"
+        indxr_init_flag = " --cursor"
     else:
         platform_name = "Generic / Custom"
 
@@ -73,16 +105,29 @@ echo "  /add-plugin superpowers"
 echo "Please refer to https://github.com/obra/superpowers to manually install skills for your AI platform."
 """
 
-    setup_content += """
+    setup_content += f"""
 # 2. Install indxr MCP Server
 echo "Installing indxr MCP Server..."
 if command -v cargo &> /dev/null; then
     cargo install indxr --features wiki,http || true
-    indxr init || true
+    indxr init{indxr_init_flag} || true
 else
     echo "Error: cargo required to install indxr. Visit https://rustup.rs/"
 fi
 """
+
+    if existing_wiki:
+        setup_content += """
+# 3. Existing Wiki Detected
+echo "Existing codebase wiki database detected. Skipping initial wiki generation."
+"""
+    else:
+        setup_content += f"""
+# 3. Generate initial Codebase Wiki
+echo "Generating initial codebase wiki (this may take a moment)..."
+(cd "{os.path.abspath(project_path)}" && indxr wiki generate{" --model " + model_choice if model_choice else ""}) || echo "Warning: Wiki generation failed. You may need to run it manually."
+"""
+
     with open(setup_script_path, "w") as f:
         f.write(setup_content)
     os.chmod(setup_script_path, 0o755)
@@ -93,22 +138,28 @@ fi
 
 1. **Context First**: Always use the `indxr` MCP server to query the codebase before proposing changes.
 2. **Strict Planning**: Never write production code without an approved plan in `workspace/artifacts/plan.md`.
-3. **Verified Index**: Check `metadata.json` for index freshness (< 7 days).
+3. **Superpower Workflows**: You MUST utilize installed Superpower skills (e.g., brainstorming, writing-plans, test-driven-development) during execution.
 """
     with open(target_path / rules_file, "w") as f:
         f.write(rules_content)
 
-    # Setup agents directory
-    agents_dir = target_path / "_agents"
-    agents_dir.mkdir(exist_ok=True, parents=True)
-    
     # Create an MCP config that points to the indxr server running in the project root
+    indxr_serve_args = ["serve", "--stdio", "--watch", "--wiki-auto-update"]
+    if model_choice:
+        indxr_serve_args.extend(["--wiki-model", model_choice])
+    
+    indxr_serve_cmd = " ".join(indxr_serve_args)
+
     mcp_config = {
         "mcpServers": {
             "indxr": {
-                "command": "indxr",
-                "args": ["serve", "--stdio", "--project", os.path.abspath(project_path)],
-                "env": {}
+                "command": "bash",
+                "args": ["-c", f"cd {os.path.abspath(project_path)} && indxr {indxr_serve_cmd}"],
+                "env": {
+                    "GEMINI_API_KEY": "$GEMINI_API_KEY",
+                    "ANTHROPIC_API_KEY": "$ANTHROPIC_API_KEY",
+                    "OPENAI_API_KEY": "$OPENAI_API_KEY"
+                }
             }
         }
     }
@@ -116,17 +167,57 @@ fi
     mcp_path = target_path / "mcp.json"
     with open(mcp_path, 'w') as f:
          json.dump(mcp_config, f, indent=2)
+         
+    # Generate Specialized Agents
+    specialized_dir = target_path / "agents" / "specialized"
+    specialized_dir.mkdir(exist_ok=True, parents=True)
     
     for agent in selected_agents:
-        agent_dir = agents_dir / "agents" / agent["name"].lower().replace(" ", "-")
+        safe_name = agent["name"].lower().replace(" ", "-")
+        agent_dir = specialized_dir / safe_name
         agent_dir.mkdir(exist_ok=True, parents=True)
         
+        # Inject agent.json
+        agent_manifest = {
+            "name": agent["name"],
+            "description": agent["role"],
+            "entrypoint": "config.yaml"
+        }
+        with open(agent_dir / "agent.json", 'w') as f:
+            json.dump(agent_manifest, f, indent=2)
+            
         # Inject config.yaml
+        config_yaml_content = f"""coding_agent: true
+agentic_mode: true
+prompt_section_customization:
+  add_prompt_sections:
+  - prompt_section:
+      title: Core Mandates
+      content: |
+        You are a specialized subagent operating within this repository's agent ecosystem.
+        You have been delegated a specific task by the Orchestrator.
+        1. Security & System Integrity: Protect secrets.
+        2. Context Efficiency: Be strategic in tool usage.
+        3. Superpower Workflows: You MUST utilize installed Superpower skills.
+    insert_before_sections: artifacts
+  - prompt_section:
+      title: Indexer MCP Integration
+      content: |
+        You have access to the codebase index via the `indxr` MCP server.
+        - Strategic Fetching: Use `find`, `summarize`, `get_file_summary` via MCP.
+    insert_after_sections: Core Mandates
+  - prompt_section:
+      title: 'Role: {agent["name"]}'
+      content: |
+        You are {agent["name"]}.
+        Zone: {agent["zone"]}
+        Responsibilities: {agent["role"]}
+        
+        SUPERPOWER MANDATE: You MUST invoke relevant superpower skills before finalizing work.
+    insert_after_sections: Indexer MCP Integration
+"""
         with open(agent_dir / "config.yaml", 'w') as f:
-            f.write(f"name: {agent['name']}\n")
-            f.write(f"role: {agent['role']}\n")
-            f.write(f"zone: {agent['zone']}\n")
-            f.write(f"mcp_servers:\n  - indxr\n")
+            f.write(config_yaml_content)
             
     print(f"Successfully minted workspace at {target_dir}")
     print("\nNext Steps:")
