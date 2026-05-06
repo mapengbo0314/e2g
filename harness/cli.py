@@ -2,23 +2,18 @@ import argparse
 import sys
 import getpass
 import os
-from harness.indexer_wrapper import check_indxr_installed
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Initialize a new Harness agent workspace.")
     parser.add_argument("command", choices=["init"], help="Command to run")
     parser.add_argument("--project-path", required=True, help="Path to the repository")
     parser.add_argument("--llm", required=True, choices=["gemini", "openai", "anthropic"], help="LLM provider")
+    parser.add_argument("--model", help="Optional specific model to use (e.g., gemini-2.5-flash, claude-3-5-sonnet-20241022)")
     parser.add_argument("--bundle", help="Optional path to an existing indxr JSON bundle")
     return parser.parse_args()
 
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] != "init":
-        print("Usage: harness init ...")
-        sys.exit(1)
-        
     args = parse_args()
-    check_indxr_installed()
     
     # Secure Credential Check
     api_key_env_var = f"{args.llm.upper()}_API_KEY"
@@ -28,22 +23,14 @@ def main():
         api_key = getpass.getpass(prompt=f"Enter your {args.llm} API Key: ")
         
     print("Pre-flight checks passed.")
-    from harness.indexer_wrapper import acquire_context
-    index_path = acquire_context(args.project_path, args.bundle)
-    print(f"Context acquired at: {index_path}")
+    
+    index_data = {}
     
     import json
     from harness.discovery_engine import discover_agents
     
-    try:
-        with open(index_path, 'r') as f:
-            index_data = json.load(f)
-    except Exception as e:
-        print(f"ERROR: Could not read index JSON at {index_path}: {e}")
-        sys.exit(1)
-        
     print(f"Discovering agents via {args.llm}...")
-    recommended_agents = discover_agents(index_data, args.llm, api_key)
+    recommended_agents = discover_agents(index_data, args.llm, api_key, args.model)
     print(f"Found {len(recommended_agents)} recommendations.")
 
     selected_agents = []
@@ -75,10 +62,10 @@ def main():
         platform_choice = "1"
         
     print(f"\nProceeding to mint {len(selected_agents)} agents for platform {platform_choice}...")
-    
+
     from harness.minting_engine import mint_workspace
     target_dir = os.path.join(args.project_path, ".agents")
-    mint_workspace(target_dir, selected_agents, args.project_path, platform_choice)
+    mint_workspace(target_dir, selected_agents, args.project_path, platform_choice, args.model, args.bundle)
 
 if __name__ == "__main__":
     main()
