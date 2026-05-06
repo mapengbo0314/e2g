@@ -2,14 +2,8 @@
 # proto-message: ProjectBundle
 
 # Self-index config for the e-2-g repo.
-# Scoped to only harness/ and indexing/ — everything else is excluded
 # by virtue of not being listed as an input directory.
 bundle_name: "e2g"
-
-input: {
-  directory: "harness/"
-  research_guidance: "Core agentic orchestration layer. Focus on the LangGraph topology in orchestrator.py, MCP server registration in mcp_server.py, and the prompter/tool integration."
-}
 
 input: {
   directory: "indexing/"

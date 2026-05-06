@@ -24,15 +24,45 @@ except ImportError:  # pragma: no cover
 
 if pydantic is None:  # pragma: no cover
     # Provide a minimal fallback for environments without Pydantic.
+    class _FieldInfo:
+        def __init__(self, default, default_factory):
+            self.default = default
+            self.default_factory = default_factory
+
     class _BaseModel:
         def __init__(self, **kwargs):
+            # Initialize defaults
+            for key in dir(self.__class__):
+                if not key.startswith('_'):
+                    val = getattr(self.__class__, key)
+                    if isinstance(val, _FieldInfo):
+                        if val.default_factory is not None:
+                            setattr(self, key, val.default_factory())
+                        else:
+                            setattr(self, key, val.default)
             # Initialize fields from keyword arguments.
             for key, value in kwargs.items():
                 setattr(self, key, value)
 
         def model_dump(self):
-            # Convert attributes to a dictionary.
-            return dict(self.__dict__)
+            # Convert attributes to a dictionary recursively.
+            result = {}
+            for key, value in self.__dict__.items():
+                if isinstance(value, _BaseModel):
+                    result[key] = value.model_dump()
+                elif isinstance(value, list):
+                    result[key] = [
+                        v.model_dump() if isinstance(v, _BaseModel) else v
+                        for v in value
+                    ]
+                elif isinstance(value, dict):
+                    result[key] = {
+                        k: (v.model_dump() if isinstance(v, _BaseModel) else v)
+                        for k, v in value.items()
+                    }
+                else:
+                    result[key] = value
+            return result
 
         def model_dump_json(self, indent: int | None = None):
             # Serialize model data to JSON.
@@ -40,9 +70,7 @@ if pydantic is None:  # pragma: no cover
 
     def _field(default=None, default_factory=None, description: str = ""):
         # Minimal Field stand-in.
-        if default_factory is not None:
-            return default_factory()
-        return default
+        return _FieldInfo(default, default_factory)
 
     # Define a custom validator decorator stand-in.
 
@@ -89,6 +117,9 @@ class ExportedSymbol(_BaseModel):
 
     id: str = _field(default="", description="The collision-proof hash ID.")
     name: str = _field(description="The name of the symbol.")
+    is_private: bool = _field(
+        default=False, description="Whether the symbol is private/internal."
+    )
     signature: str = _field(
         description="The exact structural signature (e.g., 'def run(p: str) -> int')."
     )
@@ -559,6 +590,7 @@ class VerificationState(_BaseModel):
 class SkeletonSymbol(_BaseModel):
     id: str = _field(description="Collision-proof hash ID")
     name: str = _field(description="Symbol name")
+    is_private: bool = _field(default=False, description="Whether the symbol is private/internal")
     signature: str = _field(description="Exact signature")
     line_number: int = _field(description="Starting line number")
 
@@ -581,6 +613,24 @@ class InvariantEnrichment(_BaseModel):
 class FileEnrichment(_BaseModel):
     symbols: Dict[str, SymbolEnrichment] = _field(default_factory=dict)
     invariants: Dict[str, InvariantEnrichment] = _field(default_factory=dict)
+
+    def merge(self, other: FileEnrichment, allowed_keys: Optional[set[str]] = None) -> None:
+        """Merges another enrichment into this one using Semantic-First-Win strategy."""
+        placeholders = {"", "[AST Discovered - LLM must enrich intent]", "[AST Discovered - LLM must enrich usage context]", "No summary provided", "TBD"}
+        
+        for key, value in other.symbols.items():
+            if allowed_keys is not None and key not in allowed_keys:
+                continue
+            existing = self.symbols.get(key)
+            if not existing or existing.summary.strip() in placeholders:
+                self.symbols[key] = value
+                
+        for key, value in other.invariants.items():
+            if allowed_keys is not None and key not in allowed_keys:
+                continue
+            existing = self.invariants.get(key)
+            if not existing or (existing.intent.strip() in placeholders and existing.usage_context.strip() in placeholders):
+                self.invariants[key] = value
 
 class IndexDocument(_BaseModel):
     """The top-level model for the LLM indexer output.

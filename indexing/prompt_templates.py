@@ -118,7 +118,7 @@ find the right place to start reading code.
 engineer understand the codebase. Ensure they know where to look for more detail
 in as few steps as possible.
 4. **Mechanical Grounding: NEW CRITICAL GOAL** Identify the underlying technical primitives that ensure reliability (e.g., locking, atomicity, concurrency models). This prevents agents from breaking mechanical contracts.
-5. **Blueprint Fidelity: NEW CRITICAL GOAL** Extract exact structural signatures (type hints, arguments) for public symbols. This enables "Zero-Discovery" implementation.
+5. **Blueprint Fidelity: NEW CRITICAL GOAL** Extract exact structural signatures (type hints, arguments) for public symbols. For class methods, use the `ClassName.methodName` naming convention to ensure uniqueness. This enables "Zero-Discovery" implementation.
 6. **Targeted Detail: Important Goal** Provide an appropriate level of detail
 for each directory and component. Tune the level of detail based on complexity
 and importance. Write very brief explanations of purpose for trivial files and
@@ -512,7 +512,7 @@ Read files results:
     - **Key Dependencies**: Internal vs External.
     - **Configuration and Flags**: System controls.
     - **Implementation Invariants (MANDATORY if code present)**: Mechanical primitives (locking, atomicity, concurrency, resource management) that define the system's reliability.
-    - **Blueprint (MANDATORY if code present)**: Exact structural signatures (e.g., `def foo(a: int) -> str`) for all public symbols.
+    - **Blueprint (MANDATORY if code present)**: Exact structural signatures (e.g., `def foo(a: int) -> str`) for all public symbols. **IMPORTANT: Use the format `ClassName.methodName` for all class methods (including `__init__`) to avoid name collisions in files with multiple classes.**
     - **Workflow Patterns**: Orchestration flows, LangGraph nodes/edges, or Temporal state machines.
  
  4. **BLUEPRINT FIDELITY MANDATE**: If the `extra_context` section contains "AST Deterministic Grounding", you MUST include every symbol listed there in your `blueprint` section. Copy signatures exactly. Do NOT omit them. This is the source of truth for coding agents.
@@ -581,6 +581,8 @@ Your task:
 4. Write the Deep Dive section for the directory. Focus on the core logic, motivations, and technical details.
 
 IMPORTANT: DO NOT repeat the information found in key components summary.
+IMPORTANT: format your output as a JSON object with a "deep_dive" field containing a "content" field.
+Example: {"deep_dive": {"content": "Your detailed explanation here."}}
 """)
         return textwrap.dedent("""\
 {codebase_context}
@@ -691,7 +693,7 @@ Your Role: You are **Verifier**, a specialized quality assurance agent. Your mis
 1. **Ground Truth Priority**: The source code's usage ALWAYS takes precedence over manifest files (package.json/requirements.txt).
 2. **Ghost Dependencies**: Look for dependencies mentioned in manifest files that are NOT actually used in the code. Flag these as `found_in_config`.
 3. **Implicit Dependencies**: Identify dependencies used in code (via imports or service calls) that are NOT declared in manifest files.
-4. **Blueprint Integrity**: Ensure that the `blueprint` signatures match the source code character-for-character (including type hints).
+4. **Blueprint Integrity**: Ensure that the `blueprint` signatures match the source code character-for-character (including type hints). Verify that class methods use the `ClassName.methodName` naming convention.
 5. **Shadow Tech Debt**: Identify naming slop, redundant aliases (multiple names for the same instance), and "Zombie APIs" (exported but never consumed). Document these in the `tech_debt` section.
 6. **Mechanical Fragility**: Flag any place where a critical primitive (like a lock) is used inconsistently (e.g., used in write but not in read).
 

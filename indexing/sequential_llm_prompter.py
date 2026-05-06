@@ -85,6 +85,36 @@ except ImportError:
 _QUOTA_ERROR_RETRY_JITTER_SECONDS = 30
 
 
+def strip_defaults_for_gemini(schema_dict: dict[str, Any]) -> dict[str, Any]:
+    """Recursively removes 'anyOf' and 'default' from JSON schemas for Gemini compatibility."""
+    if not isinstance(schema_dict, dict):
+        return schema_dict
+
+    cleaned = {}
+    for k, v in schema_dict.items():
+        if k in ("default", "title"):
+            continue
+        if k == "anyOf":
+            # Gemini doesn't support anyOf (e.g., from Optional fields).
+            # Pick the first type that is not 'null'.
+            non_null = [t for t in v if isinstance(t, dict) and t.get("type") != "null"]
+            if non_null:
+                cleaned.update(strip_defaults_for_gemini(non_null[0]))
+            continue
+
+        if isinstance(v, dict):
+            cleaned[k] = strip_defaults_for_gemini(v)
+        elif isinstance(v, list):
+            cleaned[k] = [strip_defaults_for_gemini(i) if isinstance(i, dict) else i for i in v]
+        else:
+            cleaned[k] = v
+
+    if "properties" in cleaned and "type" not in cleaned:
+        cleaned["type"] = "object"
+
+    return cleaned
+
+
 # Cleaned Observability for Antigravity
 class Observer:
     """Minimal interface for tracking metrics and retries."""
@@ -177,7 +207,104 @@ class LlmPrompter(abc.ABC):
     ) -> schema.IndexDocument:
         """Prompts the LLM to merge summaries."""
 
+    def prompt_for_enrichment(
+        self,
+        file_path: str,
+        skeleton: schema.FileSkeleton,
+        source_code: str,
+    ) -> schema.FileEnrichment:
+        """Prompts the LLM to enrich a file skeleton. Implements chunking if symbols > 40."""
+        if len(skeleton.symbols) <= 40:
+            return self._execute_enrichment_chunk(file_path, skeleton, source_code)
+        
+        # Symbol Chunking
+        merged_enrichment = schema.FileEnrichment(symbols={}, invariants={})
+        num_chunks = (len(skeleton.symbols) + 39) // 40
+        inv_per_chunk = (len(skeleton.invariants) + num_chunks - 1) // num_chunks if num_chunks > 0 else 0
+        
+        for i in range(0, len(skeleton.symbols), 40):
+            chunk_idx = i // 40
+            chunk_symbols = skeleton.symbols[i:i+40]
+            
+            inv_start = chunk_idx * inv_per_chunk
+            inv_end = min(inv_start + inv_per_chunk, len(skeleton.invariants))
+            chunk_invariants = skeleton.invariants[inv_start:inv_end]
+            
+            chunk_skeleton = schema.FileSkeleton(
+                symbols=chunk_symbols,
+                invariants=chunk_invariants
+            )
+            chunk_enrichment = self._execute_enrichment_chunk(file_path, chunk_skeleton, source_code)
+            
+            # Target-aware merging: only merge keys that were in the chunk
+            allowed_keys = {s.id for s in chunk_symbols} | {inv.id for inv in chunk_invariants}
+            merged_enrichment.merge(chunk_enrichment, allowed_keys=allowed_keys)
+            
+        return merged_enrichment
+
+    def _execute_enrichment_chunk(
+        self,
+        file_path: str,
+        skeleton: schema.FileSkeleton,
+        source_code: str,
+    ) -> schema.FileEnrichment:
+        system_prompt = (
+            f"You are a code enrichment agent. Given a file skeleton containing extracted symbols "
+            f"and invariants for '{file_path}', and the corresponding source code, provide a semantic "
+            f"summary for each symbol and intent/usage_context for each invariant."
+        )
+        
+        # Pydantic JSON schema string representation
+        if pydantic is not None and hasattr(schema.FileEnrichment, "model_json_schema"):
+            schema_str = json.dumps(schema.FileEnrichment.model_json_schema(), indent=2)
+            system_prompt += f"\n\nYour output MUST be a JSON object conforming to this schema:\n{schema_str}"
+        
+        skeleton_json = skeleton.model_dump_json(indent=2) if hasattr(skeleton, "model_dump_json") else json.dumps(skeleton, default=str)
+        user_prompt = f"File Skeleton:\n```json\n{skeleton_json}\n```\n\nSource Code:\n```\n{source_code}\n```"
+        
+        # We need an error prompt generator instance to pass along
+        try:
+            error_gen = error_prompt_generator.IndexerErrorPromptGenerator()
+        except NameError:
+            error_gen = None
+            
+        return self._execute_single_prompt(
+            directory_path=file_path,
+            initial_user_prompt=user_prompt,
+            agent_name="enrichment_agent",
+            error_prompt_generator_instance=error_gen,
+            conversation_factory=lambda: self._create_single_conversation(
+                system_prompt=system_prompt, agent_name="enrichment_agent",
+                output_schema_type=schema.FileEnrichment, model_type="synthesis"
+            ),
+            stringified_system_prompt=system_prompt,
+            output_schema=schema.FileEnrichment,
+        )
+
     @abc.abstractmethod
+    def _execute_single_prompt(
+        self,
+        directory_path: str,
+        initial_user_prompt: str,
+        agent_name: str,
+        error_prompt_generator_instance: Any,
+        conversation_factory: Callable[[], Any],
+        stringified_system_prompt: str,
+        output_schema: type[Any],
+    ) -> Any:
+        """Executes a single prompt with retries and error handling."""
+
+    @abc.abstractmethod
+    def _create_single_conversation(
+        self,
+        system_prompt: str,
+        agent_name: str,
+        output_schema_type: type[Any] | None = None,
+        model_type: str = "research",
+        epoch: int = 1,
+    ) -> Any:
+        """Creates a single conversation."""
+
     def prompt_for_root_map_summary(self, root_map_content: str) -> str:
         """Returns a summary of the root map content."""
 
@@ -312,10 +439,17 @@ class VertexAiConversation:
             project=project_id, 
             location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
         )
+        
+        config_kwargs = {}
+        if system_prompt:
+            config_kwargs["system_instruction"] = system_prompt
+        if output_schema_type is not None:
+            config_kwargs["response_mime_type"] = "application/json"
+            
         # Create chat session with system instruction in the config.
         self.chat = self.client.chats.create(
             model=model_name,
-            config={"system_instruction": system_prompt} if system_prompt else None,
+            config=config_kwargs if config_kwargs else None,
         )
         self.model_name = model_name
         self.output_schema_type = output_schema_type
@@ -362,10 +496,20 @@ class GoogleAiConversation:
             raise ImportError("google-genai library not found. Install google-genai.")
         
         self.client = genai.Client(api_key=api_key)
+        
+        config_kwargs = {}
+        if system_prompt:
+            config_kwargs["system_instruction"] = system_prompt
+        if output_schema_type is not None:
+            config_kwargs["response_mime_type"] = "application/json"
+            if pydantic is not None and hasattr(output_schema_type, "model_json_schema"):
+                raw_schema = output_schema_type.model_json_schema()
+                config_kwargs["response_schema"] = strip_defaults_for_gemini(raw_schema)
+            
         # Create chat session with system instruction in the config.
         self.chat = self.client.chats.create(
             model=model_name,
-            config={"system_instruction": system_prompt} if system_prompt else None,
+            config=config_kwargs if config_kwargs else None,
         )
         self.model_name = model_name
         self.output_schema_type = output_schema_type
@@ -858,7 +1002,8 @@ class GeminiLlmPrompter(LlmPrompter):
     _STRING_KEYS = {
         "name", "description", "usage_description", "definition_link",
         "comments", "content", "title", "model_name", "generated_at",
-        "verified_at"
+        "verified_at", "summary", "signature", "file_path", "intent",
+        "primitive", "usage_context", "category", "impact"
     }
 
     
@@ -986,7 +1131,7 @@ class GeminiLlmPrompter(LlmPrompter):
         error_str = str(e).lower()
         
         if "not_found" in error_str and "model" in error_str:
-            raise UnrecoverableLlmError(f"Model '{self._config.model_name}' not found. Stopping run.") from e
+            raise UnrecoverableLlmError(f"Model '{self._config.research_gemini_model}' not found. Stopping run.") from e
             
         if "quota" in error_str:
             self._stats.increment_counter("llm.runtime_quota_errors")

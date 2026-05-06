@@ -1,6 +1,9 @@
 # Build targets for the AI Codebase Indexing pipeline.
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 load("@pip//:requirements.bzl", "requirement")
+
+package(default_visibility = ["//visibility:public"])
+
 py_library(
     name = "chunker",
     srcs = ["chunker.py"],
@@ -131,6 +134,8 @@ py_library(
         requirement("openai"),
         requirement("anthropic"),
         requirement("ollama"),
+        requirement("instructor"),
+        requirement("jsonref"),
     ],
 )
 

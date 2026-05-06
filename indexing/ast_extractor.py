@@ -81,9 +81,7 @@ class PythonSymbolExtractor(ast.NodeVisitor):
         self._visit_function(node)
 
     def _visit_function(self, node: ast.AST):
-        # Skip private symbols, but keep dunder methods
-        if node.name.startswith('_') and not node.name.startswith('__'):
-            return
+        is_private = node.name.startswith('_') and not node.name.startswith('__')
 
         name = f"{self.current_class}.{node.name}" if self.current_class else node.name
         docstring = ast.get_docstring(node) or ""
@@ -97,7 +95,8 @@ class PythonSymbolExtractor(ast.NodeVisitor):
                 file_path=self.file_path,
                 line_number=node.lineno,
                 end_line_number=getattr(node, "end_lineno", node.lineno),
-                source_kind="ast"
+                source_kind="ast",
+                is_private=is_private
             )
         )
         self.generic_visit(node)
@@ -141,17 +140,134 @@ def extract_from_python(file_path: str, source_code: str) -> Tuple[List[Exported
 
 def extract_from_typescript_javascript(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
     """Attempts tree-sitter extraction for TS/JS, falling back to regex if unavailable."""
-    try:
-        # Attempt to use tree-sitter if available in the environment
-        import tree_sitter_languages
-        from tree_sitter import Parser
+    extractor = TreeSitterExtractor(file_path, source_code, 'typescript')
+    symbols, invariants = extractor.extract()
+    if not symbols and not invariants:
+        return _extract_ts_js_heuristic(file_path, source_code)
+    return symbols, invariants
+
+
+class TreeSitterExtractor:
+    """Tree-sitter based extraction for multiple languages."""
+    def __init__(self, file_path: str, source_code: str, language: str):
+        self.file_path = file_path
+        self.source_code = source_code.encode('utf-8')
+        self.language = language
+        self.symbols: List[ExportedSymbol] = []
+        self.invariants: List[ImplementationInvariant] = []
+
+    def extract(self) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
+        try:
+            import tree_sitter_languages
+            parser = tree_sitter_languages.get_parser(self.language)
+            tree = parser.parse(self.source_code)
+            self._walk(tree.root_node)
+        except Exception:
+            # Fallback to empty if tree-sitter fails
+            pass
+        return self.symbols, self.invariants
+
+    def _walk(self, node):
+        # Extract based on common node types across languages
+        # This is a simplified version that catches typical declarations
+        node_type = node.type
         
-        # Placeholder for actual tree-sitter logic. 
-        # For now, we still fall back to heuristic but the structure is ready.
-        # Real implementation would involve parser.set_language(...) and tree traversal.
-        return _extract_ts_js_heuristic(file_path, source_code)
-    except (ImportError, Exception):
-        return _extract_ts_js_heuristic(file_path, source_code)
+        name = None
+        is_symbol = False
+        kind = "ast"
+
+        # Language-specific mapping
+        if self.language in ('typescript', 'tsx', 'javascript'):
+            if node_type in ('function_declaration', 'class_declaration', 'method_definition'):
+                is_symbol = True
+                # Try to find 'name' or 'identifier' child
+                for child in node.children:
+                    if child.type in ('identifier', 'property_identifier'):
+                        name = self.source_code[child.start_byte:child.end_byte].decode('utf-8')
+                        break
+        elif self.language == 'go':
+            if node_type in ('function_declaration', 'method_declaration', 'type_declaration'):
+                is_symbol = True
+                for child in node.children:
+                    if child.type in ('identifier', 'type_identifier'):
+                        name = self.source_code[child.start_byte:child.end_byte].decode('utf-8')
+                        break
+        elif self.language in ('java', 'kotlin'):
+            if node_type in ('class_declaration', 'method_declaration', 'function_declaration'):
+                is_symbol = True
+                for child in node.children:
+                    if child.type == 'identifier':
+                        name = self.source_code[child.start_byte:child.end_byte].decode('utf-8')
+                        break
+
+        if is_symbol and name:
+            # Basic signature extraction
+            sig = self.source_code[node.start_byte:node.end_byte].decode('utf-8').split('{')[0].strip()
+            self.symbols.append(ExportedSymbol(
+                name=name,
+                signature=sig,
+                summary="",
+                file_path=self.file_path,
+                line_number=node.start_point[0] + 1,
+                end_line_number=node.end_point[0] + 1,
+                source_kind=kind
+            ))
+
+        for child in node.children:
+            self._walk(child)
+
+def _extract_java_heuristic(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
+    symbols: List[ExportedSymbol] = []
+    invariants: List[ImplementationInvariant] = []
+    pkg_match = re.search(r'^[ 	]*package\s+([a-zA-Z0-9_.]+)\s*;', source_code, re.MULTILINE)
+    pkg_prefix = f"{pkg_match.group(1)}." if pkg_match else ""
+    
+    class_pattern = re.compile(r'^[ 	]*(?:public\s+|protected\s+|private\s+)?(?:abstract\s+|final\s+)?class\s+([a-zA-Z0-9_]+)', re.MULTILINE)
+    for match in class_pattern.finditer(source_code):
+        name = match.group(1)
+        symbols.append(ExportedSymbol(
+            name=f"{pkg_prefix}{name}",
+            signature=f"class {name}",
+            summary="",
+            file_path=file_path,
+            line_number=source_code.count('\n', 0, match.start()) + 1,
+            source_kind="heuristic_ast"
+        ))
+    return symbols, invariants
+
+def _extract_kotlin_heuristic(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
+    symbols: List[ExportedSymbol] = []
+    invariants: List[ImplementationInvariant] = []
+    pkg_match = re.search(r'^[ 	]*package\s+([a-zA-Z0-9_.]+)', source_code, re.MULTILINE)
+    pkg_prefix = f"{pkg_match.group(1)}." if pkg_match else ""
+    
+    class_pattern = re.compile(r'^[ 	]*(?:public\s+|internal\s+|private\s+|protected\s+)?(?:open\s+|data\s+|sealed\s+)?(?:class|interface)\s+([a-zA-Z0-9_]+)', re.MULTILINE)
+    for match in class_pattern.finditer(source_code):
+        name = match.group(1)
+        symbols.append(ExportedSymbol(
+            name=f"{pkg_prefix}{name}",
+            signature=f"class {name}", # simplified
+            summary="",
+            file_path=file_path,
+            line_number=source_code.count('\n', 0, match.start()) + 1,
+            source_kind="heuristic_ast"
+        ))
+    return symbols, invariants
+
+def extract_from_java(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
+    extractor = TreeSitterExtractor(file_path, source_code, 'java')
+    symbols, invariants = extractor.extract()
+    if not symbols and not invariants:
+        return _extract_java_heuristic(file_path, source_code)
+    return symbols, invariants
+
+def extract_from_kotlin(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
+    extractor = TreeSitterExtractor(file_path, source_code, 'kotlin')
+    symbols, invariants = extractor.extract()
+    if not symbols and not invariants:
+        return _extract_kotlin_heuristic(file_path, source_code)
+    return symbols, invariants
+
 
 def _extract_ts_js_heuristic(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
     """Regex-based extraction for TS/JS as a fallback for full AST parsing."""
@@ -218,7 +334,11 @@ def _extract_ts_js_heuristic(file_path: str, source_code: str) -> Tuple[List[Exp
     return symbols, invariants
 
 def extract_from_go(file_path: str, source_code: str) -> Tuple[List[ExportedSymbol], List[ImplementationInvariant]]:
-    """Regex-based extraction for Go (marked as heuristic_ast)."""
+    """Tree-sitter or Regex-based extraction for Go."""
+    extractor = TreeSitterExtractor(file_path, source_code, 'go')
+    symbols, invariants = extractor.extract()
+    if symbols or invariants:
+        return symbols, invariants
     symbols: List[ExportedSymbol] = []
     invariants: List[ImplementationInvariant] = []
     
@@ -294,13 +414,17 @@ def extract_ast_grounding(file_path: str, source_code: str) -> Tuple[List[Export
         return extract_from_typescript_javascript(file_path, source_code)
     elif ext == '.go':
         return extract_from_go(file_path, source_code)
+    elif ext == '.java':
+        return extract_from_java(file_path, source_code)
+    elif ext == '.kt':
+        return extract_from_kotlin(file_path, source_code)
     
     # Fallback for unsupported languages: return empty lists. 
     return [], []
 
-def generate_deterministic_id(name: str, signature: str, line_number: int) -> str:
+def generate_deterministic_id(file_path: str, name: str, signature: str) -> str:
     """Generates a collision-proof ID using UTF-8 encoding."""
-    raw = f"{name}:{signature}:{line_number}"
+    raw = f"{file_path}:{name}:{signature}"
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:12]
 
 def extract_skeleton(file_path: str, source_code: str) -> FileSkeleton:
@@ -308,13 +432,16 @@ def extract_skeleton(file_path: str, source_code: str) -> FileSkeleton:
     
     sk_symbols = []
     for s in symbols:
-        sym_id = generate_deterministic_id(s.name, s.signature, s.line_number or 0)
-        sk_symbols.append(SkeletonSymbol(id=sym_id, name=s.name, signature=s.signature, line_number=s.line_number or 0))
+        sym_id = generate_deterministic_id(file_path, s.name, s.signature)
+        sk_symbols.append(SkeletonSymbol(id=sym_id, name=s.name, signature=s.signature, line_number=s.line_number or 0, is_private=s.is_private))
         s.id = sym_id  # Retrofit existing ExportedSymbol
         
     sk_invariants = []
+    inv_counts = {}
     for i in invariants:
-        inv_id = generate_deterministic_id(i.primitive, "invariant", i.line_number or 0)
+        inv_counts[i.primitive] = inv_counts.get(i.primitive, 0) + 1
+        count = inv_counts[i.primitive]
+        inv_id = generate_deterministic_id(file_path, i.primitive, f"invariant-{count}")
         sk_invariants.append(SkeletonInvariant(id=inv_id, primitive=i.primitive, line_number=i.line_number or 0))
         i.id = inv_id  # Retrofit existing ImplementationInvariant
         

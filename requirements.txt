@@ -1,5 +1,7 @@
-pydantic==2.5.3
+pydantic>=2.7.0
 google-genai>=1.0.0
+instructor
+jsonref
 pytest==8.0.0
 tenacity==8.2.3
 openai
@@ -8,3 +10,5 @@ ollama
 langgraph>=0.0.40,<1.0
 langgraph-checkpoint
 langgraph-checkpoint-sqlite
+tree-sitter==0.23.2
+tree-sitter-languages==1.10.2

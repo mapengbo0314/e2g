@@ -1,0 +1,7 @@
+{
+  "name": "feature-fetcher",
+  "description": "The Agent Factory: Dynamically generates specialized domain agents and attaches Superpower skills based on the Indexing profile.",
+  "type": "generator",
+  "version": "1.0",
+  "entrypoint": "config.yaml"
+}

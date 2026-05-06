@@ -37,6 +37,12 @@ class MockPrompter(sequential_llm_prompter.LlmPrompter):
     def prompt_for_root_map_summary(self, root_map_content):
         return "Mock Root Map Summary"
 
+    def _execute_single_prompt(self, directory_path, initial_user_prompt, agent_name, error_prompt_generator_instance, conversation_factory, stringified_system_prompt, output_schema):
+        pass
+
+    def _create_single_conversation(self, system_prompt, agent_name, output_schema_type=None, model_type="research", epoch=1):
+        pass
+
     def verify_artifact(self, artifact_json, source_context, directory_files=None, is_merger_mode=False):
         return self._execute_mock("verifier_agent", "verification_step", verification_types.VerificationVerdict)
 

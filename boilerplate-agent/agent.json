@@ -1,0 +1,7 @@
+{
+  "name": "orchestrator",
+  "description": "Senior Project Manager & Router that manages the Hub-and-Spoke model.",
+  "type": "router",
+  "version": "1.0",
+  "entrypoint": "config.yaml"
+}
