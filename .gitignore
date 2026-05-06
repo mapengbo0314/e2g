@@ -22,6 +22,12 @@ indexing/_generate_bundles.venv/
 
 # Bazel build artifacts
 bazel-*
+BUILD
+BUILD.bazel
+WORKSPACE
+WORKSPACE.bazel
+MODULE.bazel
+MODULE.bazel.lock
 
 # Design documentation
 designs/
