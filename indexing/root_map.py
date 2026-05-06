@@ -266,10 +266,17 @@ def regenerate_root_map(
     # Task 4: Metadata JSON
     total_tokens = 0
     total_files = 0
+    all_indexed_files = []
+    
     for work_unit in work_units:
         unit_id = str(getattr(work_unit, "output_path", getattr(work_unit, "unit_id", "")))
         files = getattr(work_unit, "files_to_index", [])
-        total_files += len(files) if files else 1 # fallback to 1 if not available
+        if files:
+            all_indexed_files.extend(files)
+            total_files += len(files)
+        else:
+            total_files += 1 # fallback to 1 if not available
+            
         try:
             artifact_json = index_state.read_artifact(unit_id, epoch)
             doc = schema.IndexDocument.model_validate_json(artifact_json)
@@ -283,6 +290,7 @@ def regenerate_root_map(
         "total_tokens": total_tokens,
         "total_files_indexed": total_files,
         "total_directories_indexed": len(work_units),
+        "indexed_files": all_indexed_files,
     }
     metadata_file = Path(output_dir) / "metadata.json"
     metadata_file.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
