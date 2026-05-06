@@ -35,3 +35,4 @@ requirements_lock.txt
 
 # Design documentation
 designs/
+depreicated_indexing/
