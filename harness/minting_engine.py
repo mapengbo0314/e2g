@@ -19,7 +19,17 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
     shutil.copytree(source_dir, target_path, ignore=ignore_patterns, dirs_exist_ok=True)
     
     # Generate specialized setup_harness.sh (Prerequisites)
-    platform_name = "Gemini CLI" if platform_choice == "1" else "Claude Code" if platform_choice == "2" else "Cursor"
+    if platform_choice == "1":
+        platform_name = "Gemini CLI"
+    elif platform_choice == "2":
+        platform_name = "Claude Code"
+    elif platform_choice == "3":
+        platform_name = "Copilot CLI"
+    elif platform_choice == "4":
+        platform_name = "Cursor"
+    else:
+        platform_name = "Generic / Custom"
+
     setup_script_path = target_path / "scripts" / "setup_harness.sh"
     setup_script_path.parent.mkdir(parents=True, exist_ok=True)
     
@@ -31,17 +41,41 @@ echo "=== Setting up Agentic Harness Prerequisites for {platform_name} ==="
 """
     if platform_choice == "1": # Gemini
         setup_content += """
+echo "Installing Superpowers for Gemini CLI..."
 if command -v gemini &> /dev/null; then
     gemini extensions install https://github.com/obra/superpowers || true
+else
+    echo "Warning: gemini command not found."
 fi
 """
     elif platform_choice == "2": # Claude
         setup_content += """
-echo "Ensure your Claude Code environment has the Superpowers skills loaded."
+echo "To install Superpowers for Claude Code, run this command inside the Claude Code interface:"
+echo "  /plugin install superpowers@claude-plugins-official"
+"""
+    elif platform_choice == "3": # Copilot
+        setup_content += """
+echo "Installing Superpowers for Copilot CLI..."
+if command -v copilot &> /dev/null; then
+    copilot plugin marketplace add obra/superpowers-marketplace || true
+    copilot plugin install superpowers@superpowers-marketplace || true
+else
+    echo "Warning: copilot command not found."
+fi
+"""
+    elif platform_choice == "4": # Cursor
+        setup_content += """
+echo "To install Superpowers for Cursor, run this command inside the Cursor Agent chat:"
+echo "  /add-plugin superpowers"
+"""
+    else: # Generic fallback
+        setup_content += """
+echo "Please refer to https://github.com/obra/superpowers to manually install skills for your AI platform."
 """
 
     setup_content += """
 # 2. Install indxr MCP Server
+echo "Installing indxr MCP Server..."
 if command -v cargo &> /dev/null; then
     cargo install indxr --features wiki,http || true
     indxr init || true

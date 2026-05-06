@@ -67,8 +67,10 @@ def main():
     print("\n=== Platform Selection ===")
     print("1. Gemini CLI")
     print("2. Claude Code")
-    print("3. Cursor / Custom")
-    platform_choice = input("Select target platform [1-3]: ").strip()
+    print("3. Copilot CLI")
+    print("4. Cursor")
+    print("5. Generic / Custom")
+    platform_choice = input("Select target platform [1-5]: ").strip()
     if not platform_choice:
         platform_choice = "1"
         
