@@ -2,6 +2,9 @@ import argparse
 import sys
 import getpass
 import os
+import tempfile
+import subprocess
+import shutil
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Initialize a new Harness agent workspace.")
@@ -15,7 +18,6 @@ def parse_args():
 def main():
     args = parse_args()
     
-    # Secure Credential Check
     api_key_env_var = f"{args.llm.upper()}_API_KEY"
     api_key = os.environ.get(api_key_env_var)
     if not api_key:
@@ -24,48 +26,51 @@ def main():
         
     print("Pre-flight checks passed.")
     
-    index_data = {}
+    print("Stage 1: Cloning boilerplate for discovery...")
+    repo_url = "https://github.com/mapengbo0314/e2g.git"
     
-    import json
-    from harness.discovery_engine import discover_agents
-    
-    print(f"Discovering agents via {args.llm}...")
-    recommended_agents = discover_agents(index_data, args.llm, api_key, args.model)
-    print(f"Found {len(recommended_agents)} recommendations.")
+    with tempfile.TemporaryDirectory() as temp_dir:
+        subprocess.run(["git", "clone", "--depth", "1", repo_url, temp_dir], check=True, capture_output=True)
+        boilerplate_dir = os.path.join(temp_dir, "boilerplate-agent")
+        
+        feature_fetcher_yaml = os.path.join(boilerplate_dir, "agents", "discovery", "feature-fetcher", "config.yaml")
+        
+        print("Stage 2: Dynamic Agent Discovery")
+        from harness.discovery_engine import discover_agents
+        
+        # We pass the project_path directly to discovery_engine which will start the MCP server
+        recommended_agents = discover_agents(args.project_path, feature_fetcher_yaml, args.llm, api_key, args.model)
+        
+        print(f"Found {len(recommended_agents)} recommendations.")
+        selected_agents = []
+        print("\n=== Recommended Agents ===")
+        for idx, agent in enumerate(recommended_agents):
+            print(f"[{idx}] {agent['name']} ({agent['zone']}): {agent['role']}")
+            choice = input(f"Include {agent['name']}? (Y/n): ").strip().lower()
+            if choice in ['', 'y', 'yes']:
+                selected_agents.append(agent)
+                
+        if not selected_agents:
+            print("No agents selected. Aborting.")
+            sys.exit(0)
 
-    selected_agents = []
-    print("\n=== Recommended Agents ===")
-    for idx, agent in enumerate(recommended_agents):
-        print(f"[{idx}] {agent['name']} ({agent['zone']}): {agent['role']}")
-        choice = input(f"Include {agent['name']}? (Y/n): ").strip().lower()
-        if choice in ['', 'y', 'yes']:
-            selected_agents.append(agent)
+        print("\n=== Platform Selection ===")
+        print("1. Gemini CLI")
+        print("2. Claude Code")
+        print("3. Copilot CLI")
+        print("4. Cursor")
+        print("5. Generic / Custom")
+        platform_choice = input("Select target platform [1-5]: ").strip()
+        if not platform_choice:
+            platform_choice = "1"
             
-    add_custom = input("\nAdd a custom agent? (y/N): ").strip().lower()
-    if add_custom in ['y', 'yes']:
-        name = input("Agent Name: ")
-        role = input("Role Description: ")
-        selected_agents.append({"name": name, "role": role, "zone": "Custom"})
+        print(f"\nStage 3: Proceeding to mint {len(selected_agents)} agents...")
         
-    if not selected_agents:
-        print("No agents selected. Aborting.")
-        sys.exit(0)
-
-    print("\n=== Platform Selection ===")
-    print("1. Gemini CLI")
-    print("2. Claude Code")
-    print("3. Copilot CLI")
-    print("4. Cursor")
-    print("5. Generic / Custom")
-    platform_choice = input("Select target platform [1-5]: ").strip()
-    if not platform_choice:
-        platform_choice = "1"
+        from harness.minting_engine import mint_workspace
+        target_dir = os.path.join(args.project_path, ".agents")
         
-    print(f"\nProceeding to mint {len(selected_agents)} agents for platform {platform_choice}...")
-
-    from harness.minting_engine import mint_workspace
-    target_dir = os.path.join(args.project_path, ".agents")
-    mint_workspace(target_dir, selected_agents, args.project_path, platform_choice, args.model, args.bundle)
+        # We pass the cloned boilerplate_dir so minting engine doesn't have to clone again
+        mint_workspace(target_dir, selected_agents, args.project_path, platform_choice, args.model, args.bundle, boilerplate_dir)
 
 if __name__ == "__main__":
     main()
