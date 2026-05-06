@@ -1003,26 +1003,26 @@ class GeminiLlmPrompter(LlmPrompter):
         "name", "description", "usage_description", "definition_link",
         "comments", "content", "title", "model_name", "generated_at",
         "verified_at", "summary", "signature", "file_path", "intent",
-        "primitive", "usage_context", "category", "impact"
+        "primitive", "usage_context", "category", "impact", "id",
+        "framework", "entry_point"
     }
 
-    
+
     @staticmethod
     def _deep_replace_nulls(obj: Any) -> Any:
-        """Recursively replace null values with empty strings for string fields."""
+        """Recursively replace null values (or 'N/A') with empty strings for string fields."""
         if isinstance(obj, dict):
             return {
-                k: "" if (v is None and k in GeminiLlmPrompter._STRING_KEYS) else GeminiLlmPrompter._deep_replace_nulls(v)
+                k: "" if ((v is None or v == "N/A") and k in GeminiLlmPrompter._STRING_KEYS) else GeminiLlmPrompter._deep_replace_nulls(v)
                 for k, v in obj.items()
             }
         if isinstance(obj, list):
             return [
-                "" if item is None else GeminiLlmPrompter._deep_replace_nulls(item)
+                "" if (item is None or item == "N/A") else GeminiLlmPrompter._deep_replace_nulls(item)
                 for item in obj
             ]
-        
-        return obj
 
+        return obj
     def _create_single_conversation(
         self,
         system_prompt: str,
