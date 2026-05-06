@@ -151,20 +151,26 @@ def test_e2e_recovery_from_transient_error(workspace):
         output_dir=str(out_dir),
     )
     
-    # Monkeypatch _SimpleConversation to simulate failures
-    original_prompt = sequential_llm_prompter._SimpleConversation.prompt
-    
     call_count = 0
-    def mock_prompt_with_failure(self, user_prompt):
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            logging.info("Simulating transient gRPC failure (Stream removed)")
-            raise Exception("Stream removed")
-        return original_prompt(self, user_prompt)
+    original_create = sequential_llm_prompter.UniversalLlmPrompter._create_single_conversation
+    
+    def mock_create_conversation(self, *args, **kwargs):
+        conv = original_create(self, *args, **kwargs)
+        original_prompt = conv.prompt
         
+        def mock_prompt(user_prompt):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                logging.info("Simulating transient gRPC failure (Stream removed)")
+                raise Exception("Stream removed")
+            return original_prompt(user_prompt)
+            
+        conv.prompt = mock_prompt
+        return conv
+
     with pytest.MonkeyPatch().context() as mp:
-        mp.setattr(sequential_llm_prompter._SimpleConversation, "prompt", mock_prompt_with_failure)
+        mp.setattr(sequential_llm_prompter.UniversalLlmPrompter, "_create_single_conversation", mock_create_conversation)
         
         generate_bundles.execute_indexing(bundle)
     

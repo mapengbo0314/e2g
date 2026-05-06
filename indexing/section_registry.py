@@ -445,18 +445,19 @@ def merge_sections(section_id: str, instances: list[Any]) -> Any:
                     key = getattr(item, "name", getattr(item, "primitive", None))
                 
                 if key not in seen_keys:
-                    all_items.append(item)
+                    all_items.append(item.model_dump() if hasattr(item, "model_dump") else item)
                     seen_keys.add(key)
         
         # Return a new instance of the payload model with the merged items.
-        return spec.payload_model(**{spec.list_field: all_items})
+        return spec.payload_model.model_validate({spec.list_field: all_items})
 
     if spec.merge_strategy == "accumulate" and spec.list_field:
         # Simple concatenation for sections where all evidence is additive (e.g. tech debt).
         all_items = []
         for inst in instances:
-            all_items.extend(getattr(inst, spec.list_field, []))
-        return spec.payload_model(**{spec.list_field: all_items})
+            for item in getattr(inst, spec.list_field, []):
+                all_items.append(item.model_dump() if hasattr(item, "model_dump") else item)
+        return spec.payload_model.model_validate({spec.list_field: all_items})
 
     # For 'llm_synthesized' or unknown strategies, we return the first one.
     # The caller (SummaryMerger) is responsible for coordinating LLM-based merges.

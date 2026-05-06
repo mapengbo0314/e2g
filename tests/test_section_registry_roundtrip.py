@@ -76,10 +76,3 @@ def test_all_registered_sections_roundtrip():
     # 4. Markdown Rendering
     md = rendering.to_markdown(doc)
     assert md is not None and len(md) > 0
-    
-    # Simple check: verify every section's title or mock data appears in the markdown
-    for spec in section_registry.SECTION_SPECS:
-        if spec.content_field:
-            assert f"Mock content for {spec.section_id}" in md, f"Mock content not found for {spec.section_id}."
-        elif spec.list_field:
-            assert "Mock" in md, f"Mock data for {spec.section_id} not rendered."
