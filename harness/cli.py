@@ -87,8 +87,7 @@ def main():
             print("No agents selected. Aborting.")
             sys.exit(0)
 
-        print("
-=== Platform Selection ===")
+        print("\n=== Platform Selection ===")
         print("1. Gemini CLI")
         print("2. Claude Code")
         print("3. Cursor")
@@ -97,8 +96,7 @@ def main():
         if not platform_choice:
             platform_choice = "1"
             
-        print(f"
-Stage 3: Proceeding to mint {len(selected_agents)} agents...")
+        print(f"\nStage 3: Proceeding to mint {len(selected_agents)} agents...")
         
         if platform_choice == "1":
             harness_folder = ".gemini"
