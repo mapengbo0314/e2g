@@ -154,7 +154,21 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
     except Exception as e:
         print(f"Warning: Could not load feature-fetcher prompt: {e}")
 
-    full_prompt = f"{system_prompt}\n\nPROJECT CONTEXT:\n{context_str}\n\nBased on the mandate above, output the required JSON."
+    print("Fetching remote skills for Agent Discovery...")
+    arch_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture.md")
+    grill_docs_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs.md")
+
+    full_prompt = (
+        f"{system_prompt}\n\n"
+        "You must utilize the principles from the following skills to guide your agent recommendations:\n\n"
+        "=== IMPROVE CODEBASE ARCHITECTURE ===\n"
+        f"{arch_skill}\n\n"
+        "=== GRILL WITH DOCS ===\n"
+        f"{grill_docs_skill}\n\n"
+        "PROJECT CONTEXT:\n"
+        f"{context_str}\n\n"
+        "Based on the mandate and skills above, output the required JSON."
+    )
     
     print(f"Querying {llm_provider} for specialized agents...")
     response_text = query_llm(full_prompt, llm_provider, api_key, model)

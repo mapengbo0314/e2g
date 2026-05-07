@@ -2,8 +2,10 @@ import pytest
 from unittest import mock
 from harness.discovery_engine import discover_agents, discover_ddd_context
 
+@mock.patch("harness.discovery_engine.fetch_remote_skill")
 @mock.patch("harness.discovery_engine.query_llm")
-def test_discover_agents(mock_query_llm):
+def test_discover_agents(mock_query_llm, mock_fetch_skill):
+    mock_fetch_skill.return_value = "Mocked skill"
     # Mock the LLM returning a valid JSON string
     mock_query_llm.return_value = '''
     {
@@ -17,6 +19,7 @@ def test_discover_agents(mock_query_llm):
     assert len(agents) == 1
     assert agents[0]["name"] == "AuthAgent"
     mock_query_llm.assert_called_once()
+    assert mock_fetch_skill.call_count == 2
 
 @mock.patch("harness.discovery_engine.fetch_remote_skill")
 @mock.patch("harness.discovery_engine.query_llm")
