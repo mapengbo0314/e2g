@@ -3,7 +3,7 @@
 <EXTREMELY-IMPORTANT>
 You are operating within the Superpowers Agentic Harness.
 You MUST adhere to the `using-superpowers` state machine.
-You MUST allocate agents utilizng `orchestrator.md` to help route agents for the superpower hanress.
+You MUST allocate agents utilizng `.agents/orchestrator.md` to help route agents for the superpower hanress.
 IF A SKILL APPLIES TO YOUR TASK, YOU MUST USE IT BEFORE ACTING.
 </EXTREMELY-IMPORTANT>
 
