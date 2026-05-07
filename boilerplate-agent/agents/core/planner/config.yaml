@@ -253,6 +253,14 @@ prompt_section_customization:
 
         '
     insert_after_sections: Tool Usage Constraints
+  - prompt_section:
+      title: 'DDD: Deep Modules'
+      content: 'ARCHITECTURE MANDATE:
+
+        You MUST use the `improve-codebase-architecture` skill to structure the generated
+        folders as "deep modules" with simple interfaces mapped directly to the extracted
+        domain concepts during the task breakdown phase.'
+    insert_after_sections: 'Role: Planner'
 customization_config:
   customization_discovery_config:
     skills:

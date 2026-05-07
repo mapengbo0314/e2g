@@ -3,5 +3,9 @@
   "description": "Specialized sub-agent that acts as an adversarial design partner to harden technical approaches and generate a design handoff.",
   "configPath": {
     "relativePathToConfig": "config.yaml"
-  }
+  },
+  "skills": [
+    "grill-me",
+    "grill-with-docs"
+  ]
 }

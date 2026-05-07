@@ -3,5 +3,8 @@
   "description": "The specialized tool for breaking down a design into a detailed, step-by-step plan before execution.",
   "configPath": {
     "relativePathToConfig": "config.yaml"
-  }
+  },
+  "skills": [
+    "improve-codebase-architecture"
+  ]
 }

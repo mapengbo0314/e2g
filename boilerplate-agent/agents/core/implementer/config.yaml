@@ -187,6 +187,15 @@ prompt_section_customization:
 
         '
     insert_after_sections: Tool Usage Constraints
+  - prompt_section:
+      title: 'DDD: Test From Outside'
+      content: 'IMPLEMENTATION MANDATE:
+
+        You MUST apply the "Test from outside" approach (using TDD skills). Force
+        yourself to design and verify the interface first through the test harness
+        targeting public interfaces of the domain modules before filling in the complex
+        implementation.'
+    insert_after_sections: 'Role: Implementer'
 customization_config:
   customization_discovery_config:
     skills:

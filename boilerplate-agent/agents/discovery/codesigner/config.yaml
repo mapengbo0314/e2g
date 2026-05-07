@@ -131,6 +131,15 @@ prompt_section_customization:
 
         '
     insert_after_sections: Codesigner Instructions
+  - prompt_section:
+      title: 'DDD: Domain Alignment'
+      content: 'DOMAIN ALIGNMENT MANDATE:
+
+        You MUST use the `grill-me` (or `grill-with-docs`) skill to stress-test the
+        extracted domain model and challenge the design against the specific goals
+        BEFORE any boilerplate or code is generated. Align understanding before code
+        is written.'
+    insert_after_sections: 'Role: Codesigner'
 customization_config:
   customization_discovery_config:
     skills:

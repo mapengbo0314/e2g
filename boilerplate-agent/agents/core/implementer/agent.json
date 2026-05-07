@@ -3,5 +3,8 @@
   "description": "The specialized tool for TDD execution and production code changes. Delegate to this sub-agent for implementation tasks.",
   "configPath": {
     "relativePathToConfig": "config.yaml"
-  }
+  },
+  "skills": [
+    "pocock-tdd"
+  ]
 }

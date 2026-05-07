@@ -234,6 +234,14 @@ prompt_section_customization:
 
         '
     insert_after_sections: Tool Usage Constraints
+  - prompt_section:
+      title: 'DDD: Domain Term Extraction'
+      content: 'DOMAIN EXTRACTION MANDATE:
+
+        You MUST use the `indxr` MCP server combined with the Ubiquitous Language
+        skill to automatically extract domain terms from existing code and docs to
+        generate the core dictionary. Prevent scattered understandings across components.'
+    insert_after_sections: 'Role: Architect'
 customization_config:
   customization_discovery_config:
     skills:
