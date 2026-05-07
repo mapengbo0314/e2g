@@ -91,32 +91,37 @@ echo "=== Setting up Agentic Harness Prerequisites for {platform_name} ==="
 """
     if platform_choice == "1": # Gemini
         setup_content += """
-echo "Installing Superpowers for Gemini CLI..."
+echo "Installing Superpowers and Skills for Gemini CLI..."
 if command -v gemini &> /dev/null; then
     gemini extensions install https://github.com/obra/superpowers || true
+    gemini extensions install https://github.com/mattpocock/skills || true
 else
     echo "Warning: gemini command not found."
 fi
 """
     elif platform_choice == "2": # Claude
         setup_content += """
-echo "To install Superpowers for Claude Code, run this command inside the Claude Code interface:"
+echo "To install Superpowers and Skills for Claude Code, run these commands inside the Claude Code interface:"
 echo "  /plugin install superpowers@claude-plugins-official"
+echo "  /plugin install skills@mattpocock"
 """
     elif platform_choice == "3": # Copilot
         setup_content += """
-echo "Installing Superpowers for Copilot CLI..."
+echo "Installing Superpowers and Skills for Copilot CLI..."
 if command -v copilot &> /dev/null; then
     copilot plugin marketplace add obra/superpowers-marketplace || true
     copilot plugin install superpowers@superpowers-marketplace || true
+    copilot plugin marketplace add mattpocock/skills-marketplace || true
+    copilot plugin install skills@skills-marketplace || true
 else
     echo "Warning: copilot command not found."
 fi
 """
     elif platform_choice == "4": # Cursor
         setup_content += """
-echo "To install Superpowers for Cursor, run this command inside the Cursor Agent chat:"
+echo "To install Superpowers and Skills for Cursor, run these commands inside the Cursor Agent chat:"
 echo "  /add-plugin superpowers"
+echo "  /add-plugin mattpocock/skills"
 """
     else: # Generic fallback
         setup_content += """
