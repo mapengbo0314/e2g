@@ -175,11 +175,10 @@ Please read `AGENTS.md` for core repository instructions and routing rules.
          json.dump(mcp_config, f, indent=2)
          
     # Cursor Multi-Platform Parity
-    if platform_choice == "4":
-        cursor_dir = project_root / ".cursor"
-        cursor_dir.mkdir(exist_ok=True)
-        with open(cursor_dir / "mcp.json", 'w') as f:
-            json.dump(mcp_config, f, indent=2)
+    cursor_dir = project_root / ".cursor"
+    cursor_dir.mkdir(exist_ok=True)
+    with open(cursor_dir / "mcp.json", 'w') as f:
+        json.dump(mcp_config, f, indent=2)
          
     # Generate Specialized Agents
     specialized_dir = target_path / "agents" / "specialized"
