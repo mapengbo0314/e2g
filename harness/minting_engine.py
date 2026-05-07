@@ -167,8 +167,43 @@ echo "Generating initial codebase wiki (this may take a moment)..."
 (cd "{os.path.abspath(project_path)}" && indxr wiki generate{" --model " + model_choice if model_choice else ""}) || echo "Warning: Wiki generation failed. You may need to run it manually."
 """
 
+    
+    # Append native skill pointer generation logic to the setup script
+    setup_content += """
+# 4. Generate Native Skill Pointers
+echo "Setting up native skill pointers..."
+
+# Source skills directory
+SKILLS_SRC="_agents/skills"
+
+if [ "$1" = "--claude" ] || [ -d ".claude" ]; then
+    echo "  Creating pointers for Claude Code..."
+    mkdir -p .claude/skills
+    for skill_file in "$SKILLS_SRC"/*.md; do
+        if [ -f "$skill_file" ]; then
+            skill_name=$(basename "$skill_file" .md)
+            echo "../../$skill_file" > ".claude/skills/$skill_name"
+        fi
+    done
+fi
+
+if [ "$1" = "--gemini" ] || [ -d ".gemini" ]; then
+    echo "  Creating pointers for Gemini CLI..."
+    mkdir -p .gemini/skills
+    for skill_file in "$SKILLS_SRC"/*.md; do
+        if [ -f "$skill_file" ]; then
+            skill_name=$(basename "$skill_file" .md)
+            # Gemini CLI reads full content, or we can use relative pointers if the platform supports it. 
+            # Assuming Gemini CLI supports Goose-style pointers:
+            echo "../../$skill_file" > ".gemini/skills/$skill_name"
+        fi
+    done
+fi
+"""
+
     with open(setup_script_path, "w") as f:
         f.write(setup_content)
+
     os.chmod(setup_script_path, 0o755)
     
     # Generate Platform Rules file (GEMINI.md, CLAUDE.md, etc.) IN THE ROOT DIRECTORY
