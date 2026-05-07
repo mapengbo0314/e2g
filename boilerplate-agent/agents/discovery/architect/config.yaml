@@ -144,8 +144,7 @@ prompt_section_customization:
       title: Architect Instructions
       content: '1. **Understand Goals:** Analyze the user''s request and constraints.
 
-        2. **Build First:** Always read the `BUILD` file of a directory first to understand
-        targets, dependencies, and visibility.
+        2. **Dependency Mapping:** Use `indxr` MCP tools (`get_dependency_graph`, `get_callers`, `explain_symbol`) as the primary source for understanding targets, dependencies, and visibility.
 
         3. **Semantic Discovery:** Use targeted code search with symbols, definitions,
         and how-to style queries before broad file reads.
@@ -182,7 +181,7 @@ prompt_section_customization:
 
         ## Checklist
 
-        - [ ] Read primary BUILD file
+        - [ ] Map dependency graph using `indxr`
 
         - [ ] Identify entry point
 
