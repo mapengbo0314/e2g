@@ -51,7 +51,7 @@ def main():
         subprocess.run(["git", "clone", "--depth", "1", repo_url, temp_dir], check=True, capture_output=True)
         boilerplate_dir = os.path.join(temp_dir, "boilerplate-agent")
         
-        feature_fetcher_yaml = os.path.join(boilerplate_dir, "agents", "discovery", "feature-fetcher", "config.yaml")
+        feature_fetcher_yaml = os.path.join(boilerplate_dir, "agents", "feature-fetcher.md")
         
         print("Stage 2: Dynamic Context Acquisition")
         from harness.discovery_engine import discover_agents, discover_ddd_context, acquire_mcp_context
