@@ -3,7 +3,7 @@ import shutil
 import json
 from pathlib import Path
 
-def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: str, platform_choice: str, model_choice: str = None, bundle_override: str = None, boilerplate_dir: str = None, ddd_context: dict = None):
+def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: str, model_choice: str = None, bundle_override: str = None, boilerplate_dir: str = None, ddd_context: dict = None):
     """Copies boilerplate, injects styled configs, and writes setup prerequisites."""
     target_path = Path(target_dir)
     
@@ -66,26 +66,12 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
             existing_wiki = True
             
     # Generate specialized setup_harness.sh (Prerequisites)
-    indxr_init_flag = ""
-    if platform_choice == "1":
-        platform_name = "Gemini CLI"
-    elif platform_choice == "2":
-        platform_name = "Claude Code"
-        indxr_init_flag = " --claude"
-    elif platform_choice == "3":
-        platform_name = "Copilot CLI"
-    elif platform_choice == "4":
-        platform_name = "Cursor"
-        indxr_init_flag = " --cursor"
-    else:
-        platform_name = "Generic / Custom"
-
     setup_script_path = target_path / "scripts" / "setup_harness.sh"
     setup_script_path.parent.mkdir(parents=True, exist_ok=True)
     
     setup_content = f"""#!/usr/bin/env bash
 set -e
-echo "=== Setting up Agentic Harness Prerequisites for {platform_name} ==="
+echo "=== Setting up Omni-Compatible Agentic Harness Prerequisites ==="
 
 # 1. Platform Specific Extension/Skill Installation
 """
