@@ -61,131 +61,68 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
             existing_wiki = True
             
     # Generate specialized setup_harness.sh (Prerequisites)
-    setup_script_path = target_path / "scripts" / "setup_harness.sh"
-    setup_script_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    setup_content = f"""#!/usr/bin/env bash
+        # Generate Segregated Setup Scripts
+    project_root = Path(project_path)
+    escaped_project_path = os.path.abspath(project_path).replace("'", "'\\''")
+    scripts_to_generate = {
+        ".gemini": """#!/usr/bin/env bash
 set -e
-echo "=== Setting up Omni-Compatible Agentic Harness Prerequisites ==="
-
-# 1. Platform Specific Extension/Skill Installation
-"""
-    if platform_choice == "1": # Gemini
-        setup_content += """
-echo "Installing Superpowers and Skills for Gemini CLI..."
+echo "=== Setting up Superpowers for Gemini CLI ==="
 if command -v gemini &> /dev/null; then
     gemini extensions install https://github.com/obra/superpowers || true
     gemini extensions install https://github.com/mattpocock/skills || true
 else
     echo "Warning: gemini command not found."
 fi
-"""
-    elif platform_choice == "2": # Claude
-        setup_content += """
+echo "Setting up native skill pointers..."
+mkdir -p .gemini/skills
+for skill_file in _agents/skills/*.md; do
+    if [ -f "$skill_file" ]; then
+        skill_name=$(basename "$skill_file" .md)
+        echo "../../$skill_file" > ".gemini/skills/$skill_name"
+    fi
+done
+""",
+        ".claude": f"""#!/usr/bin/env bash
+set -e
+echo "=== Setting up Superpowers for Claude Code ==="
 echo "To install Superpowers and Skills for Claude Code, run these commands inside the Claude Code interface:"
 echo "  /plugin install superpowers@claude-plugins-official"
 echo "  /plugin install skills@mattpocock"
-"""
-    elif platform_choice == "3": # Copilot
-        setup_content += """
-echo "Installing Superpowers and Skills for Copilot CLI..."
-if command -v copilot &> /dev/null; then
-    copilot plugin marketplace add obra/superpowers-marketplace || true
-    copilot plugin install superpowers@superpowers-marketplace || true
-    copilot plugin marketplace add mattpocock/skills-marketplace || true
-    copilot plugin install skills@skills-marketplace || true
-else
-    echo "Warning: copilot command not found."
+echo "Setting up native skill pointers..."
+mkdir -p .claude/skills
+for skill_file in _agents/skills/*.md; do
+    if [ -f "$skill_file" ]; then
+        skill_name=$(basename "$skill_file" .md)
+        echo "../../$skill_file" > ".claude/skills/$skill_name"
+    fi
+done
+# MCP Configuration for Claude
+if command -v claude &> /dev/null; then
+    echo "Adding indxr to Claude Code global MCP configuration..."
+    indxr_serve_args_str="serve --watch --wiki-auto-update"
+    claude mcp add indxr bash -c "cd '{escaped_project_path}' && indxr $indxr_serve_args_str" || true
 fi
-"""
-    elif platform_choice == "4": # Cursor
-        setup_content += """
+""",
+        ".cursor": """#!/usr/bin/env bash
+set -e
+echo "=== Setting up Superpowers for Cursor ==="
 echo "To install Superpowers and Skills for Cursor, run these commands inside the Cursor Agent chat:"
 echo "  /add-plugin superpowers"
 echo "  /add-plugin mattpocock/skills"
 """
-    else: # Generic fallback
-        setup_content += """
-echo "Please refer to https://github.com/obra/superpowers to manually install skills for your AI platform."
-"""
+    }
 
-    setup_content += f"""
-# 2. Configure indxr MCP Server
-echo "Configuring indxr MCP Server..."
-if command -v indxr &> /dev/null; then
-"""
-    if indxr_init_flag:
-        setup_content += f"""    indxr init{indxr_init_flag} || true"""
-    else:
-        setup_content += """    echo "indxr configured for Gemini CLI (skipping generic init)." """
+    for platform_dir, script_content in scripts_to_generate.items():
+        script_dir = project_root / platform_dir / "scripts"
+        script_dir.mkdir(parents=True, exist_ok=True)
+        script_path = script_dir / "setup_harness.sh"
+        with open(script_path, "w") as f:
+            f.write(script_content)
+        os.chmod(script_path, 0o755)
+        
+    print("\nTo install skills & MCPs, run the setup_harness.sh script inside your platform's hidden folder (e.g. `sh .gemini/scripts/setup_harness.sh`).")
 
-    if platform_choice == "2":
-        # Add Claude Code direct MCP configuration
-        indxr_serve_args_str = " ".join(["serve", "--watch", "--wiki-auto-update"] + (["--wiki-model", model_choice] if model_choice else []))
-        escaped_project_path = os.path.abspath(project_path).replace("'", "'\\''")
-        setup_content += f"""
-    if command -v claude &> /dev/null; then
-        echo "Adding indxr to Claude Code global MCP configuration..."
-        claude mcp add indxr bash -c "cd '{escaped_project_path}' && indxr {indxr_serve_args_str}" || true
-    fi
-"""
-
-    setup_content += """
-else
-    echo "Error: indxr is not installed. This should have been caught during init."
-fi
-"""
-
-    if existing_wiki:
-        setup_content += """
-# 3. Existing Wiki Detected
-echo "Existing codebase wiki database detected. Skipping initial wiki generation."
-"""
-    else:
-        setup_content += f"""
-# 3. Generate initial Codebase Wiki
-echo "Generating initial codebase wiki (this may take a moment)..."
-(cd "{os.path.abspath(project_path)}" && indxr wiki generate{" --model " + model_choice if model_choice else ""}) || echo "Warning: Wiki generation failed. You may need to run it manually."
-"""
-
-    
-    # Append native skill pointer generation logic to the setup script
-    setup_content += """
-# 4. Generate Native Skill Pointers
-echo "Setting up native skill pointers..."
-
-# Source skills directory
-SKILLS_SRC="_agents/skills"
-
-if [ "$1" = "--claude" ] || [ -d ".claude" ]; then
-    echo "  Creating pointers for Claude Code..."
-    mkdir -p .claude/skills
-    for skill_file in "$SKILLS_SRC"/*.md; do
-        if [ -f "$skill_file" ]; then
-            skill_name=$(basename "$skill_file" .md)
-            echo "../../$skill_file" > ".claude/skills/$skill_name"
-        fi
-    done
-fi
-
-if [ "$1" = "--gemini" ] || [ -d ".gemini" ]; then
-    echo "  Creating pointers for Gemini CLI..."
-    mkdir -p .gemini/skills
-    for skill_file in "$SKILLS_SRC"/*.md; do
-        if [ -f "$skill_file" ]; then
-            skill_name=$(basename "$skill_file" .md)
-            # Gemini CLI reads full content, or we can use relative pointers if the platform supports it. 
-            # Assuming Gemini CLI supports Goose-style pointers:
-            echo "../../$skill_file" > ".gemini/skills/$skill_name"
-        fi
-    done
-fi
-"""
-
-    with open(setup_script_path, "w") as f:
-        f.write(setup_content)
-
-    os.chmod(setup_script_path, 0o755)
     
     # Generate Platform Rules Pointers IN THE ROOT DIRECTORY
     project_root = Path(project_path)
