@@ -148,10 +148,7 @@ echo "  /add-plugin mattpocock/skills"
     
     for agent in selected_agents:
         safe_name = agent["name"].lower().replace(" ", "-")
-        agent_dir = specialized_dir / safe_name
-        agent_dir.mkdir(exist_ok=True, parents=True)
-        
-        agent_file_path = agent_dir / f"{safe_name}.md"
+        agent_file_path = target_path / "agents" / f"{safe_name}.md" 
         
         frontmatter = f"""---
 name: {agent["name"]}
