@@ -130,21 +130,46 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
     )
     
     print(f"Querying {llm_provider} for specialized agents...")
-    response_text = query_llm(full_prompt, llm_provider, api_key, model)
     
-    try:
-        cleaned = response_text.replace("```json", "").replace("```", "").strip()
-        # Find JSON boundaries if LLM included conversational text
-        start_idx = cleaned.find("{")
-        end_idx = cleaned.rfind("}") + 1
-        if start_idx != -1 and end_idx != 0:
-            cleaned = cleaned[start_idx:end_idx]
+    max_retries = 3
+    for attempt in range(max_retries):
+        response_text = query_llm(full_prompt, llm_provider, api_key, model)
+        
+        try:
+            cleaned = response_text.replace("```json", "").replace("```", "").strip()
+            # Find JSON boundaries if LLM included conversational text
+            start_idx = cleaned.find("{")
+            end_idx = cleaned.rfind("}") + 1
+            if start_idx != -1 and end_idx != 0:
+                cleaned = cleaned[start_idx:end_idx]
+                
+            data = json.loads(cleaned)
+            agents = data.get("agents", [])
             
-        data = json.loads(cleaned)
-        return data.get("agents", [])
-    except json.JSONDecodeError as e:
-        print(f"ERROR: Failed to parse LLM response as JSON: {e}\nResponse:\n{response_text}")
-        return [{"name": "Architect", "role": "General architecture and design", "zone": "Core"}]
+            # Strict Schema Validation
+            if not agents:
+                raise ValueError("LLM returned an empty agents list.")
+                
+            for agent in agents:
+                for required_key in ["name", "role", "zone", "system_prompt"]:
+                    if required_key not in agent or not str(agent[required_key]).strip():
+                        raise ValueError(f"LLM hallucinated schema: Missing or empty required key '{required_key}' in agent definition.")
+            
+            # If we get here, validation passed
+            return agents
+            
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"Attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt == max_retries - 1:
+                print("ERROR: Maximum retries reached. The LLM repeatedly failed to generate a valid JSON structure.")
+                print("Please try running the command again, or use a more capable model.")
+                import sys
+                sys.exit(1)
+            print("Retrying...")
+            time.sleep(2)
+            
+    # Fallback return (should be unreachable due to sys.exit above)
+    return []
 
 def discover_ddd_context(context_str: str, llm_provider: str, api_key: str, model: str = None) -> dict:
     """Extracts DDD context using remote skills."""
