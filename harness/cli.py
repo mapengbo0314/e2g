@@ -66,9 +66,16 @@ def main():
         selected_agents = []
         print("\n=== Recommended Agents ===")
         for idx, agent in enumerate(recommended_agents):
-            print(f"[{idx}] {agent['name']} ({agent['zone']}): {agent['role']}")
-            choice = input(f"Include {agent['name']}? (Y/n): ").strip().lower()
+            name = agent.get('name', 'UnknownAgent')
+            zone = agent.get('zone', 'Unspecified Zone')
+            role = agent.get('role', 'No role description provided.')
+            print(f"[{idx}] {name} ({zone}): {role}")
+            choice = input(f"Include {name}? (Y/n): ").strip().lower()
             if choice in ['', 'y', 'yes']:
+                # Ensure the dictionary has the expected keys even if the LLM missed them
+                agent['name'] = name
+                agent['zone'] = zone
+                agent['role'] = role
                 selected_agents.append(agent)
                 
         if not selected_agents:
