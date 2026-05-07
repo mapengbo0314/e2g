@@ -3,7 +3,7 @@ import shutil
 import json
 from pathlib import Path
 
-def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: str, platform_choice: str, model_choice: str = None, bundle_override: str = None, boilerplate_dir: str = None):
+def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: str, platform_choice: str, model_choice: str = None, bundle_override: str = None, boilerplate_dir: str = None, ddd_context: dict = None):
     """Copies boilerplate, injects styled configs, and writes setup prerequisites."""
     target_path = Path(target_dir)
     
@@ -19,6 +19,12 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
     else:
         print("Error: Boilerplate directory not found.")
         return
+
+    # Save DDD context if provided
+    if ddd_context:
+        print(f"Saving DDD context to {target_path / 'ddd_context.json'}")
+        with open(target_path / "ddd_context.json", "w") as f:
+            json.dump(ddd_context, f, indent=2)
 
     # Remove internal discovery agents from the final workspace
     discovery_path = target_path / "agents" / "discovery"
@@ -149,12 +155,14 @@ echo "Generating initial codebase wiki (this may take a moment)..."
         indxr_serve_args.extend(["--wiki-model", model_choice])
     
     indxr_serve_cmd = " ".join(indxr_serve_args)
+    # Securely quote the path for bash -c to prevent command injection
+    escaped_project_path = os.path.abspath(project_path).replace("'", "'\\''")
 
     mcp_config = {
         "mcpServers": {
             "indxr": {
                 "command": "bash",
-                "args": ["-c", f"cd {os.path.abspath(project_path)} && indxr {indxr_serve_cmd}"],
+                "args": ["-c", f"cd '{escaped_project_path}' && indxr {indxr_serve_cmd}"],
                 "env": {
                     "GEMINI_API_KEY": "$GEMINI_API_KEY",
                     "ANTHROPIC_API_KEY": "$ANTHROPIC_API_KEY",
