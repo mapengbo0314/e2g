@@ -74,14 +74,7 @@ if command -v gemini &> /dev/null; then
 else
     echo "Warning: gemini command not found."
 fi
-echo "Setting up native skill pointers..."
-mkdir -p .gemini/skills
-for skill_file in {target_path.name}/skills/*.md; do
-    if [ -f "$skill_file" ]; then
-        skill_name=$(basename "$skill_file" .md)
-        echo "../../$skill_file" > ".gemini/skills/$skill_name"
-    fi
-done
+
 """,
         ".claude": f"""#!/usr/bin/env bash
 set -e
@@ -89,14 +82,7 @@ echo "=== Setting up Superpowers for Claude Code ==="
 echo "To install Superpowers and Skills for Claude Code, run these commands inside the Claude Code interface:"
 echo "  /plugin install superpowers@claude-plugins-official"
 echo "  /plugin install skills@mattpocock"
-echo "Setting up native skill pointers..."
-mkdir -p .claude/skills
-for skill_file in {target_path.name}/skills/*.md; do
-    if [ -f "$skill_file" ]; then
-        skill_name=$(basename "$skill_file" .md)
-        echo "../../$skill_file" > ".claude/skills/$skill_name"
-    fi
-done
+
 # MCP Configuration for Claude
 if command -v claude &> /dev/null; then
     echo "Adding indxr to Claude Code global MCP configuration..."
@@ -122,6 +108,17 @@ echo "  /add-plugin mattpocock/skills"
         os.chmod(script_path, 0o755)
         
     print("\nTo install skills & MCPs, run the setup_harness.sh script inside your platform's hidden folder (e.g. `sh .gemini/scripts/setup_harness.sh`).")
+
+    # INSTANTLY GENERATE NATIVE SKILL POINTERS
+    skills_src_dir = target_path / "skills"
+    if skills_src_dir.exists():
+        for platform in [".gemini", ".claude", ".cursor"]:
+            platform_skills_dir = project_root / platform / "skills"
+            platform_skills_dir.mkdir(parents=True, exist_ok=True)
+            for skill_file in skills_src_dir.glob("*.md"):
+                pointer_path = platform_skills_dir / skill_file.stem
+                with open(pointer_path, "w") as f:
+                    f.write(f"../../{target_path.name}/skills/{skill_file.name}")
 
     
     # Generate Platform Rules Pointers IN THE ROOT DIRECTORY
