@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "harness-wf"
+version = "0.1.0"
+description = "Agentic Harness Lifecycle Initialization CLI"
+authors = [
+    {name = "mapengbo0314"}
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+harness-wf = "harness.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["harness*"]
