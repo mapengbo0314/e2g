@@ -238,9 +238,9 @@ prompt_section_customization:
       title: 'DDD: Domain Term Extraction'
       content: 'DOMAIN EXTRACTION MANDATE:
 
-        You MUST use the `indxr` MCP server combined with the Ubiquitous Language
-        skill to automatically extract domain terms from existing code and docs to
-        generate the core dictionary. Prevent scattered understandings across components.'
+        You MUST use the `indxr` MCP server combined with the `grill-with-docs` skill
+        to automatically extract domain terms from existing code and docs to generate
+        the core dictionary. Prevent scattered understandings across components.'
     insert_after_sections: 'Role: Architect'
 customization_config:
   customization_discovery_config:
