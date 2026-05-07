@@ -11,11 +11,14 @@ A unified `harness init` command is needed to provide a true one-click onboardin
 
 ## 2. Proposed Design
 
-The `harness init` architecture is cleanly separated into four distinct phases/engines that execute sequentially to ensure deterministic scaffolding and context preservation:
+The `harness init` architecture is cleanly separated into four distinct phases/engines that execute sequentially to ensure deterministic scaffolding and context preservation, while maximizing domain-aware specialization through a "Smarter Agents" feedback loop:
 
 1. **CLI Entry & Orchestrator (`cli.py`)**: Acts as the outer shell handling arguments (`--project-path`, `--llm`, `--ddd`), interactive prompts, environment validation, and final execution of the auto-generated setup script.
 2. **Context Engine (`discovery_engine.py::acquire_mcp_context`)**: A focused reader designed to avoid token bloat. Instead of traversing raw source code files recursively, it explicitly reads generated artifacts (`.indxr/wiki/index.md` and `.indxr/wiki/architecture.md`) to provide foundational knowledge to the LLM.
-3. **Discovery Engine (`discovery_engine.py`)**: The LLM interaction layer. It dispatches the summarized context to the configured LLM, dynamically recommends 3-5 specialized agents (with full 500-word System Prompts), and ensures robust DDD alignment. It utilizes strict JSON schema validation loops with a 3-retry minimum to guarantee valid outputs.
+3. **Discovery Engine (`discovery_engine.py`)**: The LLM interaction layer. It incorporates a domain-first feedback loop:
+    *   **DDD Onboarding & Grill**: The system extracts a drafted domain context and grills the user for alignment.
+    *   **Grounded Agent Discovery**: The resulting `final_ddd_context` (ubiquitous language) is passed *into* the discovery prompt. The LLM uses this validated knowledge to natively specialize the 3-5 recommended agents' identities and system prompts.
+    *   **Validation**: It utilizes strict JSON schema validation loops with a 3-retry minimum to guarantee valid outputs.
 4. **Minting Engine (`minting_engine.py`)**: The robust filesystem generator. It scaffolds the workspace by cloning boilerplates, downloading required remote skills (e.g., `grill-with-docs`, `grill-me`), generating the auto-healing MCP server configurations (`indxr serve --watch --wiki-auto-update`), dropping platform-specific rules directly into the workspace root, and instantiating the specialized agents.
 
 ## 3. Alternatives
@@ -23,7 +26,7 @@ The `harness init` architecture is cleanly separated into four distinct phases/e
 During the design phase, several alternatives were considered and rejected:
 
 *   **Recursive Source Code Scanning**: Rejected due to the risk of LLM context window explosions. Traversing the entire raw codebase tokenizes too much irrelevant data, leading to degraded LLM performance and higher costs. The chosen alternative is the Context Engine, which relies exclusively on high-level summarized knowledge from `.indxr/wiki` artifacts.
-*   **Static/Hardcoded Agent Roles**: Rejected because standardizing a generic set of agents (e.g., just "frontend" and "backend") fails to address the unique structural boundaries of diverse projects. The Discovery Engine's dynamic generation creates specialized roles that match the exact architecture and DDD boundaries of the targeted codebase.
+*   **Static/Hardcoded Agent Roles**: Rejected because standardizing a generic set of agents (e.g., just "frontend" and "backend") fails to address the unique structural boundaries of diverse projects. The Discovery Engine's dynamic generation, now grounded in the `final_ddd_context`, creates specialized roles that match the exact architecture and ubiquitous language of the targeted codebase.
 *   **Manual Dependency and MCP Configuration**: Rejected because relying on users to configure MCP server integration and download required Superpower skills manually defeats the "one-click onboarding" requirement and introduces points of failure. The Minting Engine automates this entirely, including auto-healing flags for `indxr`.
 
 ## 4. Implementation
@@ -38,8 +41,9 @@ The following files will be updated to fulfill the proposed design:
 
 *   **`harness/discovery_engine.py`**
     *   Implement `acquire_mcp_context` to explicitly restrict reading to `.indxr/wiki/index.md` and `.indxr/wiki/architecture.md`.
+    *   Implement `discover_ddd_context` to handle the interactive "DDD Alignment Grill" using Pocock skills when the `--ddd` flag is activated. This must execute *before* agent discovery to establish a shared domain model.
+    *   Update `discover_agents` to accept the `final_ddd_context` as input, allowing the LLM to natively ground the generated agent identities and system prompts in the validated ubiquitous language.
     *   Update `query_llm` and `discover_agents` to use strict JSON schema validation for LLM outputs, incorporating a loop with at least 3 retries for malformed JSON.
-    *   Implement `discover_ddd_context` to handle the interactive "DDD Alignment Grill" using Pocock skills when the `--ddd` flag is activated.
 
 *   **`harness/minting_engine.py`**
     *   Update `mint_workspace` to clone the core boilerplate into the target directory.

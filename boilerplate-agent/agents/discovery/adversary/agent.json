@@ -1,4 +1,13 @@
 {
   "name": "adversary",
-  "description": "An adversarial agent that is hyper-skeptical, factual, and strictly avoids hallucination or flattery."
+  "description": "An adversarial agent that is hyper-skeptical, factual, and strictly avoids hallucination or flattery.",
+  "skills": [
+    "grill-me",
+    "verification-before-completion"
+  ],
+  "related_agents": [
+    "verifier",
+    "reviewer",
+    "codesigner"
+  ]
 }

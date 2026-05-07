@@ -59,8 +59,20 @@ def main():
         # Acquire context once
         context_str = acquire_mcp_context(args.project_path)
         
+        final_ddd_context = None
+        if args.ddd:
+            print("\nStage 2.5: DDD Onboarding Context Extraction")
+            ddd_context_raw = discover_ddd_context(context_str, args.llm, api_key, args.model)
+            grill_answers = run_ddd_grill(ddd_context_raw)
+            
+            final_ddd_context = {
+                "ubiquitous_language": ddd_context_raw.get("context_draft", ""),
+                "translation_map": grill_answers,
+                "legacy_hints": ddd_context_raw.get("legacy_hints", {})
+            }
+
         print("Discovering specialized agents...")
-        recommended_agents = discover_agents(context_str, feature_fetcher_yaml, args.llm, api_key, args.model)
+        recommended_agents = discover_agents(context_str, feature_fetcher_yaml, args.llm, api_key, args.model, ddd_context=final_ddd_context)
         
         print(f"Found {len(recommended_agents)} recommendations.")
         selected_agents = []
@@ -74,18 +86,6 @@ def main():
         if not selected_agents:
             print("No agents selected. Aborting.")
             sys.exit(0)
-
-        final_ddd_context = None
-        if args.ddd:
-            print("\nStage 2.5: DDD Onboarding Context Extraction")
-            ddd_context = discover_ddd_context(context_str, args.llm, api_key, args.model)
-            grill_answers = run_ddd_grill(ddd_context)
-            
-            final_ddd_context = {
-                "ubiquitous_language": ddd_context.get("context_draft", ""),
-                "translation_map": grill_answers,
-                "legacy_hints": ddd_context.get("legacy_hints", {})
-            }
 
         print("\n=== Platform Selection ===")
         print("1. Gemini CLI")

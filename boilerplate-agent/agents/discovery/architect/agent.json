@@ -5,6 +5,13 @@
     "relativePathToConfig": "config.yaml"
   },
   "skills": [
+    "brainstorming",
+    "improve-codebase-architecture",
     "grill-with-docs"
+  ],
+  "related_agents": [
+    "planner",
+    "codesigner",
+    "feature-fetcher"
   ]
 }

@@ -5,6 +5,15 @@
     "relativePathToConfig": "config.yaml"
   },
   "skills": [
-    "pocock-tdd"
+    "pocock-tdd",
+    "systematic-debugging",
+    "python-testing-patterns"
+  ],
+  "related_agents": [
+    "planner",
+    "reviewer",
+    "verifier",
+    "linter-agent",
+    "refactorer"
   ]
 }

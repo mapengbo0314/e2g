@@ -1,0 +1,12 @@
+{
+  "name": "linter-agent",
+  "description": "Specialized in fixing lint, type errors, and formatting issues.",
+  "skills": [
+    "code-quality-reviewer",
+    "systematic-debugging"
+  ],
+  "related_agents": [
+    "implementer",
+    "reviewer"
+  ]
+}

@@ -5,6 +5,14 @@
     "relativePathToConfig": "config.yaml"
   },
   "skills": [
+    "writing-plans",
+    "brainstorming",
     "improve-codebase-architecture"
+  ],
+  "related_agents": [
+    "architect",
+    "implementer",
+    "codesigner",
+    "designdoc_drafter"
   ]
 }

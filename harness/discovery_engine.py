@@ -92,7 +92,7 @@ def query_llm(prompt: str, llm_provider: str, api_key: str, model: str = None) -
         
     raise ValueError(f"Unsupported LLM provider: {llm_provider}")
 
-def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provider: str, api_key: str, model: str = None) -> list[dict]:
+def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provider: str, api_key: str, model: str = None, ddd_context: dict = None) -> list[dict]:
     """Loads the system prompt and queries the LLM."""
     system_prompt = "You are the Feature Fetcher."
     try:
@@ -108,6 +108,17 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
     arch_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture/SKILL.md")
     grill_docs_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md")
 
+    ddd_prompt_section = ""
+    if ddd_context:
+        ddd_prompt_section = (
+            "=== DOMAIN-DRIVEN DESIGN (DDD) CONTEXT ===\n"
+            "The following domain knowledge and user alignment answers MUST be intrinsically woven into each agent's identity and responsibilities:\n"
+            f"Ubiquitous Language: {ddd_context.get('ubiquitous_language', 'None provided')}\n"
+            f"Translation Map (User Answers): {json.dumps(ddd_context.get('translation_map', {}))}\n"
+            f"Legacy Hints: {json.dumps(ddd_context.get('legacy_hints', {}))}\n\n"
+            "Ensure the agents' system prompts incorporate this domain-specific knowledge intrinsically. Do not just append it; use it to specialize their roles.\n\n"
+        )
+
     full_prompt = (
         f"{system_prompt}\n\n"
         "You must utilize the principles from the following skills to guide your agent recommendations:\n\n"
@@ -117,6 +128,7 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
         f"{grill_docs_skill}\n\n"
         "PROJECT CONTEXT:\n"
         f"{context_str}\n\n"
+        f"{ddd_prompt_section}"
         "TASK:\n"
         "Recommend 3-5 specialized agents. For EACH agent, you MUST provide:\n"
         "1. 'name': Concise name.\n"

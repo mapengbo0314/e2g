@@ -3,5 +3,15 @@
   "description": "Specialized sub-agent that documents technical designs and performs an impact audit.\n",
   "configPath": {
     "relativePathToConfig": "config.yaml"
-  }
+  },
+  "skills": [
+    "writing-plans",
+    "brainstorming",
+    "grill-with-docs"
+  ],
+  "related_agents": [
+    "codesigner",
+    "architect",
+    "planner"
+  ]
 }

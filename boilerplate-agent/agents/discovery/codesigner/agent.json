@@ -6,6 +6,12 @@
   },
   "skills": [
     "grill-me",
-    "grill-with-docs"
+    "grill-with-docs",
+    "brainstorming"
+  ],
+  "related_agents": [
+    "architect",
+    "designdoc_drafter",
+    "planner"
   ]
 }

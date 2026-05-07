@@ -1,0 +1,14 @@
+{
+  "name": "security-auditor",
+  "description": "Performs deep security audits and vulnerability scanning.",
+  "skills": [
+    "security-best-practices",
+    "systematic-debugging",
+    "verification-before-completion"
+  ],
+  "related_agents": [
+    "architect",
+    "adversary",
+    "verifier"
+  ]
+}

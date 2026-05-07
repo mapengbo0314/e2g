@@ -23,6 +23,33 @@ def test_discover_agents(mock_query_llm, mock_fetch_skill):
 
 @mock.patch("harness.discovery_engine.fetch_remote_skill")
 @mock.patch("harness.discovery_engine.query_llm")
+def test_discover_agents_with_ddd_context(mock_query_llm, mock_fetch_skill):
+    mock_fetch_skill.return_value = "Mocked skill"
+    mock_query_llm.return_value = '''
+    {
+      "agents": [
+        {"name": "DomainExpert", "role": "Knows DDD", "zone": "Domain"}
+      ]
+    }
+    '''
+    
+    ddd_ctx = {
+        "ubiquitous_language": "Foo means Bar",
+        "translation_map": {"Q": "A"},
+        "legacy_hints": {}
+    }
+    
+    agents = discover_agents("Mocked context", "/fake/feature-fetcher.yaml", "gemini", "fake-key", ddd_context=ddd_ctx)
+    assert len(agents) == 1
+    assert agents[0]["name"] == "DomainExpert"
+    
+    # Check if DDD context was injected in prompt
+    call_args = mock_query_llm.call_args[0][0]
+    assert "DOMAIN-DRIVEN DESIGN (DDD) CONTEXT" in call_args
+    assert "Foo means Bar" in call_args
+
+@mock.patch("harness.discovery_engine.fetch_remote_skill")
+@mock.patch("harness.discovery_engine.query_llm")
 def test_discover_ddd_context(mock_query_llm, mock_fetch_skill):
     mock_fetch_skill.return_value = "Mocked skill"
     
