@@ -1,6 +1,7 @@
 ---
 name: codesigner
-description: Specialized sub-agent that acts as an adversarial design partner to harden technical approaches and generate a design handoff.
+description: Specialized sub-agent that acts as an adversarial design partner to harden
+  technical approaches and generate a design handoff.
 ---
 # Core Mandates
 

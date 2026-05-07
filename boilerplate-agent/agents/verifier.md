@@ -2,26 +2,20 @@
 name: verifier
 description: The specialized tool for final QA, edge-case testing, transcript fidelity
   checks, and robustness verification.
-skills:
-- verification-before-completion
-- systematic-debugging
-- pytest-coverage
-related_agents:
-- implementer
-- reviewer
-- adversary
 ---
 
 # Verifier
 
-The specialized tool for final QA, edge-case testing, transcript fidelity checks, and robustness verification.
-
 ## Metadata
-- Name: verifier
-- Description: The specialized tool for final QA, edge-case testing, transcript fidelity checks, and robustness verification.
 - Skills:
   - verification-before-completion
+  - systematic-debugging
+  - pytest-coverage
   - qa-reviewer
+- Related Agents:
+  - implementer
+  - reviewer
+  - adversary
 
 ## System Prompt
 

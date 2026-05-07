@@ -2,28 +2,21 @@
 name: reviewer
 description: Senior Software Engineer for identifying issues and ensuring high standards
   in the codebase.
-skills:
-- requesting-code-review
-- receiving-code-review
-- improve-codebase-architecture
-related_agents:
-- implementer
-- verifier
-- refactorer
-- linter-agent
 ---
 
 # Reviewer
 
-Senior Software Engineer for identifying issues and ensuring high standards in the codebase.
-
 ## Metadata
-- Name: reviewer
-- Description: Senior Software Engineer for identifying issues and ensuring high standards in the codebase.
 - Skills:
   - requesting-code-review
   - receiving-code-review
+  - improve-codebase-architecture
   - code-review-excellence
+- Related Agents:
+  - implementer
+  - verifier
+  - refactorer
+  - linter-agent
 
 ## System Prompt
 

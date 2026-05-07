@@ -1,6 +1,9 @@
 ---
 name: architect
-description: The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies. Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation, or to answer questions about the codebase that require investigation.
+description: The specialized tool for codebase analysis, architectural mapping, and
+  understanding system-wide dependencies. Invoke this tool for tasks like vague requests,
+  bug root-cause analysis, system refactoring, comprehensive feature implementation,
+  or to answer questions about the codebase that require investigation.
 ---
 # Core Mandates
 

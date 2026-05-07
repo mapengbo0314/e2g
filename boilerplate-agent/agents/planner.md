@@ -2,28 +2,21 @@
 name: planner
 description: The specialized tool for breaking down a design into a detailed, step-by-step
   plan before execution.
-skills:
-- writing-plans
-- brainstorming
-- improve-codebase-architecture
-related_agents:
-- architect
-- implementer
-- codesigner
-- designdoc_drafter
 ---
 
 # Planner
 
-The specialized tool for breaking down a design into a detailed, step-by-step plan before execution.
-
 ## Metadata
-- Name: planner
-- Description: The specialized tool for breaking down a design into a detailed, step-by-step plan before execution.
 - Skills:
-  - improve-codebase-architecture
   - writing-plans
+  - brainstorming
+  - improve-codebase-architecture
   - project-planning
+- Related Agents:
+  - architect
+  - implementer
+  - codesigner
+  - designdoc_drafter
 
 ## System Prompt
 

@@ -1,6 +1,7 @@
 ---
 name: planner
-description: The specialized tool for breaking down a design into a detailed, step-by-step plan before execution.
+description: The specialized tool for breaking down a design into a detailed, step-by-step
+  plan before execution.
 ---
 # Core Mandates
 

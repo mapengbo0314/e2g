@@ -2,28 +2,20 @@
 name: codesigner
 description: Specialized sub-agent that acts as an adversarial design partner to harden
   technical approaches and generate a design handoff.
-skills:
-- grill-me
-- grill-with-docs
-- brainstorming
-related_agents:
-- architect
-- designdoc_drafter
-- planner
 ---
 
 # Codesigner
 
-Specialized sub-agent that acts as an adversarial design partner to harden technical approaches and generate a design handoff.
-
 ## Metadata
-- Name: codesigner
-- Description: Specialized sub-agent that acts as an adversarial design partner to harden technical approaches and generate a design handoff.
 - Skills:
   - grill-me
   - grill-with-docs
   - brainstorming
   - design-system-patterns
+- Related Agents:
+  - architect
+  - designdoc_drafter
+  - planner
 
 ## System Prompt
 

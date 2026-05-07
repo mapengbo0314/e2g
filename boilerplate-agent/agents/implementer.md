@@ -2,30 +2,23 @@
 name: implementer
 description: The specialized tool for TDD execution and production code changes. Delegate
   to this sub-agent for implementation tasks.
-skills:
-- pocock-tdd
-- systematic-debugging
-- python-testing-patterns
-related_agents:
-- planner
-- reviewer
-- verifier
-- linter-agent
-- refactorer
 ---
 
 # Implementer
 
-The specialized tool for TDD execution and production code changes.
-
 ## Metadata
-- Name: implementer
-- Description: The specialized tool for TDD execution and production code changes. Delegate to this sub-agent for implementation tasks.
 - Skills:
   - pocock-tdd
-  - test-driven-development
   - systematic-debugging
+  - python-testing-patterns
+  - test-driven-development
   - tdd-workflow
+- Related Agents:
+  - planner
+  - reviewer
+  - verifier
+  - linter-agent
+  - refactorer
 
 ## System Prompt
 

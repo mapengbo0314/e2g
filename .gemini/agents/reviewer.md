@@ -1,6 +1,7 @@
 ---
 name: reviewer
-description: Senior Software Engineer for identifying issues and ensuring high standards in the codebase.
+description: Senior Software Engineer for identifying issues and ensuring high standards
+  in the codebase.
 ---
 # Core Mandates
 

@@ -107,6 +107,16 @@ def main():
         else:
             harness_folder = ".agents"
 
+        # Cleanup other platforms
+        platforms = [".gemini", ".claude", ".cursor", ".agents"]
+        if harness_folder in platforms:
+            platforms.remove(harness_folder)
+        for p in platforms:
+            p_path = os.path.join(args.project_path, p)
+            if os.path.exists(p_path):
+                import shutil
+                shutil.rmtree(p_path)
+
         target_dir = os.path.join(args.project_path, harness_folder)
         
         from harness.minting_engine import mint_workspace

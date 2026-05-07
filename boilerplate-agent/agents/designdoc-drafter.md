@@ -1,27 +1,22 @@
 ---
-name: designdoc_drafter
+name: designdoc-drafter
 description: Specialized sub-agent that documents technical designs and performs an
   impact audit.
-skills:
-- writing-plans
-- brainstorming
-- grill-with-docs
-related_agents:
-- codesigner
-- architect
-- planner
 ---
 
 # Design Doc Drafter
 
-Specialized sub-agent that documents technical designs and performs an impact audit.
-
 ## Metadata
-- Name: designdoc_drafter
-- Description: Specialized sub-agent that documents technical designs and performs an impact audit.
 - Skills:
+  - writing-plans
+  - brainstorming
+  - grill-with-docs
   - adk_document_structurer
   - technical-writing
+- Related Agents:
+  - codesigner
+  - architect
+  - planner
 
 ## System Prompt
 

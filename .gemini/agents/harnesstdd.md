@@ -1,6 +1,7 @@
 ---
 name: harnesstdd
-description: "Workflow Enforcer. Orchestrates the 5-phase deterministic TDD lifecycle, requiring verifiable test evidence before allowing code changes to proceed."
+description: Workflow Enforcer. Orchestrates the 5-phase deterministic TDD lifecycle,
+  requiring verifiable test evidence before allowing code changes to proceed.
 ---
 
 # Role: Harness TDD Workflow Enforcer

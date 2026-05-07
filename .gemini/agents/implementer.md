@@ -1,6 +1,7 @@
 ---
 name: implementer
-description: The specialized tool for TDD execution and production code changes. Delegate to this sub-agent for implementation tasks.
+description: The specialized tool for TDD execution and production code changes. Delegate
+  to this sub-agent for implementation tasks.
 ---
 # Core Mandates
 

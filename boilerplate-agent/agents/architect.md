@@ -4,27 +4,21 @@ description: The specialized tool for codebase analysis, architectural mapping, 
   understanding system-wide dependencies. Invoke this tool for tasks like vague requests,
   bug root-cause analysis, system refactoring, comprehensive feature implementation,
   or to answer questions about the codebase that require investigation.
-skills:
-- brainstorming
-- improve-codebase-architecture
-- grill-with-docs
-related_agents:
-- planner
-- codesigner
-- feature-fetcher
 ---
 
 # Architect
 
-The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies.
-
 ## Metadata
-- Name: architect
-- Description: The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies. Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation, or to answer questions about the codebase that require investigation.
 - Skills:
+  - brainstorming
+  - improve-codebase-architecture
   - grill-with-docs
   - system-architecture
   - python-design-patterns
+- Related Agents:
+  - planner
+  - codesigner
+  - feature-fetcher
 
 ## System Prompt
 

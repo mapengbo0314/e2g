@@ -1,6 +1,7 @@
 ---
 name: verifier
-description: The specialized tool for final QA, edge-case testing, transcript fidelity checks, and robustness verification.
+description: The specialized tool for final QA, edge-case testing, transcript fidelity
+  checks, and robustness verification.
 ---
 # Core Mandates
 

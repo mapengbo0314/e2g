@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import json
 from pathlib import Path
@@ -147,11 +148,12 @@ echo "  /add-plugin mattpocock/skills"
     specialized_dir.mkdir(exist_ok=True, parents=True)
     
     for agent in selected_agents:
-        safe_name = agent["name"].lower().replace(" ", "-")
+        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1-\2', agent["name"])
+        safe_name = re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1).lower().replace(" ", "-")
         agent_file_path = target_path / "agents" / f"{safe_name}.md" 
         
         frontmatter = f"""---
-name: {agent["name"]}
+name: {safe_name}
 description: {agent["role"]}
 tools:
   - read_file
