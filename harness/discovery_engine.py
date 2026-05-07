@@ -5,84 +5,27 @@ import urllib.request
 import os
 
 def acquire_mcp_context(project_path: str) -> str:
-    """Spawns indxr serve and fetches the project summary via MCP."""
-    print(f"Starting indxr MCP server for dynamic analysis on {project_path}...")
+    """Acquires lightweight project context from the core wiki files to avoid token explosion."""
     
-    proc = subprocess.Popen(
-        ["indxr", "serve", project_path],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL, # Prevent deadlock from stderr buffer
-        text=True,
-        bufsize=1 # Line buffered
-    )
+    wiki_path = os.path.join(project_path, ".indxr", "wiki")
+    context_parts = []
     
-    try:
-        # 1. Initialize
-        init_req = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "harness-wf", "version": "1.0.0"}
-            }
-        }
-        proc.stdin.write(json.dumps(init_req) + "\n")
-        proc.stdin.flush()
+    if os.path.exists(wiki_path):
+        print(f"Found existing .indxr/wiki at {wiki_path}. Reading core architecture...")
         
-        # Read response loop with id matching
-        def read_response(expected_id):
-            while True:
-                line = proc.stdout.readline()
-                if not line:
-                    raise RuntimeError("MCP server died unexpectedly.")
-                line = line.strip()
-                if not line or not line.startswith("{"):
-                    continue
-                try:
-                    resp = json.loads(line)
-                    if resp.get("id") == expected_id:
-                        return resp
-                except json.JSONDecodeError:
-                    continue
+        # Read ONLY the index and architecture to avoid token explosion
+        for core_file in ["index.md", "architecture.md"]:
+            p = os.path.join(wiki_path, core_file)
+            if os.path.exists(p):
+                with open(p, 'r') as f:
+                    context_parts.append(f"=== {core_file.upper()} ===\n" + f.read())
+                    
+        if context_parts:
+            return "\n\n".join(context_parts)
 
-        read_response(1) # Wait for init response
-                
-        # Send initialized notification
-        proc.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
-        proc.stdin.flush()
-        
-        # 2. Call summarize tool
-        call_req = {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {
-                "name": "summarize",
-                "arguments": {"path": "."}
-            }
-        }
-        proc.stdin.write(json.dumps(call_req) + "\n")
-        proc.stdin.flush()
-        
-        # Read call response
-        resp = read_response(2)
-        if "error" in resp:
-            raise RuntimeError(f"MCP summarize failed: {resp['error']}")
-        if "result" in resp and "content" in resp["result"]:
-            return resp["result"]["content"][0]["text"]
-                
-        return "No context available."
-        
-    finally:
-        if proc.poll() is None:
-            proc.terminate()
-            try:
-                proc.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+    # Fallback if wiki doesn't exist
+    print(f"No usable .indxr/wiki found at {wiki_path}. Please ensure `indxr wiki generate` has been run.")
+    return "No codebase wiki found. Architecture unknown."
 
 def fetch_remote_skill(skill_url: str) -> str:
     """Fetches a skill definition from a raw GitHub URL."""
@@ -167,7 +110,16 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
         f"{grill_docs_skill}\n\n"
         "PROJECT CONTEXT:\n"
         f"{context_str}\n\n"
-        "Based on the mandate and skills above, output the required JSON."
+        "TASK:\n"
+        "Recommend 3-5 specialized agents. For EACH agent, you MUST provide:\n"
+        "1. 'name': Concise name.\n"
+        "2. 'role': Brief responsibility summary.\n"
+        "3. 'zone': (Domain/Data/Handler/Core).\n"
+        "4. 'system_prompt': A comprehensive, 300-500 word Markdown system prompt. This prompt MUST:\n"
+        "   - Define their specific expertise relative to the project files.\n"
+        "   - Enforce the use of 'indxr' MCP tools and local skills.\n"
+        "   - Define their 'Goldfish' phase responsibilities.\n\n"
+        "Return as JSON: {'agents': [{'name': '...', 'role': '...', 'zone': '...', 'system_prompt': '...'}]}"
     )
     
     print(f"Querying {llm_provider} for specialized agents...")
@@ -207,6 +159,22 @@ def discover_ddd_context(context_str: str, llm_provider: str, api_key: str, mode
         "- 'context_draft': A string containing the drafted domain context.\n"
         "- 'questions': A list of strings representing alignment questions.\n"
         "- 'legacy_hints': A dictionary containing hints about legacy components.\n\n"
+        f"PROJECT CONTEXT:\n{context_str}"
+    )
+    
+    response_text = query_llm(prompt, llm_provider, api_key, model)
+    
+    try:
+        cleaned = response_text.replace("```json", "").replace("```", "").strip()
+        start_idx = cleaned.find("{")
+        end_idx = cleaned.rfind("}") + 1
+        if start_idx != -1 and end_idx != 0:
+            cleaned = cleaned[start_idx:end_idx]
+        return json.loads(cleaned)
+    except json.JSONDecodeError as e:
+        print(f"ERROR: Failed to parse DDD LLM response as JSON: {e}")
+        return {"context_draft": "", "questions": [], "legacy_hints": {}}
+ntaining hints about legacy components.\n\n"
         f"PROJECT CONTEXT:\n{context_str}"
     )
     

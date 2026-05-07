@@ -206,6 +206,30 @@ echo "Generating initial codebase wiki (this may take a moment)..."
     with open(mcp_path, 'w') as f:
          json.dump(mcp_config, f, indent=2)
          
+    import urllib.request
+    
+    # 4. Download External Skills directly into the workspace
+    print("Downloading requested skills...")
+    skills_to_download = {
+        "grill-with-docs": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs.md",
+        "improve-codebase-architecture": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture.md",
+        "grill-me": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/productivity/grill-me/SKILL.md"
+    }
+    
+    skills_dir = target_path / "_agents" / "skills"
+    skills_dir.mkdir(exist_ok=True, parents=True)
+    
+    for skill_name, url in skills_to_download.items():
+        skill_path = skills_dir / f"{skill_name}.md"
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                with open(skill_path, 'wb') as f:
+                    f.write(response.read())
+            print(f"  - Downloaded {skill_name}")
+        except Exception as e:
+            print(f"  - Warning: Failed to download {skill_name}: {e}")
+
     # Generate Specialized Agents
     specialized_dir = target_path / "agents" / "specialized"
     specialized_dir.mkdir(exist_ok=True, parents=True)
@@ -215,7 +239,12 @@ echo "Generating initial codebase wiki (this may take a moment)..."
         agent_dir = specialized_dir / safe_name
         agent_dir.mkdir(exist_ok=True, parents=True)
         
-        # Inject agent.json
+        # 1. Write the full SYSTEM_PROMPT.md
+        system_prompt_path = agent_dir / "system_prompt.md"
+        with open(system_prompt_path, 'w') as f:
+            f.write(agent.get("system_prompt", f"# {agent['name']}\n\n{agent['role']}"))
+
+        # 2. Inject agent.json
         agent_manifest = {
             "name": agent["name"],
             "description": agent["role"],
@@ -224,7 +253,7 @@ echo "Generating initial codebase wiki (this may take a moment)..."
         with open(agent_dir / "agent.json", 'w') as f:
             json.dump(agent_manifest, f, indent=2)
             
-        # Inject config.yaml
+        # 3. Inject config.yaml (referencing the system_prompt.md)
         ddd_section = ""
         if ddd_context:
             ddd_section = f"""  - prompt_section:
@@ -240,6 +269,8 @@ echo "Generating initial codebase wiki (this may take a moment)..."
 
         config_yaml_content = f"""coding_agent: true
 agentic_mode: true
+# Load the full brain from the generated markdown file
+system_prompt_file: system_prompt.md
 prompt_section_customization:
   add_prompt_sections:
   - prompt_section:
@@ -249,7 +280,7 @@ prompt_section_customization:
         You have been delegated a specific task by the Orchestrator.
         1. Security & System Integrity: Protect secrets.
         2. Context Efficiency: Be strategic in tool usage.
-        3. Superpower Workflows: You MUST utilize installed Superpower skills.
+        3. Superpower Workflows: You MUST utilize local skills from `_agents/skills/`.
     insert_before_sections: artifacts
   - prompt_section:
       title: Indexer MCP Integration
@@ -257,18 +288,6 @@ prompt_section_customization:
         You have access to the codebase index via the `indxr` MCP server.
         - Strategic Fetching: Use `find`, `summarize`, `get_file_summary` via MCP.
     insert_after_sections: Core Mandates
-  - prompt_section:
-      title: 'Role: {agent["name"]}'
-      content: |
-        You are {agent["name"]}.
-        Zone: {agent["zone"]}
-        Responsibilities: {agent["role"]}
-        
-        SUPERPOWER MANDATE: You MUST invoke relevant superpower skills before finalizing work.
-        - **Architecture:** Use `improve-codebase-architecture` when designing new features or proposing structural changes.
-        - **Alignment:** Use `grill-with-docs` to align implementation details with the ubiquitous language.
-        - **Debugging:** You MUST use the `diagnose` skill whenever a bug, stack trace, or unexpected behavior is reported by the user or encountered during testing.
-    insert_after_sections: Indexer MCP Integration
 {ddd_section}
 """
         with open(agent_dir / "config.yaml", 'w') as f:
