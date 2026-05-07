@@ -160,14 +160,23 @@ echo "Generating initial codebase wiki (this may take a moment)..."
         f.write(setup_content)
     os.chmod(setup_script_path, 0o755)
     
-    # Generate Platform Rules file (GEMINI.md, CLAUDE.md, etc.)
-    rules_file = "GEMINI.md" if platform_choice == "1" else "CLAUDE.md" if platform_choice == "2" else "RULES.md"
+    # Generate Platform Rules file (GEMINI.md, CLAUDE.md, etc.) IN THE ROOT DIRECTORY
+    rules_file = "GEMINI.md" if platform_choice == "1" else "CLAUDE.md" if platform_choice == "2" else ".cursorrules" if platform_choice == "4" else "RULES.md"
+    project_root = Path(project_path)
+    
     rules_content = f"""# Agentic Harness Rules for {platform_name}
+
+<EXTREMELY-IMPORTANT>
+You are operating within the Superpowers Agentic Harness. 
+You MUST adhere to the `using-superpowers` state machine.
+IF A SKILL APPLIES TO YOUR TASK, YOU MUST USE IT BEFORE ACTING.
+</EXTREMELY-IMPORTANT>
 
 1. **Context First**: Always use the `indxr` MCP server to query the codebase before proposing changes.
 2. **Strict Planning**: Never write production code without an approved plan in `workspace/artifacts/plan.md`.
 3. **Superpower Workflows**: You MUST utilize installed Superpower skills (e.g., brainstorming, writing-plans, test-driven-development) during execution.
-4. **Wiki Knowledge Base Integration**: The `indxr` MCP server maintains an auto-updating codebase wiki. You MUST utilize these tools when working:
+4. **Local Skills**: You MUST refer to the local skills stored in `{target_path.name}/_agents/skills/` for your specific workflows (e.g., DDD alignment, architectural improvements).
+5. **Wiki Knowledge Base Integration**: The `indxr` MCP server maintains an auto-updating codebase wiki. You MUST utilize these tools when working:
    - `wiki_search`: Search wiki by keyword/concept before reading raw source code.
    - `wiki_read`: Read full content and metadata of a wiki page.
    - `wiki_status`: Check wiki health, page count, and source file coverage.
@@ -176,7 +185,7 @@ echo "Generating initial codebase wiki (this may take a moment)..."
    - `wiki_record_failure`: Record failed fix attempts so future agents learn from them.
    - `wiki_generate` / `wiki_update` / `wiki_contribute`: Used for maintaining the wiki structure.
 """
-    with open(target_path / rules_file, "w") as f:
+    with open(project_root / rules_file, "w") as f:
         f.write(rules_content)
 
     # Create an MCP config that points to the indxr server running in the project root
