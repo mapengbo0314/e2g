@@ -156,8 +156,11 @@ echo "  /add-plugin mattpocock/skills"
         frontmatter = f"""---
 name: {agent["name"]}
 description: {agent["role"]}
-coding_agent: true
-agentic_mode: true
+tools:
+  - read_file
+  - grep_search
+  - replace
+  - run_shell_command
 ---
 """
         system_prompt = agent.get("system_prompt", f"# {agent['name']}\n\n{agent['role']}")
