@@ -107,5 +107,19 @@ def main():
         # We pass the cloned boilerplate_dir so minting engine doesn't have to clone again
         mint_workspace(target_dir, selected_agents, args.project_path, platform_choice, args.model, args.bundle, boilerplate_dir, ddd_context=final_ddd_context)
 
+        print("\nStage 4: Executing Automated Setup...")
+        setup_script = os.path.join(target_dir, "scripts", "setup_harness.sh")
+        if os.path.exists(setup_script):
+            try:
+                # Run the setup script with the target_dir as the working directory
+                subprocess.run([setup_script], cwd=target_dir, check=True)
+                print(f"\n✅ Setup Complete! Your Agentic Workspace is ready at: {target_dir}")
+                print("Launch your AI platform in that directory to begin.")
+            except subprocess.CalledProcessError as e:
+                print(f"\n❌ Error during automated setup (Exit Code: {e.returncode}).")
+                print(f"You may need to manually run: cd {target_dir} && ./scripts/setup_harness.sh")
+        else:
+            print(f"\nWarning: Setup script not found at {setup_script}")
+
 if __name__ == "__main__":
     main()

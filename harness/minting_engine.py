@@ -294,7 +294,3 @@ prompt_section_customization:
             f.write(config_yaml_content)
             
     print(f"Successfully minted workspace at {target_dir}")
-    print("\nNext Steps:")
-    print(f"1. cd {target_dir}")
-    print("2. ./scripts/setup_harness.sh (Install prerequisites)")
-    print("3. Activate your environment and Launch AI")
