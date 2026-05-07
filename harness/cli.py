@@ -53,12 +53,13 @@ def main():
         
         feature_fetcher_yaml = os.path.join(boilerplate_dir, "agents", "discovery", "feature-fetcher", "config.yaml")
         
-        print("Stage 2: Dynamic Agent Discovery")
+        print("Stage 2: Dynamic Context Acquisition")
         from harness.discovery_engine import discover_agents, discover_ddd_context, acquire_mcp_context
         
+        # Acquire context once
         context_str = acquire_mcp_context(args.project_path)
         
-        # We pass the context_str directly to discovery_engine
+        print("Discovering specialized agents...")
         recommended_agents = discover_agents(context_str, feature_fetcher_yaml, args.llm, api_key, args.model)
         
         print(f"Found {len(recommended_agents)} recommendations.")
