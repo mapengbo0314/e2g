@@ -162,7 +162,7 @@ echo "Generating initial codebase wiki (this may take a moment)..."
         f.write(rules_content)
 
     # Create an MCP config that points to the indxr server running in the project root
-    indxr_serve_args = ["serve", "--stdio", "--watch", "--wiki-auto-update"]
+    indxr_serve_args = ["serve", "--watch", "--wiki-auto-update"]
     if model_choice:
         indxr_serve_args.extend(["--wiki-model", model_choice])
     

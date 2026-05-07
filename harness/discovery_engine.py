@@ -7,7 +7,7 @@ def acquire_mcp_context(project_path: str) -> str:
     print(f"Starting indxr MCP server for dynamic analysis on {project_path}...")
     
     proc = subprocess.Popen(
-        ["indxr", "serve", "--stdio", project_path],
+        ["indxr", "serve", project_path],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL, # Prevent deadlock from stderr buffer
