@@ -255,30 +255,6 @@ IF A SKILL APPLIES TO YOUR TASK, YOU MUST USE IT BEFORE ACTING.
         with open(cursor_dir / "mcp.json", 'w') as f:
             json.dump(mcp_config, f, indent=2)
          
-    import urllib.request
-    
-    # 4. Download External Skills directly into the workspace
-    print("Downloading requested skills...")
-    skills_to_download = {
-        "grill-with-docs": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md",
-        "improve-codebase-architecture": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture/SKILL.md",
-        "grill-me": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/productivity/grill-me/SKILL.md"
-    }
-    
-    skills_dir = target_path / "skills"
-    skills_dir.mkdir(exist_ok=True, parents=True)
-    
-    for skill_name, url in skills_to_download.items():
-        skill_path = skills_dir / f"{skill_name}.md"
-        try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=10) as response:
-                with open(skill_path, 'wb') as f:
-                    f.write(response.read())
-            print(f"  - Downloaded {skill_name}")
-        except Exception as e:
-            print(f"  - Warning: Failed to download {skill_name}: {e}")
-
     # Generate Specialized Agents
     specialized_dir = target_path / "agents" / "specialized"
     specialized_dir.mkdir(exist_ok=True, parents=True)
