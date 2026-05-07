@@ -3,5 +3,11 @@
   "description": "Senior Project Manager & Router that manages the Hub-and-Spoke model.",
   "type": "router",
   "version": "1.0",
-  "entrypoint": "config.yaml"
+  "entrypoint": "config.yaml",
+  "skills": [
+    "grill-me",
+    "ubiquitous-language",
+    "improve-coding-architecture",
+    "ddd-alignment"
+  ]
 }

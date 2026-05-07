@@ -26,6 +26,18 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
         with open(target_path / "ddd_context.json", "w") as f:
             json.dump(ddd_context, f, indent=2)
 
+        # Write DDD markdown files
+        ddd_dir = target_path / ".gemini" / "ddd"
+        ddd_dir.mkdir(parents=True, exist_ok=True)
+        
+        if "ubiquitous_language" in ddd_context:
+            with open(ddd_dir / "ubiquitous_language.md", "w") as f:
+                f.write(ddd_context["ubiquitous_language"])
+        
+        if "translation_map" in ddd_context:
+            with open(ddd_dir / "translation_map.json", "w") as f:
+                json.dump(ddd_context["translation_map"], f, indent=2)
+
     # Remove internal discovery agents from the final workspace
     discovery_path = target_path / "agents" / "discovery"
     if discovery_path.exists():
@@ -195,6 +207,19 @@ echo "Generating initial codebase wiki (this may take a moment)..."
             json.dump(agent_manifest, f, indent=2)
             
         # Inject config.yaml
+        ddd_section = ""
+        if ddd_context:
+            ddd_section = f"""  - prompt_section:
+      title: Domain-Driven Design (DDD) Context
+      content: |
+        This project uses Domain-Driven Design principles.
+        You MUST refer to the following DDD documentation in the `.gemini/ddd/` directory:
+        - `ubiquitous_language.md`: Defines the core domain terms and their meanings.
+        - `translation_map.json`: Maps domain concepts to implementation details.
+        
+        Ensure your implementation aligns with these definitions.
+    insert_after_sections: 'Role: {agent["name"]}'"""
+
         config_yaml_content = f"""coding_agent: true
 agentic_mode: true
 prompt_section_customization:
@@ -223,6 +248,7 @@ prompt_section_customization:
         
         SUPERPOWER MANDATE: You MUST invoke relevant superpower skills before finalizing work.
     insert_after_sections: Indexer MCP Integration
+{ddd_section}
 """
         with open(agent_dir / "config.yaml", 'w') as f:
             f.write(config_yaml_content)

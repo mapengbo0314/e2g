@@ -13,7 +13,25 @@ def parse_args():
     parser.add_argument("--llm", required=True, choices=["gemini", "openai", "anthropic"], help="LLM provider")
     parser.add_argument("--model", help="Optional specific model to use (e.g., gemini-2.5-flash, claude-3-5-sonnet-20241022)")
     parser.add_argument("--bundle", help="Optional path to an existing indxr JSON bundle")
+    parser.add_argument("--ddd", action="store_true", help="Enable DDD Onboarding sequence")
     return parser.parse_args()
+
+def run_ddd_grill(ddd_context: dict) -> dict:
+    """Interactively grill the user with alignment questions."""
+    print("\n=== DDD Alignment Grill ===")
+    questions = ddd_context.get("questions", [])
+    answers = {}
+    
+    if not questions:
+        print("No alignment questions generated.")
+        return answers
+
+    for i, q in enumerate(questions):
+        print(f"\n[{i+1}/{len(questions)}] {q}")
+        ans = input("> ").strip()
+        answers[q] = ans
+        
+    return answers
 
 def main():
     args = parse_args()
@@ -36,7 +54,7 @@ def main():
         feature_fetcher_yaml = os.path.join(boilerplate_dir, "agents", "discovery", "feature-fetcher", "config.yaml")
         
         print("Stage 2: Dynamic Agent Discovery")
-        from harness.discovery_engine import discover_agents
+        from harness.discovery_engine import discover_agents, discover_ddd_context
         
         # We pass the project_path directly to discovery_engine which will start the MCP server
         recommended_agents = discover_agents(args.project_path, feature_fetcher_yaml, args.llm, api_key, args.model)
@@ -54,6 +72,21 @@ def main():
             print("No agents selected. Aborting.")
             sys.exit(0)
 
+        final_ddd_context = None
+        if args.ddd:
+            print("\nStage 2.5: DDD Onboarding Context Extraction")
+            # For now, we pass an empty dict for index_data as requested, 
+            # or we could pass the summary if we had it easily accessible.
+            # In a real scenario, we'd probably use acquire_mcp_context(args.project_path)
+            ddd_context = discover_ddd_context({}, args.llm, api_key)
+            grill_answers = run_ddd_grill(ddd_context)
+            
+            final_ddd_context = {
+                "ubiquitous_language": ddd_context.get("ul_draft", ""),
+                "translation_map": grill_answers,
+                "legacy_hints": ddd_context.get("legacy_hints", {})
+            }
+
         print("\n=== Platform Selection ===")
         print("1. Gemini CLI")
         print("2. Claude Code")
@@ -66,11 +99,13 @@ def main():
             
         print(f"\nStage 3: Proceeding to mint {len(selected_agents)} agents...")
         
-        from harness.minting_engine import mint_workspace
-        target_dir = os.path.join(args.project_path, ".agents")
+        # Option B: Dynamic Target Directory based on platform
+        harness_folder = ".gemini" if platform_choice == "1" else ".agents"
+        target_dir = os.path.join(args.project_path, harness_folder)
         
+        from harness.minting_engine import mint_workspace
         # We pass the cloned boilerplate_dir so minting engine doesn't have to clone again
-        mint_workspace(target_dir, selected_agents, args.project_path, platform_choice, args.model, args.bundle, boilerplate_dir)
+        mint_workspace(target_dir, selected_agents, args.project_path, platform_choice, args.model, args.bundle, boilerplate_dir, ddd_context=final_ddd_context)
 
 if __name__ == "__main__":
     main()
