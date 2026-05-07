@@ -54,10 +54,12 @@ def main():
         feature_fetcher_yaml = os.path.join(boilerplate_dir, "agents", "discovery", "feature-fetcher", "config.yaml")
         
         print("Stage 2: Dynamic Agent Discovery")
-        from harness.discovery_engine import discover_agents, discover_ddd_context
+        from harness.discovery_engine import discover_agents, discover_ddd_context, acquire_mcp_context
         
-        # We pass the project_path directly to discovery_engine which will start the MCP server
-        recommended_agents = discover_agents(args.project_path, feature_fetcher_yaml, args.llm, api_key, args.model)
+        context_str = acquire_mcp_context(args.project_path)
+        
+        # We pass the context_str directly to discovery_engine
+        recommended_agents = discover_agents(context_str, feature_fetcher_yaml, args.llm, api_key, args.model)
         
         print(f"Found {len(recommended_agents)} recommendations.")
         selected_agents = []
@@ -75,14 +77,11 @@ def main():
         final_ddd_context = None
         if args.ddd:
             print("\nStage 2.5: DDD Onboarding Context Extraction")
-            # For now, we pass an empty dict for index_data as requested, 
-            # or we could pass the summary if we had it easily accessible.
-            # In a real scenario, we'd probably use acquire_mcp_context(args.project_path)
-            ddd_context = discover_ddd_context({}, args.llm, api_key)
+            ddd_context = discover_ddd_context(context_str, args.llm, api_key, args.model)
             grill_answers = run_ddd_grill(ddd_context)
             
             final_ddd_context = {
-                "ubiquitous_language": ddd_context.get("ul_draft", ""),
+                "ubiquitous_language": ddd_context.get("context_draft", ""),
                 "translation_map": grill_answers,
                 "legacy_hints": ddd_context.get("legacy_hints", {})
             }

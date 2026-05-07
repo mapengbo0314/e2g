@@ -2,12 +2,8 @@ import pytest
 from unittest import mock
 from harness.discovery_engine import discover_agents, discover_ddd_context
 
-@mock.patch("harness.discovery_engine.acquire_mcp_context")
 @mock.patch("harness.discovery_engine.query_llm")
-def test_discover_agents(mock_query_llm, mock_acquire):
-    # Mock the MCP context
-    mock_acquire.return_value = "Mocked context"
-    
+def test_discover_agents(mock_query_llm):
     # Mock the LLM returning a valid JSON string
     mock_query_llm.return_value = '''
     {
@@ -17,26 +13,29 @@ def test_discover_agents(mock_query_llm, mock_acquire):
     }
     '''
     
-    agents = discover_agents("/fake/path", "/fake/feature-fetcher.yaml", "gemini", "fake-key")
+    agents = discover_agents("Mocked context", "/fake/feature-fetcher.yaml", "gemini", "fake-key")
     assert len(agents) == 1
     assert agents[0]["name"] == "AuthAgent"
-    mock_acquire.assert_called_once_with("/fake/path")
+    mock_query_llm.assert_called_once()
 
+@mock.patch("harness.discovery_engine.fetch_remote_skill")
 @mock.patch("harness.discovery_engine.query_llm")
-def test_discover_ddd_context(mock_query_llm):
+def test_discover_ddd_context(mock_query_llm, mock_fetch_skill):
+    mock_fetch_skill.return_value = "Mocked skill"
+    
     # Mock LLM response
     mock_query_llm.return_value = '''
     {
-      "ul_draft": "Mocked Ubiquitous Language",
+      "context_draft": "Mocked Ubiquitous Language",
       "questions": ["Question 1?", "Question 2?"],
       "legacy_hints": {"deprecated": "old_module"}
     }
     '''
     
-    index_data = {"files": ["main.py", "utils.py"]}
-    result = discover_ddd_context(index_data, "gemini", "fake-key")
+    result = discover_ddd_context("Mocked context", "gemini", "fake-key")
     
-    assert result["ul_draft"] == "Mocked Ubiquitous Language"
+    assert result["context_draft"] == "Mocked Ubiquitous Language"
     assert len(result["questions"]) == 2
     assert "legacy_hints" in result
     mock_query_llm.assert_called_once()
+    assert mock_fetch_skill.call_count == 2
