@@ -38,11 +38,6 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
             with open(ddd_dir / "translation_map.json", "w") as f:
                 json.dump(ddd_context["translation_map"], f, indent=2)
 
-    # Remove internal discovery agents from the final workspace
-    discovery_path = target_path / "agents" / "discovery"
-    if discovery_path.exists():
-        shutil.rmtree(discovery_path)
-
     # Handle existing bundle / wiki migration
     existing_wiki = False
     if bundle_override:
@@ -258,61 +253,49 @@ Please read `AGENTS.md` for core repository instructions and routing rules.
         agent_dir = specialized_dir / safe_name
         agent_dir.mkdir(exist_ok=True, parents=True)
         
-        # 1. Write the full SYSTEM_PROMPT.md
-        system_prompt_path = agent_dir / "system_prompt.md"
-        with open(system_prompt_path, 'w') as f:
-            f.write(agent.get("system_prompt", f"# {agent['name']}\n\n{agent['role']}"))
-
-        # 2. Inject agent.json
-        agent_manifest = {
-            "name": agent["name"],
-            "description": agent["role"],
-            "entrypoint": "config.yaml"
-        }
-        with open(agent_dir / "agent.json", 'w') as f:
-            json.dump(agent_manifest, f, indent=2)
-            
-        # 3. Inject config.yaml (referencing the system_prompt.md)
+        agent_file_path = agent_dir / f"{safe_name}.md"
+        
+        frontmatter = f"""---
+name: {agent["name"]}
+description: {agent["role"]}
+coding_agent: true
+agentic_mode: true
+---
+"""
+        system_prompt = agent.get("system_prompt", f"# {agent['name']}\n\n{agent['role']}")
+        
+        # Append DDD logic
         ddd_section = ""
         if ddd_context:
-            ddd_section = f"""  - prompt_section:
-      title: Domain-Driven Design (DDD) Context
-      content: |
-        This project uses Domain-Driven Design principles.
-        At the beginning of any new session or task involving domain logic, you MUST use the `read_file` tool to load `{target_path.name}/ddd/context.md`.
-        
-        You MUST refer to the following DDD documentation:
-        - `context.md`: Defines the core domain terms and their meanings.
-        - `translation_map.json`: Maps domain concepts to implementation details.
-        
-        Ensure your implementation aligns with these definitions.
-    insert_after_sections: Core Mandates"""
+            ddd_section = f"""
+## Domain-Driven Design (DDD) Context
+This project uses Domain-Driven Design principles.
+At the beginning of any new session or task involving domain logic, you MUST use the `read_file` tool to load `{target_path.name}/ddd/context.md`.
 
-        config_yaml_content = f"""coding_agent: true
-agentic_mode: true
-# Load the full brain from the generated markdown file
-system_prompt_file: system_prompt.md
-prompt_section_customization:
-  add_prompt_sections:
-  - prompt_section:
-      title: Core Mandates
-      content: |
-        You are a specialized subagent operating within this repository's agent ecosystem.
-        You have been delegated a specific task by the Orchestrator.
-        1. Security & System Integrity: Protect secrets.
-        2. Context Efficiency: Be strategic in tool usage.
-        3. Superpower Workflows: You MUST run `list_directory` on `{target_path.name}/skills/` at the start of your session to discover available local skills.
-    insert_before_sections: artifacts
-  - prompt_section:
-      title: Indexer MCP Integration
-      content: |
-        You have access to the codebase index via the `indxr` MCP server.
-        - Strategic Fetching: Use `find`, `summarize`, `get_file_summary` via MCP.
-    insert_after_sections: Core Mandates
-{ddd_section}
+You MUST refer to the following DDD documentation:
+- `context.md`: Defines the core domain terms and their meanings.
+- `translation_map.json`: Maps domain concepts to implementation details.
+
+Ensure your implementation aligns with these definitions.
 """
-        with open(agent_dir / "config.yaml", 'w') as f:
-            f.write(config_yaml_content)
+
+        core_mandates = f"""
+## Core Mandates
+You are a specialized subagent operating within this repository's agent ecosystem.
+You have been delegated a specific task by the Orchestrator.
+1. Security & System Integrity: Protect secrets.
+2. Context Efficiency: Be strategic in tool usage.
+3. Superpower Workflows: You MUST run `list_directory` on `{target_path.name}/skills/` at the start of your session to discover available local skills.
+
+## Indexer MCP Integration
+You have access to the codebase index via the `indxr` MCP server.
+- Strategic Fetching: Use `find`, `summarize`, `get_file_summary` via MCP.
+"""
+
+        final_content = frontmatter + system_prompt + "\n" + core_mandates + "\n" + ddd_section
+        
+        with open(agent_file_path, 'w') as f:
+            f.write(final_content)
             
     print(f"Successfully minted workspace at {target_dir}")
     print("\nNext Steps:")
