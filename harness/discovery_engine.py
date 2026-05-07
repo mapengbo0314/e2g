@@ -76,12 +76,19 @@ def query_llm(prompt: str, llm_provider: str, api_key: str, model: str = None) -
     elif llm_provider == "gemini":
         from google import genai
         client = genai.Client(api_key=api_key)
+        # Fix model name format: Gemini SDK often expects 'gemini-2.5-flash' without 'models/' prefix 
+        # but depending on the SDK version, it might require it. Let's ensure it's robust.
         use_model = model or "gemini-2.5-flash"
-        response = client.models.generate_content(
-            model=use_model,
-            contents=prompt
-        )
-        return response.text
+        
+        try:
+            # We are using generate_content, which is synchronous. It might take 10-20 seconds.
+            response = client.models.generate_content(
+                model=use_model,
+                contents=prompt
+            )
+            return response.text
+        except Exception as e:
+            raise RuntimeError(f"Gemini API call failed: {e}")
         
     raise ValueError(f"Unsupported LLM provider: {llm_provider}")
 
@@ -143,8 +150,8 @@ def discover_ddd_context(context_str: str, llm_provider: str, api_key: str, mode
     """Extracts DDD context using remote skills."""
     print("Fetching remote skills for DDD alignment...")
     grill_me_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/productivity/grill-me/SKILL.md")
-    grill_with_docs_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs.md")
-    
+    grill_with_docs_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md")
+
     prompt = (
         "You are a strict Domain-Driven Design architect. Analyze the following project context and execute the provided skills.\n\n"
         "=== GRILL-WITH-DOCS SKILL ===\n"
@@ -160,8 +167,7 @@ def discover_ddd_context(context_str: str, llm_provider: str, api_key: str, mode
         "- 'questions': A list of strings representing alignment questions.\n"
         "- 'legacy_hints': A dictionary containing hints about legacy components.\n\n"
         f"PROJECT CONTEXT:\n{context_str}"
-    )
-    
+    )    
     response_text = query_llm(prompt, llm_provider, api_key, model)
     
     try:
