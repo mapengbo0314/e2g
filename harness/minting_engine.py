@@ -87,7 +87,7 @@ echo "  /plugin install skills@mattpocock"
 if command -v claude &> /dev/null; then
     echo "Adding indxr to Claude Code global MCP configuration..."
     indxr_serve_args_str="serve --watch --wiki-auto-update"
-    claude mcp add indxr bash -c "cd '{escaped_project_path}' && indxr $indxr_serve_args_str" || true
+    claude mcp add indxr -- bash -c "cd '{escaped_project_path}' && indxr $indxr_serve_args_str" || true
 fi
 """,
         ".cursor": f"""#!/usr/bin/env bash
