@@ -124,13 +124,18 @@ echo "Please refer to https://github.com/obra/superpowers to manually install sk
 """
 
     setup_content += f"""
-# 2. Install indxr MCP Server
-echo "Installing indxr MCP Server..."
-if command -v cargo &> /dev/null; then
-    cargo install indxr --features wiki,http || true
-    indxr init{indxr_init_flag} || true
+# 2. Configure indxr MCP Server
+echo "Configuring indxr MCP Server..."
+if command -v indxr &> /dev/null; then
+"""
+    if indxr_init_flag:
+        setup_content += f"""    indxr init{indxr_init_flag} || true"""
+    else:
+        setup_content += """    echo "indxr configured for Gemini CLI (skipping generic init)." """
+
+    setup_content += """
 else
-    echo "Error: cargo required to install indxr. Visit https://rustup.rs/"
+    echo "Error: indxr is not installed. This should have been caught during init."
 fi
 """
 
@@ -157,6 +162,14 @@ echo "Generating initial codebase wiki (this may take a moment)..."
 1. **Context First**: Always use the `indxr` MCP server to query the codebase before proposing changes.
 2. **Strict Planning**: Never write production code without an approved plan in `workspace/artifacts/plan.md`.
 3. **Superpower Workflows**: You MUST utilize installed Superpower skills (e.g., brainstorming, writing-plans, test-driven-development) during execution.
+4. **Wiki Knowledge Base Integration**: The `indxr` MCP server maintains an auto-updating codebase wiki. You MUST utilize these tools when working:
+   - `wiki_search`: Search wiki by keyword/concept before reading raw source code.
+   - `wiki_read`: Read full content and metadata of a wiki page.
+   - `wiki_status`: Check wiki health, page count, and source file coverage.
+   - `wiki_suggest_contribution`: Find which page to update based on your analysis.
+   - `wiki_compound`: Auto-route your synthesized knowledge to the best matching page.
+   - `wiki_record_failure`: Record failed fix attempts so future agents learn from them.
+   - `wiki_generate` / `wiki_update` / `wiki_contribute`: Used for maintaining the wiki structure.
 """
     with open(target_path / rules_file, "w") as f:
         f.write(rules_content)
