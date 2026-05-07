@@ -87,25 +87,14 @@ def main():
             print("No agents selected. Aborting.")
             sys.exit(0)
 
-        print("\n=== Platform Selection ===")
-        print("1. Gemini CLI")
-        print("2. Claude Code")
-        print("3. Copilot CLI")
-        print("4. Cursor")
-        print("5. Generic / Custom")
-        platform_choice = input("Select target platform [1-5]: ").strip()
-        if not platform_choice:
-            platform_choice = "1"
-            
         print(f"\nStage 3: Proceeding to mint {len(selected_agents)} agents...")
         
-        # Option B: Dynamic Target Directory based on platform
-        harness_folder = ".gemini" if platform_choice == "1" else ".agents"
+        harness_folder = ".agents"
         target_dir = os.path.join(args.project_path, harness_folder)
         
         from harness.minting_engine import mint_workspace
         # We pass the cloned boilerplate_dir so minting engine doesn't have to clone again
-        mint_workspace(target_dir, selected_agents, args.project_path, platform_choice, args.model, args.bundle, boilerplate_dir, ddd_context=final_ddd_context)
+        mint_workspace(target_dir, selected_agents, args.project_path, args.model, args.bundle, boilerplate_dir, ddd_context=final_ddd_context)
 
 if __name__ == "__main__":
     main()
