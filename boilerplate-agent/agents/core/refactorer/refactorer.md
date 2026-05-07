@@ -34,4 +34,5 @@ customization_config:
         - architect
         - reviewer
         - verifier
+        - implementer
 ```

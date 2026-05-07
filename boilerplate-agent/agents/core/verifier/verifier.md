@@ -60,4 +60,8 @@ customization_config:
       inherit_users: true
     agents:
       inherit_users: true
+      related_agents:
+        - implementer
+        - reviewer
+        - adversary
 ```

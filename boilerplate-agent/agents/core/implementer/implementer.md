@@ -103,4 +103,10 @@ customization_config:
       inherit_users: true
     agents:
       inherit_users: true
+      related_agents:
+        - planner
+        - reviewer
+        - verifier
+        - linter-agent
+        - refactorer
 ```

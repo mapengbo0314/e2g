@@ -131,4 +131,9 @@ customization_config:
       inherit_users: true
     agents:
       inherit_users: true
+      related_agents:
+        - architect
+        - implementer
+        - codesigner
+        - designdoc_drafter
 ```
