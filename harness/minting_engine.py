@@ -309,12 +309,14 @@ IF A SKILL APPLIES TO YOUR TASK, YOU MUST USE IT BEFORE ACTING.
       title: Domain-Driven Design (DDD) Context
       content: |
         This project uses Domain-Driven Design principles.
-        You MUST refer to the following DDD documentation in the `.gemini/ddd/` directory:
+        At the beginning of any new session or task involving domain logic, you MUST use the `read_file` tool to load `{target_path.name}/ddd/context.md`.
+        
+        You MUST refer to the following DDD documentation:
         - `context.md`: Defines the core domain terms and their meanings.
         - `translation_map.json`: Maps domain concepts to implementation details.
         
         Ensure your implementation aligns with these definitions.
-    insert_after_sections: 'Role: {agent["name"]}'"""
+    insert_after_sections: Core Mandates"""
 
         config_yaml_content = f"""coding_agent: true
 agentic_mode: true
@@ -329,7 +331,7 @@ prompt_section_customization:
         You have been delegated a specific task by the Orchestrator.
         1. Security & System Integrity: Protect secrets.
         2. Context Efficiency: Be strategic in tool usage.
-        3. Superpower Workflows: You MUST utilize local skills from `{target_path.name}/skills/`.
+        3. Superpower Workflows: You MUST run `list_directory` on `{target_path.name}/skills/` at the start of your session to discover available local skills.
     insert_before_sections: artifacts
   - prompt_section:
       title: Indexer MCP Integration
