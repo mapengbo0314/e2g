@@ -98,8 +98,8 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
         print(f"Warning: Could not load feature-fetcher prompt: {e}")
 
     print("Fetching remote skills for Agent Discovery...")
-    arch_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture.md")
-    grill_docs_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs.md")
+    arch_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture/SKILL.md")
+    grill_docs_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md")
 
     full_prompt = (
         f"{system_prompt}\n\n"
@@ -159,22 +159,6 @@ def discover_ddd_context(context_str: str, llm_provider: str, api_key: str, mode
         "- 'context_draft': A string containing the drafted domain context.\n"
         "- 'questions': A list of strings representing alignment questions.\n"
         "- 'legacy_hints': A dictionary containing hints about legacy components.\n\n"
-        f"PROJECT CONTEXT:\n{context_str}"
-    )
-    
-    response_text = query_llm(prompt, llm_provider, api_key, model)
-    
-    try:
-        cleaned = response_text.replace("```json", "").replace("```", "").strip()
-        start_idx = cleaned.find("{")
-        end_idx = cleaned.rfind("}") + 1
-        if start_idx != -1 and end_idx != 0:
-            cleaned = cleaned[start_idx:end_idx]
-        return json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        print(f"ERROR: Failed to parse DDD LLM response as JSON: {e}")
-        return {"context_draft": "", "questions": [], "legacy_hints": {}}
-ntaining hints about legacy components.\n\n"
         f"PROJECT CONTEXT:\n{context_str}"
     )
     

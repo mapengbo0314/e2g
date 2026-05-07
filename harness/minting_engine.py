@@ -211,8 +211,8 @@ echo "Generating initial codebase wiki (this may take a moment)..."
     # 4. Download External Skills directly into the workspace
     print("Downloading requested skills...")
     skills_to_download = {
-        "grill-with-docs": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs.md",
-        "improve-codebase-architecture": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture.md",
+        "grill-with-docs": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md",
+        "improve-codebase-architecture": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture/SKILL.md",
         "grill-me": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/productivity/grill-me/SKILL.md"
     }
     
