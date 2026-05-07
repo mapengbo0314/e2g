@@ -31,7 +31,7 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
         ddd_dir.mkdir(parents=True, exist_ok=True)
         
         if "ubiquitous_language" in ddd_context:
-            with open(ddd_dir / "ubiquitous_language.md", "w") as f:
+            with open(ddd_dir / "context.md", "w") as f:
                 f.write(ddd_context["ubiquitous_language"])
         
         if "translation_map" in ddd_context:
@@ -232,7 +232,7 @@ echo "Generating initial codebase wiki (this may take a moment)..."
       content: |
         This project uses Domain-Driven Design principles.
         You MUST refer to the following DDD documentation in the `.gemini/ddd/` directory:
-        - `ubiquitous_language.md`: Defines the core domain terms and their meanings.
+        - `context.md`: Defines the core domain terms and their meanings.
         - `translation_map.json`: Maps domain concepts to implementation details.
         
         Ensure your implementation aligns with these definitions.
@@ -265,6 +265,9 @@ prompt_section_customization:
         Responsibilities: {agent["role"]}
         
         SUPERPOWER MANDATE: You MUST invoke relevant superpower skills before finalizing work.
+        - **Architecture:** Use `improve-codebase-architecture` when designing new features or proposing structural changes.
+        - **Alignment:** Use `grill-with-docs` to align implementation details with the ubiquitous language.
+        - **Debugging:** You MUST use the `diagnose` skill whenever a bug, stack trace, or unexpected behavior is reported by the user or encountered during testing.
     insert_after_sections: Indexer MCP Integration
 {ddd_section}
 """
