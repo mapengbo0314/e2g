@@ -192,26 +192,27 @@ fi
 
     os.chmod(setup_script_path, 0o755)
     
-    # Generate Platform Rules file (GEMINI.md, CLAUDE.md, etc.) IN THE ROOT DIRECTORY
+    # Generate Platform Rules Pointers IN THE ROOT DIRECTORY
     project_root = Path(project_path)
-    if platform_choice == "1":
-        rules_file = "GEMINI.md"
-    elif platform_choice == "2":
-        rules_file = "CLAUDE.md"
-    elif platform_choice == "3":
-        rules_file = ".github/copilot-instructions.md"
-        (project_root / ".github").mkdir(exist_ok=True)
-    elif platform_choice == "4":
-        rules_file = ".cursorrules"
-    else:
-        rules_file = "RULES.md"
-    
-    # Generate Platform Rules Pointer File
-    pointer_content = f"""# Agentic Harness
+    pointer_content = """# Agentic Harness
     
 Please read `AGENTS.md` for core repository instructions and routing rules.
 """
-    with open(project_root / rules_file, "w") as f:
+    # Define all pointer files
+    pointer_files = [
+        "GEMINI.md",
+        "CLAUDE.md",
+        ".cursorrules"
+    ]
+    
+    for rules_file in pointer_files:
+        with open(project_root / rules_file, "w") as f:
+            f.write(pointer_content)
+            
+    # Special case for Copilot (in .github/)
+    copilot_dir = project_root / ".github"
+    copilot_dir.mkdir(exist_ok=True)
+    with open(copilot_dir / "copilot-instructions.md", "w") as f:
         f.write(pointer_content)
 
     # Create an MCP config that points to the indxr server running in the project root
