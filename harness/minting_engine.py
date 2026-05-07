@@ -65,7 +65,7 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
     project_root = Path(project_path)
     escaped_project_path = os.path.abspath(project_path).replace("'", "'\\''")
     scripts_to_generate = {
-        ".gemini": """#!/usr/bin/env bash
+        ".gemini": f"""#!/usr/bin/env bash
 set -e
 echo "=== Setting up Superpowers for Gemini CLI ==="
 if command -v gemini &> /dev/null; then
@@ -76,7 +76,7 @@ else
 fi
 echo "Setting up native skill pointers..."
 mkdir -p .gemini/skills
-for skill_file in _agents/skills/*.md; do
+for skill_file in {target_path.name}/skills/*.md; do
     if [ -f "$skill_file" ]; then
         skill_name=$(basename "$skill_file" .md)
         echo "../../$skill_file" > ".gemini/skills/$skill_name"
@@ -91,7 +91,7 @@ echo "  /plugin install superpowers@claude-plugins-official"
 echo "  /plugin install skills@mattpocock"
 echo "Setting up native skill pointers..."
 mkdir -p .claude/skills
-for skill_file in _agents/skills/*.md; do
+for skill_file in {target_path.name}/skills/*.md; do
     if [ -f "$skill_file" ]; then
         skill_name=$(basename "$skill_file" .md)
         echo "../../$skill_file" > ".claude/skills/$skill_name"
@@ -104,7 +104,7 @@ if command -v claude &> /dev/null; then
     claude mcp add indxr bash -c "cd '{escaped_project_path}' && indxr $indxr_serve_args_str" || true
 fi
 """,
-        ".cursor": """#!/usr/bin/env bash
+        ".cursor": f"""#!/usr/bin/env bash
 set -e
 echo "=== Setting up Superpowers for Cursor ==="
 echo "To install Superpowers and Skills for Cursor, run these commands inside the Cursor Agent chat:"
@@ -126,9 +126,9 @@ echo "  /add-plugin mattpocock/skills"
     
     # Generate Platform Rules Pointers IN THE ROOT DIRECTORY
     project_root = Path(project_path)
-    pointer_content = """# Agentic Harness
+    pointer_content = f"""# Agentic Harness
     
-Please read `AGENTS.md` for core repository instructions and routing rules.
+Please read `{target_path.name}/AGENTS.md` for core repository instructions and routing rules.
 """
     # Define all pointer files
     pointer_files = [
@@ -221,7 +221,7 @@ You are a specialized subagent operating within this repository's agent ecosyste
 You have been delegated a specific task by the Orchestrator.
 1. Security & System Integrity: Protect secrets.
 2. Context Efficiency: Be strategic in tool usage.
-3. Superpower Workflows: You MUST run `list_directory` on `{target_path.name}/skills/` at the start of your session to discover available local skills.
+3. Superpower Workflows: You MUST utilize installed Superpower skills. If your platform supports a native skill tool (e.g. `activate_skill`, `skill`), use it. Otherwise, read the `.md` files located in `{target_path.name}/skills/`.
 
 ## Indexer MCP Integration
 You have access to the codebase index via the `indxr` MCP server.
