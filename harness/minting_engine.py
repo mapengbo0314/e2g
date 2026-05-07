@@ -3,7 +3,7 @@ import shutil
 import json
 from pathlib import Path
 
-def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: str, model_choice: str = None, bundle_override: str = None, boilerplate_dir: str = None, ddd_context: dict = None):
+def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: str, platform_choice: str, model_choice: str = None, bundle_override: str = None, boilerplate_dir: str = None, ddd_context: dict = None):
     """Copies boilerplate, injects styled configs, and writes setup prerequisites."""
     target_path = Path(target_dir)
     
@@ -108,41 +108,6 @@ echo "  /add-plugin mattpocock/skills"
         os.chmod(script_path, 0o755)
         
     print("\nTo install skills & MCPs, run the setup_harness.sh script inside your platform's hidden folder (e.g. `sh .gemini/scripts/setup_harness.sh`).")
-
-    # INSTANTLY GENERATE NATIVE SKILL POINTERS
-    skills_src_dir = target_path / "skills"
-    if skills_src_dir.exists():
-        for platform in [".gemini", ".claude", ".cursor"]:
-            platform_skills_dir = project_root / platform / "skills"
-            platform_skills_dir.mkdir(parents=True, exist_ok=True)
-            for skill_file in skills_src_dir.glob("*.md"):
-                pointer_path = platform_skills_dir / skill_file.stem
-                with open(pointer_path, "w") as f:
-                    f.write(f"../../{target_path.name}/skills/{skill_file.name}")
-
-    
-    # Generate Platform Rules Pointers IN THE ROOT DIRECTORY
-    project_root = Path(project_path)
-    pointer_content = f"""# Agentic Harness
-    
-Please read `{target_path.name}/AGENTS.md` for core repository instructions and routing rules.
-"""
-    # Define all pointer files
-    pointer_files = [
-        "GEMINI.md",
-        "CLAUDE.md",
-        ".cursorrules"
-    ]
-    
-    for rules_file in pointer_files:
-        with open(project_root / rules_file, "w") as f:
-            f.write(pointer_content)
-            
-    # Special case for Copilot (in .github/)
-    copilot_dir = project_root / ".github"
-    copilot_dir.mkdir(exist_ok=True)
-    with open(copilot_dir / "copilot-instructions.md", "w") as f:
-        f.write(pointer_content)
 
     # Create an MCP config that points to the indxr server running in the project root
     indxr_serve_args = ["serve", "--watch", "--wiki-auto-update"]
