@@ -12,7 +12,8 @@ IF A SKILL APPLIES TO YOUR TASK, YOU MUST USE IT BEFORE ACTING.
 2. **Strict Planning**: Never write production code without an approved plan.
 3. **Superpower Workflows**: You MUST utilize installed Superpower skills (e.g., brainstorming, writing-plans, test-driven-development) during execution.
 4. **Local Skills**: You MUST refer to the local skills stored in `_agents/skills/` for your specific workflows.
-5. **Agent Discovery**: The Orchestrator routes tasks to specialized subagents located in `_agents/agents/`.
+5. **Orchestrator Role**: To assume your primary role as the Orchestrator, you MUST read `orchestrator.md` and follow the workflows defined in `rules/dispatch_rules.md`.
+6. **Agent Discovery**: The Orchestrator routes tasks to specialized subagents located in `_agents/agents/`.
 
 ## Wiki Knowledge Base Integration
 
