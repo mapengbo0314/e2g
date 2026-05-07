@@ -185,41 +185,13 @@ echo "Generating initial codebase wiki (this may take a moment)..."
     else:
         rules_file = "RULES.md"
     
-    diagnostic_section = ""
-    if platform_choice in ["2", "3"]:
-        tool_name = "Skill" if platform_choice == "2" else "skill"
-        install_cmd = "/plugin install superpowers@claude-plugins-official" if platform_choice == "2" else "copilot plugin install superpowers@superpowers-marketplace"
-        diagnostic_section = f"""
-## 🚨 BOOTSTRAP SELF-DIAGNOSTIC (MANDATORY ON FIRST LAUNCH)
-Before answering the user's first prompt in this workspace, you MUST verify you have the `{tool_name}` tool available.
-If the `{tool_name}` tool is NOT available, you MUST halt and instruct the user to run:
-`{install_cmd}`
-Do not proceed with any tasks until the superpower workflow is enabled.
-"""
-
-    rules_content = f"""# Agentic Harness Rules for {platform_name}
-
-<EXTREMELY-IMPORTANT>
-You are operating within the Superpowers Agentic Harness. 
-You MUST adhere to the `using-superpowers` state machine.
-IF A SKILL APPLIES TO YOUR TASK, YOU MUST USE IT BEFORE ACTING.
-</EXTREMELY-IMPORTANT>
-{diagnostic_section}
-1. **Context First**: Always use the `indxr` MCP server to query the codebase before proposing changes.
-2. **Strict Planning**: Never write production code without an approved plan in `workspace/artifacts/plan.md`.
-3. **Superpower Workflows**: You MUST utilize installed Superpower skills (e.g., brainstorming, writing-plans, test-driven-development) during execution.
-4. **Local Skills**: You MUST refer to the local skills stored in `{target_path.name}/skills/` for your specific workflows (e.g., DDD alignment, architectural improvements).
-5. **Wiki Knowledge Base Integration**: The `indxr` MCP server maintains an auto-updating codebase wiki. You MUST utilize these tools when working:
-   - `wiki_search`: Search wiki by keyword/concept before reading raw source code.
-   - `wiki_read`: Read full content and metadata of a wiki page.
-   - `wiki_status`: Check wiki health, page count, and source file coverage.
-   - `wiki_suggest_contribution`: Find which page to update based on your analysis.
-   - `wiki_compound`: Auto-route your synthesized knowledge to the best matching page.
-   - `wiki_record_failure`: Record failed fix attempts so future agents learn from them.
-   - `wiki_generate` / `wiki_update` / `wiki_contribute`: Used for maintaining the wiki structure.
+    # Generate Platform Rules Pointer File
+    pointer_content = f"""# Agentic Harness
+    
+Please read `AGENTS.md` for core repository instructions and routing rules.
 """
     with open(project_root / rules_file, "w") as f:
-        f.write(rules_content)
+        f.write(pointer_content)
 
     # Create an MCP config that points to the indxr server running in the project root
     indxr_serve_args = ["serve", "--watch", "--wiki-auto-update"]
