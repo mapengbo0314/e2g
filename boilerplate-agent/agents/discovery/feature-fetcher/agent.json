@@ -1,7 +1,0 @@
-{
-  "name": "feature-fetcher",
-  "description": "The Agent Factory: Analyzes indices and proposes specialized domain agents for SME approval.",
-  "type": "discovery",
-  "version": "1.0",
-  "entrypoint": "config.yaml"
-}
