@@ -27,7 +27,7 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
             json.dump(ddd_context, f, indent=2)
 
         # Write DDD markdown files
-        ddd_dir = target_path / ".gemini" / "ddd"
+        ddd_dir = target_path / "ddd"
         ddd_dir.mkdir(parents=True, exist_ok=True)
         
         if "ubiquitous_language" in ddd_context:
@@ -138,6 +138,17 @@ if command -v indxr &> /dev/null; then
     else:
         setup_content += """    echo "indxr configured for Gemini CLI (skipping generic init)." """
 
+    if platform_choice == "2":
+        # Add Claude Code direct MCP configuration
+        indxr_serve_args_str = " ".join(["serve", "--watch", "--wiki-auto-update"] + (["--wiki-model", model_choice] if model_choice else []))
+        escaped_project_path = os.path.abspath(project_path).replace("'", "'\\''")
+        setup_content += f"""
+    if command -v claude &> /dev/null; then
+        echo "Adding indxr to Claude Code global MCP configuration..."
+        claude mcp add indxr bash -c "cd '{escaped_project_path}' && indxr {indxr_serve_args_str}" || true
+    fi
+"""
+
     setup_content += """
 else
     echo "Error: indxr is not installed. This should have been caught during init."
@@ -161,9 +172,31 @@ echo "Generating initial codebase wiki (this may take a moment)..."
     os.chmod(setup_script_path, 0o755)
     
     # Generate Platform Rules file (GEMINI.md, CLAUDE.md, etc.) IN THE ROOT DIRECTORY
-    rules_file = "GEMINI.md" if platform_choice == "1" else "CLAUDE.md" if platform_choice == "2" else ".cursorrules" if platform_choice == "4" else "RULES.md"
     project_root = Path(project_path)
+    if platform_choice == "1":
+        rules_file = "GEMINI.md"
+    elif platform_choice == "2":
+        rules_file = "CLAUDE.md"
+    elif platform_choice == "3":
+        rules_file = ".github/copilot-instructions.md"
+        (project_root / ".github").mkdir(exist_ok=True)
+    elif platform_choice == "4":
+        rules_file = ".cursorrules"
+    else:
+        rules_file = "RULES.md"
     
+    diagnostic_section = ""
+    if platform_choice in ["2", "3"]:
+        tool_name = "Skill" if platform_choice == "2" else "skill"
+        install_cmd = "/plugin install superpowers@claude-plugins-official" if platform_choice == "2" else "copilot plugin install superpowers@superpowers-marketplace"
+        diagnostic_section = f"""
+## 🚨 BOOTSTRAP SELF-DIAGNOSTIC (MANDATORY ON FIRST LAUNCH)
+Before answering the user's first prompt in this workspace, you MUST verify you have the `{tool_name}` tool available.
+If the `{tool_name}` tool is NOT available, you MUST halt and instruct the user to run:
+`{install_cmd}`
+Do not proceed with any tasks until the superpower workflow is enabled.
+"""
+
     rules_content = f"""# Agentic Harness Rules for {platform_name}
 
 <EXTREMELY-IMPORTANT>
@@ -171,11 +204,11 @@ You are operating within the Superpowers Agentic Harness.
 You MUST adhere to the `using-superpowers` state machine.
 IF A SKILL APPLIES TO YOUR TASK, YOU MUST USE IT BEFORE ACTING.
 </EXTREMELY-IMPORTANT>
-
+{diagnostic_section}
 1. **Context First**: Always use the `indxr` MCP server to query the codebase before proposing changes.
 2. **Strict Planning**: Never write production code without an approved plan in `workspace/artifacts/plan.md`.
 3. **Superpower Workflows**: You MUST utilize installed Superpower skills (e.g., brainstorming, writing-plans, test-driven-development) during execution.
-4. **Local Skills**: You MUST refer to the local skills stored in `{target_path.name}/_agents/skills/` for your specific workflows (e.g., DDD alignment, architectural improvements).
+4. **Local Skills**: You MUST refer to the local skills stored in `{target_path.name}/skills/` for your specific workflows (e.g., DDD alignment, architectural improvements).
 5. **Wiki Knowledge Base Integration**: The `indxr` MCP server maintains an auto-updating codebase wiki. You MUST utilize these tools when working:
    - `wiki_search`: Search wiki by keyword/concept before reading raw source code.
    - `wiki_read`: Read full content and metadata of a wiki page.
@@ -215,6 +248,13 @@ IF A SKILL APPLIES TO YOUR TASK, YOU MUST USE IT BEFORE ACTING.
     with open(mcp_path, 'w') as f:
          json.dump(mcp_config, f, indent=2)
          
+    # Cursor Multi-Platform Parity
+    if platform_choice == "4":
+        cursor_dir = project_root / ".cursor"
+        cursor_dir.mkdir(exist_ok=True)
+        with open(cursor_dir / "mcp.json", 'w') as f:
+            json.dump(mcp_config, f, indent=2)
+         
     import urllib.request
     
     # 4. Download External Skills directly into the workspace
@@ -225,7 +265,7 @@ IF A SKILL APPLIES TO YOUR TASK, YOU MUST USE IT BEFORE ACTING.
         "grill-me": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/productivity/grill-me/SKILL.md"
     }
     
-    skills_dir = target_path / "_agents" / "skills"
+    skills_dir = target_path / "skills"
     skills_dir.mkdir(exist_ok=True, parents=True)
     
     for skill_name, url in skills_to_download.items():
@@ -289,7 +329,7 @@ prompt_section_customization:
         You have been delegated a specific task by the Orchestrator.
         1. Security & System Integrity: Protect secrets.
         2. Context Efficiency: Be strategic in tool usage.
-        3. Superpower Workflows: You MUST utilize local skills from `_agents/skills/`.
+        3. Superpower Workflows: You MUST utilize local skills from `{target_path.name}/skills/`.
     insert_before_sections: artifacts
   - prompt_section:
       title: Indexer MCP Integration
