@@ -101,12 +101,13 @@ echo "  /add-plugin mattpocock/skills"
     }
 
     for platform_dir, script_content in scripts_to_generate.items():
-        script_dir = project_root / platform_dir / "scripts"
-        script_dir.mkdir(parents=True, exist_ok=True)
-        script_path = script_dir / "setup_harness.sh"
-        with open(script_path, "w") as f:
-            f.write(script_content)
-        os.chmod(script_path, 0o755)
+        if platform_dir == f".{platform_choice}":
+            script_dir = project_root / platform_dir / "scripts"
+            script_dir.mkdir(parents=True, exist_ok=True)
+            script_path = script_dir / "setup_harness.sh"
+            with open(script_path, "w") as f:
+                f.write(script_content)
+            os.chmod(script_path, 0o755)
         
     print("\nTo install skills & MCPs, run the setup_harness.sh script inside your platform's hidden folder (e.g. `sh .gemini/scripts/setup_harness.sh`).")
 
@@ -137,16 +138,7 @@ echo "  /add-plugin mattpocock/skills"
     with open(mcp_path, 'w') as f:
          json.dump(mcp_config, f, indent=2)
          
-    # Cursor Multi-Platform Parity
-    cursor_dir = project_root / ".cursor"
-    cursor_dir.mkdir(exist_ok=True)
-    with open(cursor_dir / "mcp.json", 'w') as f:
-        json.dump(mcp_config, f, indent=2)
-         
     # Generate Specialized Agents
-    specialized_dir = target_path / "agents" / "specialized"
-    specialized_dir.mkdir(exist_ok=True, parents=True)
-    
     for agent in selected_agents:
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1-\2', agent["name"])
         safe_name = re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1).lower().replace(" ", "-")

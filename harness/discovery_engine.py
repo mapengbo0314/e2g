@@ -98,8 +98,8 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
     try:
         import yaml
         with open(feature_fetcher_yaml_path, 'r') as f:
-            config = yaml.safe_load(f)
-            if "system_prompt" in config:
+            config = next(yaml.safe_load_all(f), {})
+            if config and isinstance(config, dict) and "system_prompt" in config:
                 system_prompt = config["system_prompt"]
     except Exception as e:
         print(f"Warning: Could not load feature-fetcher prompt: {e}")
