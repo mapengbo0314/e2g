@@ -124,42 +124,19 @@ git commit -m "feat(harness): implement platform-aware prompt deduplication and 
 
 ---
 
-### Task 3: Update Orchestrator Routing Rules
+### Task 3: Hardened Context Intake Gate (UPGRADED)
 
 **Files:**
 - Modify: `boilerplate-agent/rules/dispatch_rules.md`
 - Modify: `boilerplate-agent/orchestrator.md`
+- Create: `boilerplate-agent/skills/context-intake/SKILL.md`
+- Create: `boilerplate-agent/scripts/prune_logs.py`
 
-- [ ] **Step 1: Write minimal implementation (dispatch_rules.md)**
+- [x] **Step 1: Implement Mandatory Intake Gate**
+Ensures all large inputs (> 2000 chars) or logs are distilled via `context-intake` skill before delegation.
 
-Using an exact replace, insert the new mandate into `boilerplate-agent/rules/dispatch_rules.md` inside the `<orchestration_hierarchy>` section, right below the Adversarial Verification bullet.
+- [x] **Step 2: Implement Pruning Utility**
+Added `scripts/prune_logs.py` to allow local deterministic pruning of logs.
 
-```markdown
-- **Failure Context Triage (MANDATORY)**: If the user input contains a raw stack trace, CI failure, or explicitly requests a bug fix, DO NOT read the logs directly. You MUST delegate to a triage agent (e.g., `architect` or `@generalist`) and instruct them to write a compressed artifact to `workspace/artifacts/triage.md`. When delegating to the `implementer` to fix the bug, pass `artifacts/triage.md` as the primary diagnostic frame, but **always include the original user prompt** in the delegation message to preserve intent.
-```
-
-- [ ] **Step 2: Write minimal implementation (orchestrator.md)**
-
-Using an exact replace, ensure `boilerplate-agent/orchestrator.md` is updated appropriately if needed (e.g. adding `token-optimizer` to the `Skills:` list if it's a skill).
-
-```markdown
-## Metadata
-- Name: orchestrator
-- Description: Senior Project Manager & Router that manages the Hub-and-Spoke model.
-- Type: router
-- Version: 1.0
-- Entrypoint: orchestrator.md
-- Skills:
-  - grill-me
-  - grill-with-docs
-  - improve-coding-architecture
-  - ddd-alignment
-```
-
-- [ ] **Step 3: Commit**
-
-Run:
-```bash
-git add boilerplate-agent/rules/dispatch_rules.md boilerplate-agent/orchestrator.md
-git commit -m "feat(orchestrator): mandate pre-delegation failure triage"
-```
+- [x] **Step 3: Register and Enforce**
+Registered skill in Orchestrator and updated Core Mandates to require intake awareness.
