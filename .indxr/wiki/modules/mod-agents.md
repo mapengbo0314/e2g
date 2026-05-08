@@ -3,7 +3,7 @@ id: mod-agents
 title: Agent Configuration System
 page_type: module
 source_files:
-- _agents/agents/CONFIG_SCHEMA.md
+- _agents/agents/config-schema.md
 - _agents/agents.json
 - _agents/reload_agents.py
 - _agents/agents/adversary/agent.json

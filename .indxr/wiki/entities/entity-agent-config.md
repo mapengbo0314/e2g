@@ -3,7 +3,7 @@ id: entity-agent-config
 title: Agent Configuration Schema
 page_type: entity
 source_files:
-- _agents/agents/CONFIG_SCHEMA.md
+- _agents/agents/config-schema.md
 - _agents/GEMINI.md
 generated_at_ref: 703d472a00754a21da89f8b7ca2cde038b89e5b3
 generated_at: 2026-05-06T21:04:02Z

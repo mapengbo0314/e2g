@@ -11,7 +11,7 @@ e-2-g/
   _agents/
     GEMINI.md
     agents/
-      CONFIG_SCHEMA.md
+      config-schema.md
       adversary/
         agent.json
         config.yaml
@@ -139,7 +139,7 @@ e-2-g/
 **_agents/GEMINI.md**
 - `# General Agent Rules`
 
-**_agents/agents/CONFIG_SCHEMA.md**
+**_agents/agents/config-schema.md**
 - `# Agent Config Schema`
 
 **_agents/agents/adversary/agent.json**
@@ -474,7 +474,7 @@ e-2-g/
 
 ---
 
-## _agents/agents/CONFIG_SCHEMA.md
+## _agents/agents/config-schema.md
 
 **Language:** Markdown | **Size:** 1.0 KB | **Lines:** 50
 

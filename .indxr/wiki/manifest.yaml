@@ -16,7 +16,7 @@ pages:
   page_type: module
   file: modules/mod-agents.md
   source_files:
-  - _agents/agents/CONFIG_SCHEMA.md
+  - _agents/agents/config-schema.md
   - _agents/agents.json
   - _agents/reload_agents.py
   - _agents/agents/adversary/agent.json
@@ -117,7 +117,7 @@ pages:
   page_type: entity
   file: entities/entity-agent-config.md
   source_files:
-  - _agents/agents/CONFIG_SCHEMA.md
+  - _agents/agents/config-schema.md
   - _agents/GEMINI.md
 - id: mod-demos
   page_type: module
