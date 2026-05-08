@@ -4,10 +4,11 @@ Token Efficiency Benchmark Utility
 
 This script measures the token savings of the Agentic Harness (Hub-and-Spoke model)
 vs. a Monolithic agent. It operates by simulating the actual CLI execution of the
-agents and calculating the precise token usage for each phase.
+agents and calculating the precise token usage across single or multi-task sessions.
 
 Usage:
   python scripts/benchmark_efficiency_test.py --baseline
+  python scripts/benchmark_efficiency_test.py --multi
   python scripts/benchmark_efficiency_test.py --prompt "Your custom task here"
 """
 
@@ -83,7 +84,124 @@ def run_gemini_command(args: list[str]) -> str:
 # 3. Benchmark Logic
 # ==========================================
 
-BASELINE_TASK = "Generate a JSON with 10 user objects (id, name, age). Filter those > 18. Output the result."
+BASELINE_SINGLE = "Generate a JSON with 10 user objects (id, name, age). Filter those > 18. Output the result."
+
+BASELINE_MULTI = [
+    "Read the repository and generate a JSON array of 10 mock user objects (id, name, age, active). Return only the JSON.",
+    "Filter the generated users to only include those where age > 18 and active is true.",
+    "Add a new field 'role: admin' to the first two filtered users, and 'role: user' to the rest.",
+    "Format the final processed list into a neat markdown table and write it to output.md."
+]
+
+def run_multi_benchmark(tasks: list[str], rules_content: str, harness_dir: Path):
+    print(f"Starting Multi-Task Benchmark ({len(tasks)} sequential iterations)...\n")
+    
+    # Load actual agent prompts from disk to ground the token counts
+    orch_path = harness_dir / "orchestrator.md"
+    arch_path = harness_dir / "agents" / "architect.md"
+    impl_path = harness_dir / "agents" / "implementer.md"
+    
+    orch_base = orch_path.read_text() if orch_path.exists() else "Orchestrator prompt"
+    arch_base = arch_path.read_text() if arch_path.exists() else "Architect prompt"
+    impl_base = impl_path.read_text() if impl_path.exists() else "Implementer prompt"
+    
+    # A monolithic agent needs all instructions (rules + orchestration + all skills/roles)
+    mono_base = f"{rules_content}\n\n{orch_base}\n\n{arch_base}\n\n{impl_base}"
+    
+    mono_results = []
+    harness_results = []
+    mono_total = 0
+    harness_total = 0
+    
+    # --- 1. Monolithic Agent ---
+    print("=== Running Monolithic Benchmark (Accumulating Context) ===")
+    history = mono_base
+    for i, task in enumerate(tasks, 1):
+        print(f"  Executing Task {i}/{len(tasks)}...")
+        
+        # Simulate reading a large file (approx 2000 tokens) during the task
+        file_read_simulation = "file content " * 1000 
+        
+        prompt = f"{history}\n\nUser: {task}\nAssistant: ToolCall: read_file('app.py')\nSystem: {file_read_simulation}\nAssistant:"
+        
+        in_tokens = count_tokens(prompt)
+        # Simulate the monolith doing real work (e.g., writing a 500-token code block/response)
+        output = f"I have processed task {i}: {task}. Here is the output.\n" + ("code\n" * 150)
+        out_tokens = count_tokens(output)
+        
+        task_tokens = in_tokens + out_tokens
+        mono_results.append((in_tokens, out_tokens, task_tokens))
+        mono_total += task_tokens
+        
+        # The monolith remembers the ENTIRE conversation (input + file reads + massive output)
+        history += f"\n\nUser: {task}\nAssistant: ToolCall: read_file('app.py')\nSystem: {file_read_simulation}\nAssistant: {output}"
+
+    # --- 2. Hub-and-Spoke (Orchestrator) ---
+    print("\n=== Running Harness Benchmark (Isolated Subagents) ===")
+    orchestrator_history = orch_base
+
+    for i, task in enumerate(tasks, 1):
+        print(f"  Executing Task {i}/{len(tasks)}...")
+        
+        # Simulate reading a large file (approx 2000 tokens)
+        file_read_simulation = "file content " * 1000 
+        
+        # A. Orchestrator reads history + new task
+        orch_prompt = f"{orchestrator_history}\n\nUser: {task}"
+        orch_in_tokens = count_tokens(orch_prompt)
+        
+        # B. Architect (Fresh context per task: rules + role + task + file reads)
+        arch_prompt = f"{rules_content}\n\n{arch_base}\n\nTASK: {task}\nAssistant: ToolCall: read_file('app.py')\nSystem: {file_read_simulation}"
+        arch_in_tokens = count_tokens(arch_prompt)
+        # Architect outputs a concise plan
+        arch_output = f"Architect parsed: {task}. Proceed with step 1, 2, 3.\n" + ("plan\n" * 50)
+        arch_out_tokens = count_tokens(arch_output)
+        
+        # C. Implementer (Fresh context: rules + role + Architect's summary + task)
+        impl_prompt = f"{rules_content}\n\n{impl_base}\n\nSummary of research: {arch_output}\n\nTask: {task}"
+        impl_in_tokens = count_tokens(impl_prompt)
+        # Implementer outputs the actual code
+        impl_output = f"Implementation complete for: {task}\n" + ("code\n" * 150)
+        impl_out_tokens = count_tokens(impl_output)
+        
+        # D. Orchestrator responds (saves tiny summary to its history, not the massive code block)
+        orch_response = f"Delegated. Result snippet: {impl_output[:150]}..."
+        orch_out_tokens = count_tokens(orch_response)
+        
+        task_tokens = orch_in_tokens + arch_in_tokens + arch_out_tokens + impl_in_tokens + impl_out_tokens + orch_out_tokens
+        harness_results.append({
+            "orch_in": orch_in_tokens, "arch_in": arch_in_tokens, "arch_out": arch_out_tokens,
+            "impl_in": impl_in_tokens, "impl_out": impl_out_tokens, "orch_out": orch_out_tokens,
+            "total": task_tokens
+        })
+        harness_total += task_tokens
+        
+        # The orchestrator ONLY remembers the user's prompt and its tiny summary, never the raw code/output
+        orchestrator_history += f"\n\nUser: {task}\nAssistant: {orch_response}"
+
+    # --- 3. Results ---
+    print("\n" + "="*70)
+    print("MULTI-TASK BENCHMARK RESULTS")
+    print("="*70)
+    print(f"{'Task':<10} | {'Monolith Tokens':<25} | {'Harness Tokens':<25}")
+    print("-" * 70)
+    for i in range(len(tasks)):
+        m_tot = mono_results[i][2]
+        h_tot = harness_results[i]["total"]
+        print(f"Task {i+1:<5} | {m_tot:<25,} | {h_tot:<25,}")
+        
+    print("-" * 70)
+    print(f"{'TOTAL':<10} | {mono_total:<25,} | {harness_total:<25,}")
+    
+    if mono_total > 0:
+        savings = (1 - (harness_total / mono_total)) * 100
+        print(f"\nOverall Token Savings: {savings:.1f}%")
+    print("="*70)
+    
+    print("\nHarness Detailed Breakdown per Task:")
+    for i, res in enumerate(harness_results, 1):
+        print(f"Task {i}: Orch({res['orch_in']}+{res['orch_out']}) + Arch({res['arch_in']}+{res['arch_out']}) + Impl({res['impl_in']}+{res['impl_out']}) = {res['total']}")
+
 
 def run_monolith_benchmark(task_prompt: str, rules_content: str):
     full_prompt = f"{rules_content}\n\nTASK: {task_prompt}"
@@ -96,8 +214,7 @@ def run_monolith_benchmark(task_prompt: str, rules_content: str):
     input_tokens = count_tokens(full_prompt)
     
     try:
-        # We simulate the run without interactive prompts to measure output
-        output = run_gemini_command(["run", "--agent", agent_file, "--input", "Complete the task."])
+        output = run_gemini_command(["-y", "-p", f"You are a test agent. Read these instructions:\n\n{full_prompt}\n\nComplete the task."])
         output_tokens = count_tokens(output)
     finally:
         if os.path.exists(agent_file):
@@ -106,7 +223,6 @@ def run_monolith_benchmark(task_prompt: str, rules_content: str):
     return input_tokens + output_tokens
 
 def run_harness_benchmark(task_prompt: str, harness_dir: Path):
-    # Determine correct include pointer based on directory name
     include_str = f"@{harness_dir.name}/rules/core_mandates.md"
     hub_prompt = f"{include_str}\n\nTASK: {task_prompt}"
     
@@ -129,20 +245,18 @@ def run_harness_benchmark(task_prompt: str, harness_dir: Path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--baseline", action="store_true", help="Run the deterministic baseline task")
-    parser.add_argument("--prompt", type=str, help="Run a custom task")
+    parser.add_argument("--baseline", action="store_true", help="Run the single-task baseline")
+    parser.add_argument("--multi", action="store_true", help="Run the multi-task (4 iterations) benchmark")
+    parser.add_argument("--prompt", type=str, help="Run a custom single task")
     args = parser.parse_args()
     
-    task = args.prompt or (BASELINE_TASK if args.baseline else None)
-    if not task:
-        print("Please provide a prompt or use --baseline")
+    if not (args.baseline or args.multi or args.prompt):
+        print("Please provide --baseline, --multi, or --prompt")
         return
 
-    # Determine harness directory relative to this script
     script_dir = Path(__file__).parent.resolve()
     harness_dir = script_dir.parent
     
-    # Extract rules content
     rules_path = harness_dir / "rules" / "core_mandates.md"
     try:
         with open(rules_path, "r") as f:
@@ -152,20 +266,23 @@ def main():
         print(f"Warning: {rules_path} not found. Using fallback rules.")
 
     try:
-        monolith_total = run_monolith_benchmark(task, rules)
-        harness_total = run_harness_benchmark(task, harness_dir)
-        
-        print("\n" + "="*30)
-        print("BENCHMARK RESULTS")
-        print(f"Task: {task[:50]}...")
-        print(f"Monolith: {monolith_total} tokens")
-        print(f"Harness:  {harness_total} tokens")
-        if monolith_total > 0:
-            savings = (1 - (harness_total / monolith_total)) * 100
-            print(f"Savings:  {savings:.1f}%")
+        if args.multi:
+            run_multi_benchmark(BASELINE_MULTI, rules, harness_dir)
         else:
-            print("Savings:  N/A (Monolith total is 0)")
-        print("="*30)
+            task = args.prompt or BASELINE_SINGLE
+            monolith_total = run_monolith_benchmark(task, rules)
+            harness_total = run_harness_benchmark(task, harness_dir)
+            
+            print("\n" + "="*30)
+            print("SINGLE TASK RESULTS")
+            print(f"Task: {task[:50]}...")
+            print(f"Monolith: {monolith_total} tokens")
+            print(f"Harness:  {harness_total} tokens")
+            if monolith_total > 0:
+                savings = (1 - (harness_total / monolith_total)) * 100
+                print(f"Savings:  {savings:.1f}%")
+            print("="*30)
+            
     except CLIRunnerError as e:
         print(f"\nBenchmark failed due to CLI error: {e}", file=sys.stderr)
         sys.exit(1)
