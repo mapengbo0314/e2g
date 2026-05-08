@@ -2,7 +2,8 @@ import subprocess
 import sys
 import os
 
-from scripts.prune_logs import prune_logs
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "boilerplate-agent", "scripts"))
+from prune_logs import prune_logs
 
 def test_prune_logs_basic():
     input_text = """
@@ -14,7 +15,7 @@ venv/lib/python3.9/site-packages/some_lib.py:20: in lib_func
 """
     # Use the script as a CLI utility
     process = subprocess.Popen(
-        [sys.executable, "scripts/prune_logs.py"],
+        [sys.executable, "boilerplate-agent/scripts/prune_logs.py"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -42,7 +43,7 @@ Traceback (most recent call last):
     raise Exception("Boom")
 """
     process = subprocess.Popen(
-        [sys.executable, "scripts/prune_logs.py"],
+        [sys.executable, "boilerplate-agent/scripts/prune_logs.py"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
