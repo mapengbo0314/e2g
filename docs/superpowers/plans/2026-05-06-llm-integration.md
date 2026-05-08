@@ -76,7 +76,7 @@ def query_llm(prompt: str, llm_provider: str, api_key: str, model: str = None) -
     elif llm_provider == "gemini":
         from google import genai
         client = genai.Client(api_key=api_key)
-        use_model = model or "gemini-2.5-flash"
+        use_model = model or "gemini-1.5-flash"
         response = client.models.generate_content(
             model=use_model,
             contents=prompt

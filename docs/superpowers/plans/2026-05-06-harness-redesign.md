@@ -48,7 +48,7 @@ def parse_args():
     parser.add_argument("command", choices=["init"], help="Command to run")
     parser.add_argument("--project-path", required=True, help="Path to the repository")
     parser.add_argument("--llm", required=True, choices=["gemini", "openai", "anthropic"], help="LLM provider")
-    parser.add_argument("--model", help="Optional specific model to use (e.g., gemini-2.5-flash, claude-3-5-sonnet-20241022)")
+    parser.add_argument("--model", help="Optional specific model to use (e.g., gemini-1.5-flash, claude-3-5-sonnet-20241022)")
     parser.add_argument("--bundle", help="Optional path to an existing indxr JSON bundle")
     return parser.parse_args()
 
@@ -233,7 +233,7 @@ def parse_args():
     parser.add_argument("command", choices=["init"], help="Command to run")
     parser.add_argument("--project-path", required=True, help="Path to the repository")
     parser.add_argument("--llm", required=True, choices=["gemini", "openai", "anthropic"], help="LLM provider")
-    parser.add_argument("--model", help="Optional specific model to use (e.g., gemini-2.5-flash, claude-3-5-sonnet-20241022)")
+    parser.add_argument("--model", help="Optional specific model to use (e.g., gemini-1.5-flash, claude-3-5-sonnet-20241022)")
     parser.add_argument("--bundle", help="Optional path to an existing indxr JSON bundle")
     return parser.parse_args()
 

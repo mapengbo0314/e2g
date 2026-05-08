@@ -76,9 +76,9 @@ def query_llm(prompt: str, llm_provider: str, api_key: str, model: str = None) -
     elif llm_provider == "gemini":
         from google import genai
         client = genai.Client(api_key=api_key)
-        # Fix model name format: Gemini SDK often expects 'gemini-2.5-flash' without 'models/' prefix 
+        # Fix model name format: Gemini SDK often expects 'gemini-3.1-pro-preview' without 'models/' prefix 
         # but depending on the SDK version, it might require it. Let's ensure it's robust.
-        use_model = model or "gemini-2.5-flash"
+        use_model = model or "gemini-3.1-pro-preview"
         
         try:
             # We are using generate_content, which is synchronous. It might take 10-20 seconds.
