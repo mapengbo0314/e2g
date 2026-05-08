@@ -23,3 +23,39 @@ venv/lib/python3.9/site-packages/some_lib.py:20: in lib_func
     assert "venv/" not in stdout
     assert "Error: Something went wrong" in stdout
     assert "some/path/to/repo/file.py" in stdout
+
+def test_prune_logs_comprehensive():
+    input_text = """
+Header line 1
+Header line 2
+node_modules/some-lib/index.js:5
+  some code
+some/repo/file.py:10
+  repo code
+Error: Failed here
+venv/lib/python3.9/site-packages/other-lib/main.py:20
+  ignored code
+Traceback (most recent call last):
+  File "some/repo/file.py", line 10, in <module>
+    raise Exception("Boom")
+"""
+    process = subprocess.Popen(
+        [sys.executable, "scripts/prune_logs.py"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    stdout, stderr = process.communicate(input=input_text)
+    
+    # Should keep header vendor frames if before error
+    assert "node_modules/some-lib/index.js:5" in stdout
+    # Should keep repo frames
+    assert "some/repo/file.py:10" in stdout
+    # Should keep the error
+    assert "Error: Failed here" in stdout
+    # Should prune vendor frames after error
+    assert "venv/lib/python3.9/site-packages/other-lib/main.py:20" not in stdout
+    # Should keep traceback even if it looks like vendor (though here it's repo)
+    assert "Traceback" in stdout
+    assert "Exception" in stdout
