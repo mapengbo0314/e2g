@@ -98,6 +98,8 @@ echo "=== Setting up Superpowers for Gemini CLI ==="
 if command -v gemini &> /dev/null; then
     gemini extensions install https://github.com/obra/superpowers || true
     gemini extensions install https://github.com/mattpocock/skills || true
+    echo "Installing stack-trace-decoder..."
+    gemini extensions install https://github.com/latestaiagents/agent-skills@stack-trace-decoder || true
 else
     echo "Warning: gemini command not found."
 fi
@@ -109,6 +111,9 @@ echo "=== Setting up Superpowers for Claude Code ==="
 echo "To install Superpowers and Skills for Claude Code, run these commands inside the Claude Code interface:"
 echo "  /plugin install superpowers@claude-plugins-official"
 echo "  /plugin install skills@mattpocock"
+
+echo "Installing stack-trace-decoder..."
+npx skills add latestaiagents/agent-skills@stack-trace-decoder -y || true
 
 # MCP Configuration for Claude
 if command -v claude &> /dev/null; then
@@ -123,6 +128,9 @@ echo "=== Setting up Superpowers for Cursor ==="
 echo "To install Superpowers and Skills for Cursor, run these commands inside the Cursor Agent chat:"
 echo "  /add-plugin superpowers"
 echo "  /add-plugin mattpocock/skills"
+
+echo "Installing stack-trace-decoder..."
+npx skills add latestaiagents/agent-skills@stack-trace-decoder -y || true
 """
     }
 
@@ -219,20 +227,17 @@ You MUST refer to the following DDD documentation:
 Ensure your implementation aligns with these definitions.
 """
 
-        core_mandates = f"""
-## Core Mandates
-You are a specialized subagent operating within this repository's agent ecosystem.
-You have been delegated a specific task by the Orchestrator.
-1. Security & System Integrity: Protect secrets.
-2. Context Efficiency: Be strategic in tool usage.
-3. Superpower Workflows: You MUST utilize installed Superpower skills. If your platform supports a native skill tool (e.g. `activate_skill`, `skill`), use it. Otherwise, read the `.md` files located in `{target_path.name}/skills/`.
+        # Determine the correct include syntax based on platform
+        include_pointer = ""
+        if active_platform == "gemini":
+            include_pointer = f"@.{active_platform}/rules/core_mandates.md\n\n"
+        elif active_platform == "claude":
+            include_pointer = f"@.{active_platform}/rules/core_mandates.md\n\n"
+        else:
+            # Fallback for cursor/agents where include syntax might not be natively supported
+            include_pointer = "<!-- Core Mandates should be read from rules/core_mandates.md -->\n\n"
 
-## Indexer MCP Integration
-You have access to the codebase index via the `indxr` MCP server.
-- Strategic Fetching: Use `find`, `summarize`, `get_file_summary` via MCP.
-"""
-
-        final_content = frontmatter + system_prompt + "\n" + core_mandates + "\n" + ddd_section
+        final_content = frontmatter + include_pointer + system_prompt + "\n" + ddd_section
         
         with open(agent_file_path, 'w') as f:
             f.write(final_content)
