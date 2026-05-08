@@ -57,7 +57,10 @@ Once the harness is minted, the daily execution flow is strictly enforced:
 ├── mcp.json (Config)
 ├── agents/ (Specialized Spokes)
 │   ├── trust-agent.md
-│   └── api-specialist.md
+│   ├── api-specialist.md
+│   ├── planner.md
+│   ├── implementer.md
+│   └── verifier.md
 ├── rules/ (State Machine)
 │   ├── dispatch_rules.md
 │   └── unified_superpower_workflow.md
