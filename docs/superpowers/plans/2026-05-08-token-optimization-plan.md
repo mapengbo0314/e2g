@@ -98,11 +98,6 @@ Update `minting_engine.py` using `sed` or Python scripting to replace the hardco
     ```bash
     echo "Installing stack-trace-decoder..."
     npx skills add latestaiagents/agent-skills@stack-trace-decoder -y || true
-    echo "Installing token-optimizer globally..."
-    npm install -g token-optimizer || true
-    echo "Configuring token-optimizer..."
-    token-optimizer config set disableStructureMap true || true
-    token-optimizer wrap bash || true
     ```
 3.  Update the `"gemini"` value to include:
     ```bash
