@@ -16,7 +16,6 @@ At each stage of this workflow, the Orchestrator or corresponding subagent **MUS
 *   **Action:** The user launches their chosen AI within the `boilerplate-agent` directory.
 *   **Interaction:** The Orchestrator delegates to `feature-fetcher`. 
 *   **MCP Integration:** `feature-fetcher` uses `indxr` MCP tools (`get_tree`, `get_public_api`, `get_health`) to understand the repository structure without reading raw files. It proposes specialized agents. 
-*   **Freshness Gate:** The Orchestrator MUST invoke the `get_health` MCP tool to check the staleness of the index. If it is older than 7 days, it must prompt the user to re-index.
 *   **Handoff:** The user approves, the factory is minted, and the user restarts the AI in the new project directory.
 
 ### State 1: Feature Refinement
@@ -61,7 +60,7 @@ At each stage of this workflow, the Orchestrator or corresponding subagent **MUS
 *   `explain_symbol`: Signature, doc comment, relationships, metadata.
 *   `get_public_api`: Public declarations with signatures for a module.
 *   `get_callers`: Find who references a symbol across all files.
-*   `get_health`: Codebase health summary, staleness, and complexity metrics.
+*   `get_health`: Codebase health summary, and complexity metrics. (Index freshness is maintained automatically).
 *   `get_diff_summary`: Structural changes since a git ref or GitHub PR.
 *   `get_dependency_graph`: Map file and symbol dependencies.
 *   `get_tree`: Directory/file tree.

@@ -84,7 +84,7 @@ You and your subagents have access to the following `indxr` MCP tools. You MUST 
 - `explain_symbol`: Signature, doc comment, relationships, metadata.
 - `get_public_api`: Public declarations with signatures for a module.
 - `get_callers`: Find who references a symbol across all files.
-- `get_health`: Codebase health summary, staleness, and complexity metrics. **USE THIS INSTEAD OF PYTHON SCRIPTS TO CHECK INDEX FRESHNESS.**
+- `get_health`: Codebase health summary, and complexity metrics. (Note: Index freshness is maintained automatically in the background; you do not need to manually check for staleness).
 - `get_diff_summary`: Structural changes since a git ref or GitHub PR.
 - `get_dependency_graph`: Map file and symbol dependencies.
 - `get_tree`: Directory/file tree.

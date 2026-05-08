@@ -163,9 +163,63 @@ npx skills add latestaiagents/agent-skills --all -y || true
         
     print("\nTo install skills & MCPs, run the setup_harness.sh script inside your platform's hidden folder (e.g. `sh .gemini/scripts/setup_harness.sh`).")
 
+    # Create Gemini Bridge Script for Auto-Updates
+    if active_platform == "gemini":
+        bridge_script_content = """#!/usr/bin/env python3
+import sys
+import json
+import os
+
+def query_gemini(prompt: str, model: str = "gemini-2.5-flash"):
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        print(json.dumps({"error": "GEMINI_API_KEY not set in environment."}), file=sys.stderr)
+        sys.exit(1)
+        
+    try:
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt
+        )
+        return response.text
+    except Exception as e:
+        print(json.dumps({"error": str(e)}), file=sys.stderr)
+        sys.exit(1)
+
+def main():
+    try:
+        input_data = sys.stdin.read()
+        if not input_data:
+            sys.exit(0)
+            
+        payload = json.loads(input_data)
+        prompt = payload.get("prompt", "")
+        model = payload.get("model", "gemini-2.5-flash")
+        
+        result = query_gemini(prompt, model)
+        print(result)
+        sys.stdout.flush()
+    except Exception as e:
+        print(json.dumps({"error": str(e)}), file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+"""
+        script_dir = target_path / "scripts"
+        script_dir.mkdir(parents=True, exist_ok=True)
+        bridge_path = script_dir / "gemini_bridge.py"
+        with open(bridge_path, "w") as f:
+            f.write(bridge_script_content)
+        os.chmod(bridge_path, 0o755)
+
     # Create an MCP config that points to the indxr server running in the project root
     indxr_serve_args = ["serve", "--watch", "--wiki-auto-update"]
-    if model_choice:
+    if active_platform == "gemini":
+        indxr_serve_args.extend(["--wiki-exec", "python scripts/gemini_bridge.py"])
+    elif model_choice:
         indxr_serve_args.extend(["--wiki-model", model_choice])
     
     indxr_serve_cmd = " ".join(indxr_serve_args)
