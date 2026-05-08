@@ -113,7 +113,7 @@ echo "  /plugin install superpowers@claude-plugins-official"
 echo "  /plugin install skills@mattpocock"
 
 echo "Installing stack-trace-decoder..."
-npx skills add latestaiagents/agent-skills@stack-trace-decoder -y || true
+npx skills add latestaiagents/agent-skills --all -y || true
 
 # MCP Configuration for Claude
 if command -v claude &> /dev/null; then
@@ -130,7 +130,7 @@ echo "  /add-plugin superpowers"
 echo "  /add-plugin mattpocock/skills"
 
 echo "Installing stack-trace-decoder..."
-npx skills add latestaiagents/agent-skills@stack-trace-decoder -y || true
+npx skills add latestaiagents/agent-skills --all -y || true
 """
     }
 
