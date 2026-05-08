@@ -94,16 +94,8 @@ git commit -m "feat(harness): extract shared core mandates to rules directory"
 Update `minting_engine.py` using `sed` or Python scripting to replace the hardcoded `core_mandates` injection and update the `setup_harness.sh` scripts.
 
 1.  Find the `scripts_to_generate` dictionary in `harness/minting_engine.py`.
-2.  Update the `"claude"` and `"cursor"` values to include:
-    ```bash
-    echo "Installing stack-trace-decoder..."
-    npx skills add latestaiagents/agent-skills@stack-trace-decoder -y || true
-    ```
-3.  Update the `"gemini"` value to include:
-    ```bash
-    echo "Installing stack-trace-decoder..."
-    gemini extensions install https://github.com/latestaiagents/agent-skills@stack-trace-decoder || true
-    ```
+2.  Update the `"claude"` and `"cursor"` values to install `token-optimizer`.
+3.  Update the `"gemini"` value to install `token-optimizer`.
 4.  Find the loop `for agent in selected_agents:` near the end of the file.
 5.  Remove the `core_mandates = f"""..."""` block.
 6.  Replace the `final_content` construction with platform-aware logic:

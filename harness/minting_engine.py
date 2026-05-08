@@ -125,9 +125,6 @@ echo "To install Superpowers and Skills for Claude Code, run these commands insi
 echo "  /plugin install superpowers@claude-plugins-official"
 echo "  /plugin install skills@mattpocock"
 
-echo "Installing stack-trace-decoder..."
-npx skills add latestaiagents/agent-skills --all -y || true
-
 # MCP Configuration for Claude
 if command -v claude &> /dev/null; then
     echo "Adding indxr to Claude Code global MCP configuration..."
@@ -142,9 +139,6 @@ echo "=== Setting up Superpowers for Cursor ==="
 echo "To install Superpowers and Skills for Cursor, run these commands inside the Cursor Agent chat:"
 echo "  /add-plugin superpowers"
 echo "  /add-plugin mattpocock/skills"
-
-echo "Installing stack-trace-decoder..."
-npx skills add latestaiagents/agent-skills --all -y || true
 """
     }
 
@@ -158,22 +152,20 @@ npx skills add latestaiagents/agent-skills --all -y || true
             f.write(script_content)
         os.chmod(script_path, 0o755)
     
-    # Generate Root Level Pointers
-    root_pointers = {
-        "gemini": "GEMINI.md",
-        "claude": "CLAUDE.md",
-        "cursor": ".cursorrules",
-        "agents": "AGENTS.md"
-    }
+    # Generate Platform Rules Pointers IN THE ROOT DIRECTORY
+    pointer_content = """# Agentic Harness
     
-    if active_platform in root_pointers:
-        pointer_file = root_pointers[active_platform]
-        harness_dir = f".{active_platform}"
-        with open(project_root / pointer_file, "w") as f:
-            if active_platform == "gemini":
-                f.write(f"@{harness_dir}/AGENTS.md\n@{harness_dir}/orchestrator.md\n")
-            else:
-                f.write(f"# Agentic Harness\n\nPlease read `{harness_dir}/orchestrator.md` for core repository instructions and routing rules.\n")
+Please read `AGENTS.md` for core repository instructions and routing rules.
+"""
+    pointer_files = ["GEMINI.md", "CLAUDE.md", ".cursorrules"]
+    for rules_file in pointer_files:
+        with open(project_root / rules_file, "w") as f:
+            f.write(pointer_content)
+            
+    copilot_dir = project_root / ".github"
+    copilot_dir.mkdir(exist_ok=True)
+    with open(copilot_dir / "copilot-instructions.md", "w") as f:
+        f.write(pointer_content)
         
     print("\nTo install skills & MCPs, run the setup_harness.sh script inside your platform's hidden folder (e.g. `sh .gemini/scripts/setup_harness.sh`).")
 
