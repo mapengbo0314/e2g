@@ -1,6 +1,6 @@
 import pytest
 from unittest import mock
-from harness.discovery_engine import discover_agents, discover_ddd_context
+from harness.discovery_engine import discover_agents, discover_ddd_context, discover_custom_agent
 
 @mock.patch("harness.discovery_engine.fetch_remote_skill")
 @mock.patch("harness.discovery_engine.query_llm")
@@ -47,6 +47,21 @@ def test_discover_agents_with_ddd_context(mock_query_llm, mock_fetch_skill):
     call_args = mock_query_llm.call_args[0][0]
     assert "DOMAIN-DRIVEN DESIGN (DDD) CONTEXT" in call_args
     assert "Foo means Bar" in call_args
+
+@mock.patch("harness.discovery_engine.query_llm")
+def test_discover_custom_agent(mock_query_llm):
+    mock_query_llm.return_value = '''
+    {
+      "name": "CustomAgent",
+      "role": "Custom Role",
+      "zone": "Core",
+      "system_prompt": "Custom Prompt"
+    }
+    '''
+    
+    agent = discover_custom_agent("CustomAgent", "Custom Specs", "Context", {"ubiquitous_language": "foo"}, "gemini", "key")
+    assert agent["name"] == "CustomAgent"
+    assert "Custom Prompt" in agent["system_prompt"]
 
 @mock.patch("harness.discovery_engine.fetch_remote_skill")
 @mock.patch("harness.discovery_engine.query_llm")

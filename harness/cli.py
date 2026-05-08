@@ -24,12 +24,17 @@ def run_ddd_grill(ddd_context: dict) -> dict:
     
     if not questions:
         print("No alignment questions generated.")
-        return answers
-
-    for i, q in enumerate(questions):
-        print(f"\n[{i+1}/{len(questions)}] {q}")
-        ans = input("> ").strip()
-        answers[q] = ans
+    else:
+        for i, q in enumerate(questions):
+            print(f"\n[{i+1}/{len(questions)}] {q}")
+            ans = input("> ").strip()
+            answers[q] = ans
+            
+    # Enhancement: Extra question for general domain knowledge
+    print("\n[Extra] Are there any other domain specific knowledge you would like to pass in?")
+    extra_knowledge = input("> ").strip()
+    if extra_knowledge:
+        answers["__additional_domain_knowledge__"] = extra_knowledge
         
     return answers
 
@@ -68,7 +73,8 @@ def main():
             final_ddd_context = {
                 "ubiquitous_language": ddd_context_raw.get("context_draft", ""),
                 "translation_map": grill_answers,
-                "legacy_hints": ddd_context_raw.get("legacy_hints", {})
+                "legacy_hints": ddd_context_raw.get("legacy_hints", {}),
+                "additional_domain_knowledge": grill_answers.get("__additional_domain_knowledge__", "")
             }
 
         print("Discovering specialized agents...")
@@ -83,6 +89,22 @@ def main():
             if choice in ['', 'y', 'yes']:
                 selected_agents.append(agent)
                 
+        # Custom Agent Creation Loop
+        while True:
+            choice = input("\nWould you like to create an additional custom agent? (y/N): ").strip().lower()
+            if choice not in ['y', 'yes']:
+                break
+                
+            custom_name = input("Enter Agent Name: ").strip()
+            if not custom_name: continue
+            custom_specs = input("Enter Agent Specs/Role: ").strip()
+            if not custom_specs: continue
+            
+            from harness.discovery_engine import discover_custom_agent
+            custom_agent = discover_custom_agent(custom_name, custom_specs, context_str, final_ddd_context, args.llm, api_key, args.model)
+            selected_agents.append(custom_agent)
+            print(f"Agent {custom_name} added.")
+
         if not selected_agents:
             print("No agents selected. Aborting.")
             sys.exit(0)
