@@ -1,6 +1,17 @@
 import os
 import json
 import yaml
+import re
+
+def to_slug(text):
+    """Converts CamelCase/PascalCase and spaces to lowercase kebab-case, stripping symbols."""
+    # 1. Handle CamelCase (Insert hyphens between lower-to-upper transitions)
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1-\2', text)
+    s2 = re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1).lower()
+    # 2. Replace any non-alphanumeric character (except hyphens) with a hyphen
+    s3 = re.sub(r'[^a-z0-9]+', '-', s2)
+    # 3. Clean up multiple hyphens and leading/trailing
+    return re.sub(r'-+', '-', s3).strip('-')
 
 def reload_agents():
     """Regenerates .gemini/agents/*.md from _agents/agents/*/ config files."""
@@ -54,8 +65,9 @@ def reload_agents():
             markdown_content = []
             
             # Frontmatter
+            safe_name = to_slug(agent_data.get('name', agent_name))
             markdown_content.append("---")
-            markdown_content.append(f"name: {agent_data.get('name', agent_name)}")
+            markdown_content.append(f"name: {safe_name}")
             markdown_content.append(f"description: {agent_data.get('description', '').strip()}")
             markdown_content.append("---")
             
@@ -96,10 +108,10 @@ def reload_agents():
                         markdown_content.append(str(cap_list))
                     markdown_content.append("")
                     
-            output_file = os.path.join(output_dir, f"{agent_name}.md")
+            output_file = os.path.join(output_dir, f"{safe_name}.md")
             with open(output_file, "w", encoding="utf-8") as f:
                 f.write("\n".join(markdown_content))
-            print(f"  [+] {agent_name} -> {output_file}")
+            print(f"  [+] {safe_name} -> {output_file}")
             updated_count += 1
             
         elif agent_type == "flat":

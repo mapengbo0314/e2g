@@ -163,63 +163,9 @@ npx skills add latestaiagents/agent-skills --all -y || true
         
     print("\nTo install skills & MCPs, run the setup_harness.sh script inside your platform's hidden folder (e.g. `sh .gemini/scripts/setup_harness.sh`).")
 
-    # Create Gemini Bridge Script for Auto-Updates
-    if active_platform == "gemini":
-        bridge_script_content = """#!/usr/bin/env python3
-import sys
-import json
-import os
-
-def query_gemini(prompt: str, model: str = "gemini-2.5-flash"):
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        print(json.dumps({"error": "GEMINI_API_KEY not set in environment."}), file=sys.stderr)
-        sys.exit(1)
-        
-    try:
-        from google import genai
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model=model,
-            contents=prompt
-        )
-        return response.text
-    except Exception as e:
-        print(json.dumps({"error": str(e)}), file=sys.stderr)
-        sys.exit(1)
-
-def main():
-    try:
-        input_data = sys.stdin.read()
-        if not input_data:
-            sys.exit(0)
-            
-        payload = json.loads(input_data)
-        prompt = payload.get("prompt", "")
-        model = payload.get("model", "gemini-2.5-flash")
-        
-        result = query_gemini(prompt, model)
-        print(result)
-        sys.stdout.flush()
-    except Exception as e:
-        print(json.dumps({"error": str(e)}), file=sys.stderr)
-        sys.exit(1)
-
-if __name__ == "__main__":
-    main()
-"""
-        script_dir = target_path / "scripts"
-        script_dir.mkdir(parents=True, exist_ok=True)
-        bridge_path = script_dir / "gemini_bridge.py"
-        with open(bridge_path, "w") as f:
-            f.write(bridge_script_content)
-        os.chmod(bridge_path, 0o755)
-
     # Create an MCP config that points to the indxr server running in the project root
     indxr_serve_args = ["serve", "--watch", "--wiki-auto-update"]
-    if active_platform == "gemini":
-        indxr_serve_args.extend(["--wiki-exec", "python scripts/gemini_bridge.py"])
-    elif model_choice:
+    if model_choice:
         indxr_serve_args.extend(["--wiki-model", model_choice])
     
     indxr_serve_cmd = " ".join(indxr_serve_args)
@@ -244,11 +190,19 @@ if __name__ == "__main__":
     with open(mcp_path, 'w') as f:
          json.dump(mcp_config, f, indent=2)
          
+    # Helper to generate a valid URL-safe slug
+    def to_slug(text):
+        # 1. Handle CamelCase (Insert hyphens between lower-to-upper transitions)
+        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1-\2', text)
+        s2 = re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1).lower()
+        # 2. Replace any non-alphanumeric character (except hyphens) with a hyphen
+        s3 = re.sub(r'[^a-z0-9]+', '-', s2)
+        # 3. Clean up multiple hyphens and leading/trailing
+        return re.sub(r'-+', '-', s3).strip('-')
+
     # Generate Specialized Agents
     for agent in selected_agents:
-        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1-\2', agent["name"])
-        safe_name = re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1).lower().replace(" ", "-").replace("_", "-")
-        safe_name = re.sub(r'-+', '-', safe_name).strip('-')
+        safe_name = to_slug(agent["name"])
         
         agent_dir_path = target_path / "agents"
         agent_dir_path.mkdir(parents=True, exist_ok=True)
