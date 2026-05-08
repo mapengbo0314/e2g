@@ -18,11 +18,6 @@ At each stage of this workflow, the Orchestrator or corresponding subagent **MUS
 *   **MCP Integration:** `feature-fetcher` uses `indxr` MCP tools (`get_tree`, `get_public_api`, `get_health`) to understand the repository structure without reading raw files. It proposes specialized agents. 
 *   **Handoff:** The user approves, the factory is minted, and the user restarts the AI in the new project directory.
 
-### State 0.5: Context Intake (Gating)
-- **Trigger**: Large input or logs detected.
-- **Goal**: Distill raw input into a bounded summary.
-- **Exit Condition**: `context_intake_summary` produced and verified.
-
 ### State 1: Feature Refinement
 *   **Required Superpower Skill:** `brainstorming`
 *   **Action:** The Orchestrator engages the user to define a feature or fix.
