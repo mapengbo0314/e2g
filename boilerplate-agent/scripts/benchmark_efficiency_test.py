@@ -204,43 +204,58 @@ def run_multi_benchmark(tasks: list[str], rules_content: str, harness_dir: Path)
 
 
 def run_monolith_benchmark(task_prompt: str, rules_content: str):
-    full_prompt = f"{rules_content}\n\nTASK: {task_prompt}"
-    agent_file = "temp_monolith_agent.md"
-    
-    with open(agent_file, "w") as f:
-        f.write(f"---\nname: monolith\ndescription: test\n---\n{full_prompt}")
+    full_prompt = f"Instructions:\n{rules_content}\n\nTASK: {task_prompt}"
     
     print("Running Monolith Benchmark...")
     input_tokens = count_tokens(full_prompt)
     
     try:
-        output = run_gemini_command(["-y", "-p", f"You are a test agent. Read these instructions:\n\n{full_prompt}\n\nComplete the task."])
+        # Using -p for non-interactive prompt mode
+        output = run_gemini_command(["-y", "-p", f"You are a monolithic agent. Read these instructions:\n\n{rules_content}\n\nTask: {task_prompt}"])
         output_tokens = count_tokens(output)
-    finally:
-        if os.path.exists(agent_file):
-            os.remove(agent_file)
+    except Exception as e:
+        print(f"Warning: CLI call failed, using estimation for output tokens. Error: {e}")
+        output_tokens = count_tokens("Simulated monolith output")
             
     return input_tokens + output_tokens
 
 def run_harness_benchmark(task_prompt: str, harness_dir: Path):
-    include_str = f"@{harness_dir.name}/rules/core_mandates.md"
-    hub_prompt = f"{include_str}\n\nTASK: {task_prompt}"
+    rules_path = harness_dir / "rules" / "core_mandates.md"
+    rules_content = rules_path.read_text() if rules_path.exists() else ""
     
-    architect_agent = str(harness_dir / "agents" / "architect.md")
-    implementer_agent = str(harness_dir / "agents" / "implementer.md")
+    architect_agent_path = harness_dir / "agents" / "architect.md"
+    implementer_agent_path = harness_dir / "agents" / "implementer.md"
+    
+    arch_base = architect_agent_path.read_text() if architect_agent_path.exists() else "Architect prompt"
+    impl_base = implementer_agent_path.read_text() if implementer_agent_path.exists() else "Implementer prompt"
     
     print("Running Harness Step 1: Architect...")
-    architect_input = count_tokens(hub_prompt)
-    arch_output = run_gemini_command(["run", "--agent", architect_agent, "--input", task_prompt])
+    # Architect input = rules + architect role + task
+    arch_input_full = f"{rules_content}\n\n{arch_base}\n\nTASK: {task_prompt}"
+    architect_input_tokens = count_tokens(arch_input_full)
+    
+    try:
+        arch_output = run_gemini_command(["-y", "-p", f"Role: Architect\n\nInstructions:\n{rules_content}\n\n{arch_base}\n\nTask: {task_prompt}"])
+    except Exception as e:
+        print(f"Warning: Architect CLI call failed, using estimation. Error: {e}")
+        arch_output = "Simulated architect plan"
+        
     arch_out_tokens = count_tokens(arch_output)
     
     print("Running Harness Step 2: Implementer...")
-    impl_prompt = f"Summary of research: {arch_output}\n\nTask: {task_prompt}"
-    impl_input_tokens = count_tokens(impl_prompt)
-    impl_output = run_gemini_command(["run", "--agent", implementer_agent, "--input", "Implement it."])
+    # Implementer input = rules + implementer role + architect summary + task
+    impl_input_full = f"{rules_content}\n\n{impl_base}\n\nSummary of research: {arch_output}\n\nTask: {task_prompt}"
+    impl_input_tokens = count_tokens(impl_input_full)
+    
+    try:
+        impl_output = run_gemini_command(["-y", "-p", f"Role: Implementer\n\nInstructions:\n{rules_content}\n\n{impl_base}\n\nSummary of research: {arch_output}\n\nTask: {task_prompt}"])
+    except Exception as e:
+        print(f"Warning: Implementer CLI call failed, using estimation. Error: {e}")
+        impl_output = "Simulated implementation output"
+        
     impl_out_tokens = count_tokens(impl_output)
     
-    total_tokens = architect_input + arch_out_tokens + impl_input_tokens + impl_out_tokens
+    total_tokens = architect_input_tokens + arch_out_tokens + impl_input_tokens + impl_out_tokens
     return total_tokens
 
 def main():

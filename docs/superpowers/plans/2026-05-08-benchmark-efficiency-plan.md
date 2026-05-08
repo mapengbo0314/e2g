@@ -142,21 +142,14 @@ def run_monolith_benchmark(task_prompt: str, rules_content: str):
     # Construct massive prompt
     full_prompt = f"{rules_content}\n\nTASK: {task_prompt}"
     
-    # Create temp agent file
-    with open("temp_monolith_agent.md", "w") as f:
-        f.write(f"---\nname: monolith\ndescription: test\n---\n{full_prompt}")
-    
     print("Running Monolith Benchmark...")
-    # Simulate execution (we might use --run for non-interactive)
-    # Since we want to measure tokens, we calculate input tokens manually
+    # Calculate input tokens
     input_tokens = count_tokens(full_prompt)
     
-    # Execute (Mocking actual completion for now to save tokens during development, 
-    # but the script will run it for real)
-    output = run_gemini_command(["run", "--agent", "temp_monolith_agent.md", "--input", "Complete the task."])
+    # Execute using -p for headless mode
+    output = run_gemini_command(["-y", "-p", f"Instructions:\n{rules_content}\n\nTask: {task_prompt}"])
     output_tokens = count_tokens(output)
     
-    os.remove("temp_monolith_agent.md")
     return input_tokens + output_tokens
 ```
 
@@ -170,17 +163,21 @@ def run_harness_benchmark(task_prompt: str, rules_content: str):
     # Step 1: Architect (Research)
     print("Running Harness Step 1: Architect...")
     architect_input = count_tokens(hub_prompt)
-    arch_output = run_gemini_command(["run", "--agent", ".gemini/agents/architect.md", "--input", task_prompt])
+    # Step 1: Architect (Research)
+    print("Running Harness Step 1: Architect...")
+    arch_content = Path(".gemini/agents/architect.md").read_text()
+    arch_output = run_gemini_command(["-y", "-p", f"Role: Architect\n\nInstructions:\n{arch_content}\n\nTask: {task_prompt}"])
     arch_out_tokens = count_tokens(arch_output)
     
     # Step 2: Implementer (Action) - passing summary
     print("Running Harness Step 2: Implementer...")
+    impl_content = Path(".gemini/agents/implementer.md").read_text()
     impl_prompt = f"Summary of research: {arch_output}\n\nTask: {task_prompt}"
     impl_input_tokens = count_tokens(impl_prompt)
-    impl_output = run_gemini_command(["run", "--agent", ".gemini/agents/implementer.md", "--input", "Implement it."])
+    impl_output = run_gemini_command(["-y", "-p", f"Role: Implementer\n\nInstructions:\n{impl_content}\n\n{impl_prompt}"])
     impl_out_tokens = count_tokens(impl_output)
     
-    total_tokens = architect_input + arch_out_tokens + impl_input_tokens + impl_out_tokens
+    total_tokens = count_tokens(arch_content) + arch_out_tokens + impl_input_tokens + impl_out_tokens
     return total_tokens
 ```
 
