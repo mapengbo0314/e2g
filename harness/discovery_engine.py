@@ -104,20 +104,9 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
     except Exception as e:
         print(f"Warning: Could not load feature-fetcher prompt: {e}")
 
-    print("Loading local skills for Agent Discovery...")
-    try:
-        # Resolve the boilerplate directory path dynamically
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        skills_dir = os.path.join(project_root, "boilerplate-agent", "skills")
-        
-        with open(os.path.join(skills_dir, "improve-codebase-architecture", "SKILL.md"), "r") as f:
-            arch_skill = f.read()
-        with open(os.path.join(skills_dir, "grill-with-docs", "SKILL.md"), "r") as f:
-            grill_docs_skill = f.read()
-    except Exception as e:
-        print(f"Warning: Could not load local skills for agent discovery: {e}")
-        arch_skill = "Use architecture best practices."
-        grill_docs_skill = "Grill the user on their choices."
+    print("Fetching remote skills for Agent Discovery...")
+    arch_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture/SKILL.md")
+    grill_docs_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md")
 
     ddd_prompt_section = ""
     if ddd_context:
