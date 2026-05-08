@@ -15,6 +15,7 @@ You MUST utilize `rules/dispatch_rules.md` to help establish rules.
 - Version: 1.0
 - Entrypoint: rules/dispatch_rules.md
 - Skills:
+  - context-intake
   - grill-me
   - grill-with-docs
   - improve-codebase-architecture
