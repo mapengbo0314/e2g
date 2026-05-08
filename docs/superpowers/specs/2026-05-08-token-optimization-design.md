@@ -30,6 +30,18 @@ Introduce a mandatory compression step before debugging tasks.
     *   Modify `boilerplate-agent/rules/dispatch_rules.md` (and related Orchestrator instructions) to include a strict pre-delegation mandate:
         *   *"If the user input contains a raw stack trace, CI failure, or explicitly requests a bug fix, DO NOT read the logs directly. Delegate to a triage agent (e.g., `architect` or `@generalist`) and instruct them to use the `stack-trace-decoder` skill. They must write a compressed artifact to `artifacts/triage.md`. When delegating to the `implementer`, pass `artifacts/triage.md` as the primary diagnostic frame, but always include the original user prompt to preserve intent."*
 
+### Part 3: Out-of-Band Context Compression (Claude & Codex)
+To further reduce token waste on platforms that do not support native context caching (like Claude Code and Cursor/Codex), we will integrate the `token-optimizer` package.
+
+1.  **Strict Integration Protocol (Conflict Avoidance):**
+    *   We will **disable** `token-optimizer`'s AST "Structure Map" feature entirely (`disableStructureMap=true`) to ensure it does not compete with `indxr` as the semantic source of truth.
+2.  **Setup Script Injection:**
+    *   Update `harness/minting_engine.py` to inject the following commands into the Claude and Cursor setup scripts:
+        *   `npm install -g token-optimizer`
+        *   `token-optimizer config set disableStructureMap true`
+        *   `token-optimizer wrap bash`
+3.  **Synergy:** This layer acts as a lossless volume reducer (wrapping verbose CLI outputs like `pytest` and archiving `indxr` JSON blobs >4KB to disk), while Part 2 (the `stack-trace-decoder` skill) acts as the semantic interpreter for the LLM.
+
 ## 3. Alternatives Considered
 *   **Orchestrator Prepending Mandates Runtime:** We considered keeping agents lean but having the Orchestrator inject the rules dynamically into the delegation prompt. *Rejected:* This bloats the Orchestrator's own context window, defeating the token-saving goal.
 *   **`@include` for all platforms:** We considered using `@include` blindly. *Rejected:* Goldfish review identified this would break Claude Code and Cursor.
@@ -39,4 +51,5 @@ Introduce a mandatory compression step before debugging tasks.
 - [ ] Verify `boilerplate-agent/rules/core_mandates.md` exists and contains the "Core Mandates" and "Workspace Guidelines".
 - [ ] Verify `harness/minting_engine.py` generates agent files using `@` inclusion for `gemini` and `claude` platforms pointing to `rules/core_mandates.md`.
 - [ ] Verify `harness/minting_engine.py` includes `npx skills add latestaiagents/agent-skills@stack-trace-decoder` in the setup script templates.
+- [ ] Verify `harness/minting_engine.py` configures `token-optimizer` with `disableStructureMap true` for Claude and Cursor platforms.
 - [ ] Verify `boilerplate-agent/rules/dispatch_rules.md` contains the new mandatory Failure Context Triage routing rule.
