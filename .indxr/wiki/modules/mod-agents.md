@@ -22,94 +22,51 @@ source_files:
 - _agents/agents/reviewer/config.yaml
 - _agents/agents/verifier/agent.json
 - _agents/agents/verifier/config.yaml
-generated_at_ref: 703d472a00754a21da89f8b7ca2cde038b89e5b3
-generated_at: 2026-05-06T21:04:02Z
+generated_at_ref: f1af3b2fa46c98c92658d870947ac03b9020de8a
+generated_at: 2026-05-08T19:40:40Z
 links_to:
-- topic-workflow-orchestration
 - entity-agent-config
 - mod-harness-core
+- topic-workflow-orchestration
 covers:
 - heading:Agent Config Schema
 - key:defaultAgent
 - key:agents
 - fn:reload_agents
-- key:name
-- key:description
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
+contradictions:
+- description: Wiki previously described a two-layer JSON/YAML configuration structure (agent.json + config.yaml) but the system has migrated to single Markdown files
+  source: _agents/agents/config-schema.md
+  detected_at: 2026-05-08T19:40:40Z
+- description: Wiki stated configurations follow a specific YAML schema but agents are now defined in Markdown format
+  source: _agents/agents/*.md files
+  detected_at: 2026-05-08T19:40:40Z
 ---
+
+# Agent Configuration System
 
 The agent configuration system provides a centralized mechanism for defining specialized AI agents with distinct roles, capabilities, and behavioral configurations. This system enables workflow orchestration by allowing the harness to dynamically select and configure agents based on task requirements.
 
 ## Configuration Architecture
 
-The system uses a two-layer configuration structure:
+**MAJOR ARCHITECTURAL CHANGE**: The system has migrated from a two-layer JSON/YAML configuration structure to a Markdown-based agent definition format. This represents a fundamental shift in how agents are configured and managed.
 
-1. **Agent Metadata** (`agent.json`): Defines agent identity, description, and configuration file references
-2. **Behavioral Configuration** (`config.yaml`): Specifies detailed prompt customizations, coding behaviors, and agentic mode settings
+### New Agent Definition Format
 
-This separation allows the harness to quickly enumerate available agents while deferring expensive configuration parsing until agent instantiation. The `_agents/agents.json` file specifies `"defaultAgent": "planner"`, establishing the planner as the primary orchestration entry point.
+Agent configurations are now stored as standalone Markdown files in `_agents/agents/`, replacing the previous `agent.json` + `config.yaml` pattern. Each agent is defined in a single `.md` file (e.g., `planner.md`, `architect.md`) that contains structured agent specifications in a human-readable format.
+
+### Registry Structure
+
+The `_agents/agents.json` file continues to specify `"defaultAgent": "planner"`, establishing the planner as the primary orchestration entry point, but now references the new Markdown-based agent definitions.
 
 ## Agent Registry and Reload System
 
-The `reload_agents()` function in `_agents/reload_agents.py` implements a build-time configuration compilation process that transforms the source agent definitions into the runtime format expected by the harness. This enables configuration changes to be applied without system restart and maintains separation between development-time configuration and runtime agent instantiation.
+The `reload_agents()` function in `_agents/reload_agents.py` has been updated to handle the new Markdown-based configuration format. This build-time configuration compilation process transforms the source agent definitions into the runtime format expected by the harness, maintaining the ability to apply configuration changes without system restart.
 
-The registry pattern in `_agents/agents.json` provides O(1) agent lookup and supports dynamic agent selection based on task characteristics, enabling the [[topic-workflow-orchestration]] system to dispatch work appropriately.
+The function now processes Markdown agent definitions instead of JSON/YAML configurations, enabling more flexible and maintainable agent specifications while preserving the separation between development-time configuration and runtime agent instantiation.
 
 ## Specialized Agent Roles
 
-Each agent configuration defines a specific role in the development workflow:
+The system maintains the same specialized agent roles, now defined in Markdown format:
 
 - **Planner**: Primary orchestration agent for task decomposition and workflow coordination
 - **Architect**: Deep codebase analysis and system-wide dependency mapping
@@ -118,28 +75,28 @@ Each agent configuration defines a specific role in the development workflow:
 - **Reviewer**: Code quality assessment and standards enforcement
 - **Verifier**: Final QA, edge-case testing, and robustness verification
 - **Adversary**: Hyper-skeptical validation agent for critical path verification
+- **Designdoc-drafter**: Documentation and specification generation (new addition)
 
-This role specialization prevents capability dilution and ensures each agent's prompt engineering is optimized for its specific function in the development pipeline.
+This role specialization continues to prevent capability dilution and ensures each agent's prompt engineering is optimized for its specific function in the development pipeline.
 
 ## Configuration Schema Structure
 
-Each `config.yaml` follows the schema documented in [[entity-agent-config]]:
+The new configuration schema is documented in [[entity-agent-config]] and follows a Markdown-based structure that replaces the previous YAML format:
 
-```yaml
-coding_agent: # Core behavioral settings
-agentic_mode: # Autonomous operation parameters  
-prompt_section_customization: # Context injection points
-customization_config: # Role-specific behavior tuning
-```
+- Agent metadata and behavioral settings are embedded within structured Markdown
+- Prompt customizations are integrated directly into the agent definition
+- Role-specific behavior tuning is handled through the Markdown specification format
 
-The `prompt_section_customization` key enables surgical modification of specific prompt sections without full prompt rewriting, while `customization_config` provides agent-specific behavioral parameters that influence decision-making heuristics.
+The schema documentation in `_agents/agents/config-schema.md` explains the rationale: "Why it looks like this" - indicating the new format was designed for improved maintainability and human readability compared to the previous JSON/YAML approach.
 
 ## Integration with Core Harness
 
-The configuration system integrates with [[mod-harness-core]] through the agent factory pattern, where configurations are lazy-loaded during agent instantiation rather than system startup. This design reduces memory footprint and enables configuration hot-reloading during development.
+The configuration system continues to integrate with [[mod-harness-core]] through the agent factory pattern, with configurations lazy-loaded during agent instantiation. The migration to Markdown-based definitions maintains the reduced memory footprint and configuration hot-reloading capabilities while improving the developer experience for agent configuration management.
 
-The `configPath.relativePathToConfig` pattern in agent metadata enables flexible configuration file organization while maintaining predictable resolution semantics for the harness loader.
+## Boilerplate Integration
+
+A new boilerplate agent system has been introduced in `boilerplate-agent/`, providing template configurations and standardized agent definitions that can be used as starting points for custom agent development. This includes comprehensive agent templates and supporting infrastructure.
 
 ## Cross-Agent Communication Protocol
 
-Agent configurations include communication protocols that enable the [[topic-workflow-orchestration]] system to coordinate multi-agent workflows. The `agentic_mode` settings control how agents handle handoffs, context preservation, and result validation when participating in multi-step processes.
+Agent configurations continue to include communication protocols that enable the [[topic-workflow-orchestration]] system to coordinate multi-agent workflows. The new Markdown format preserves the ability to specify how agents handle handoffs, context preservation, and result validation when participating in multi-step processes.

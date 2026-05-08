@@ -26,8 +26,8 @@ source_files:
 - boilerplate-agent/scripts/clone_harness.py
 - boilerplate-agent/scripts/clone_harness.sh
 - boilerplate-agent/scripts/setup_harness.sh
-generated_at_ref: 703d472a00754a21da89f8b7ca2cde038b89e5b3
-generated_at: 2026-05-06T21:04:02Z
+generated_at_ref: f1af3b2fa46c98c92658d870947ac03b9020de8a
+generated_at: 2026-05-08T19:40:40Z
 links_to:
 - mod-harness-core
 - topic-workflow-orchestration
@@ -37,128 +37,99 @@ covers:
 - key:type
 - key:version
 - key:entrypoint
-- key:system_prompt
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:configPath
-- key:coding_agent
-- key:agentic_mode
-- key:prompt_section_customization
-- key:customization_config
-- key:name
-- key:description
-- key:type
-- key:version
-- key:entrypoint
-- key:system_prompt
-- fn:main
+- key:skills
+- key:related_agents
+contradictions:
+- description: Wiki stated agents were organized into core/ and discovery/ domains with JSON configs, but agents are now stored as Markdown files in a flat structure
+  source: boilerplate-agent/agents/*.md
+  detected_at: 2026-05-08T19:40:40Z
+- description: 'Wiki stated router uses ''type: router'' to indicate orchestration role, but now uses ''entrypoint: rules/dispatch_rules.md'' for rule-based dispatch'
+  source: boilerplate-agent/agent.json:5
+  detected_at: 2026-05-08T19:40:40Z
+- description: 'Wiki stated core agents use ''coding_agent: true'' in config files, but these config files no longer exist'
+  source: boilerplate-agent/agents/core/*/config.yaml removed
+  detected_at: 2026-05-08T19:40:40Z
+- description: Wiki stated deployment scripts were in scripts/ directory, but these have been removed
+  source: boilerplate-agent/scripts/ removed
+  detected_at: 2026-05-08T19:40:40Z
 ---
 
-The Boilerplate Agent System provides a reference implementation of a hierarchical agent orchestration pattern using the [[mod-harness-core]] framework. This system demonstrates the hub-and-spoke architecture where a router agent coordinates specialized sub-agents organized into functional domains.
+# Boilerplate Agent System
+
+The Boilerplate Agent System provides a reference implementation of a hierarchical agent orchestration pattern using the [[mod-harness-core]] framework. This system demonstrates the hub-and-spoke architecture where a router agent coordinates specialized sub-agents.
 
 ## Architecture
 
-The system implements a three-tier hierarchy:
+The system has undergone a **major architectural transformation** from the traditional hierarchical agent structure to a dynamic, Domain-Driven Design (DDD) approach:
 
-1. **Router Layer**: The `orchestrator` agent (`agent.json:2`) acts as the entry point, managing delegation to sub-agents based on task requirements
-2. **Domain Layer**: Agents are grouped into `core/` (execution-focused) and `discovery/` (analysis-focused) domains
-3. **Specialization Layer**: Each domain contains specialized agents with specific responsibilities
+### New Dynamic Architecture
 
-The router uses `"type": "router"` (`agent.json:4`) to indicate its orchestration role, while sub-agents use domain-specific types or default to execution agents.
+1. **Router Layer**: The `orchestrator` agent (`agent.json:2`) acts as the entry point, managing delegation based on dispatch rules
+2. **Dynamic Discovery**: Agents are now discovered and minted on-demand using DDD principles and contextual analysis
+3. **Rule-Based Dispatch**: The router uses `"entrypoint": "rules/dispatch_rules.md"` (`agent.json:5`) instead of static domain organization
 
-## Core Domain Agents
+### Agent Discovery and Minting
 
-The `core/` domain implements a TDD-style workflow pipeline:
+The system now features:
+- **DDD Context Discovery**: Automatic analysis of project domains using `discover_ddd_context()` (`discovery_engine.py:65`)
+- **Custom Agent Generation**: Dynamic agent creation via `discover_custom_agent()` (`discovery_engine.py:43`) 
+- **Remote Skills Integration**: Dynamic skill fetching with `fetch_remote_skill()` (`discovery_engine.py:23`)
+- **Enhanced Minting**: Workspace creation with DDD context integration (`minting_engine.py:7`)
 
-- **planner**: Breaks down requirements into detailed execution steps (`planner/agent.json:3`)
-- **implementer**: Handles code generation and modification (`implementer/agent.json:3`)
-- **reviewer**: Performs code quality assessment (`reviewer/agent.json:3`)
-- **verifier**: Conducts final QA and edge-case testing (`verifier/agent.json:3`)
+## Agent Definitions
 
-Each core agent uses `coding_agent: true` in their config files, enabling code-generation capabilities through the [[mod-harness-core]] framework.
+Agents are now defined as Markdown documentation rather than JSON configurations:
 
-## Discovery Domain Agents
+### Core Execution Agents
+- **planner**: Strategic planning and task breakdown (`boilerplate-agent/agents/planner.md`)
+- **implementer**: Code generation and modification (`boilerplate-agent/agents/implementer.md`)
+- **reviewer**: Code quality assessment (`boilerplate-agent/agents/reviewer.md`)
+- **verifier**: QA and testing validation (`boilerplate-agent/agents/verifier.md`)
 
-The `discovery/` domain handles analysis and design activities:
+### Discovery and Analysis Agents
+- **architect**: Codebase analysis and system design (`boilerplate-agent/agents/architect.md`)
+- **codesigner**: Collaborative design partner (`boilerplate-agent/agents/codesigner.md`)
+- **designdoc-drafter**: Technical documentation (`boilerplate-agent/agents/designdoc-drafter.md`)
+- **adversary**: Critical validation and skeptical review (`boilerplate-agent/agents/adversary.md`)
 
-- **architect**: Performs codebase analysis and dependency mapping (`architect/agent.json:3`)
-- **codesigner**: Acts as adversarial design partner (`codesigner/agent.json:3`)
-- **designdoc_drafter**: Documents technical designs and impact analysis (`designdoc_drafter/agent.json:3`)
-- **adversary**: Provides skeptical validation (`adversary/agent.json:2`)
-- **feature-fetcher**: Proposes specialized domain agents (`feature-fetcher/agent.json:2`)
+### Specialized Domain Agents
+- **feature-fetcher**: Dynamic agent discovery and proposal (`boilerplate-agent/agents/feature-fetcher.md`)
+- **linter-agent**: Code quality enforcement (`boilerplate-agent/agents/linter-agent.md`)
+- **security-auditor**: Security analysis (`boilerplate-agent/agents/security-auditor.md`)
+- **performance-profiler**: Performance optimization (`boilerplate-agent/agents/performance-profiler.md`)
+- **refactorer**: Code restructuring (`boilerplate-agent/agents/refactorer.md`)
 
-## Configuration Pattern
+## Configuration System
 
-All agents follow a consistent configuration structure:
+The configuration approach has been completely redesigned:
 
-1. **Agent Metadata**: `agent.json` files define name, description, and config path using `"configPath": {"relativePathToConfig": "config.yaml"}` pattern
-2. **Behavioral Config**: `config.yaml` files contain `prompt_section_customization` and `customization_config` sections that specialize agent behavior
-3. **Mode Configuration**: The `agentic_mode` setting controls autonomous operation vs. guided execution
+### Rule-Based Configuration
+- **Core Mandates**: Fundamental operational rules (`boilerplate-agent/rules/core_mandates.md`)
+- **Dispatch Rules**: Agent routing and delegation logic (`boilerplate-agent/rules/dispatch_rules.md`)
+- **Unified Workflows**: Comprehensive workflow patterns with DDD integration (`boilerplate-agent/rules/unified_superpower_workflow.md:44`)
 
-## Deployment Infrastructure
+### Skills Integration
+The system now includes sophisticated skill modules:
+- **grill-me**: Interactive validation (`boilerplate-agent/skills/grill-me.md`)
+- **grill-with-docs**: Documentation-aware analysis (`boilerplate-agent/skills/grill-with-docs.md`)
+- **improve-codebase-architecture**: Architectural enhancement (`boilerplate-agent/skills/improve-codebase-architecture.md`)
 
-The system includes deployment scripts that integrate with [[mod-harness-core]]:
+## Enhanced Discovery Engine
 
-- `clone_harness.py` (`scripts/clone_harness.py:86`): Programmatic setup for agent environments
-- `clone_harness.sh` and `setup_harness.sh`: Shell-based deployment automation
+The discovery system has been significantly enhanced:
 
-These scripts handle the initialization of agent workspaces and ensure proper integration with the harness framework.
+- **Context Acquisition**: MCP-based context gathering (`discovery_engine.py:35`)
+- **Model Flexibility**: Support for multiple LLM models (`discovery_engine.py:76`)
+- **DDD Grilling**: Interactive domain analysis via CLI (`cli.py:45`)
 
 ## Design Principles
 
-The boilerplate demonstrates several key patterns:
+The evolved system emphasizes:
 
-1. **Separation of Concerns**: Each agent has a single, well-defined responsibility
-2. **Hierarchical Delegation**: The router maintains workflow context while delegating specialized tasks
-3. **Configuration Inheritance**: Common patterns are shared while allowing agent-specific customization
-4. **Domain Segregation**: Core execution agents are separated from discovery/analysis agents
+1. **Dynamic Adaptation**: Agents are discovered and created based on actual project needs
+2. **Domain-Driven Organization**: Structure follows business domains rather than technical layers
+3. **Rule-Based Orchestration**: Behavior is governed by explicit rules rather than hardcoded logic
+4. **Skills Modularity**: Reusable capabilities that can be combined dynamically
+5. **Context Awareness**: Deep integration with project context and documentation
 
-This structure provides a template for implementing complex multi-agent workflows while maintaining clear boundaries and predictable interaction patterns. See [[topic-workflow-orchestration]] for details on how these agents coordinate during execution.
+This transformation represents a shift from static agent hierarchies to a dynamic, context-aware orchestration system that adapts to project requirements in real-time. See [[topic-workflow-orchestration]] for details on how the new rule-based system coordinates agent interactions.

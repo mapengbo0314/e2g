@@ -5,56 +5,64 @@ page_type: entity
 source_files:
 - _agents/agents/config-schema.md
 - _agents/GEMINI.md
-generated_at_ref: 703d472a00754a21da89f8b7ca2cde038b89e5b3
-generated_at: 2026-05-06T21:04:02Z
+generated_at_ref: f1af3b2fa46c98c92658d870947ac03b9020de8a
+generated_at: 2026-05-08T19:40:40Z
 links_to:
-- mod-skills
-- mod-agents
+- harnessdiscovery_enginepy
+- mod-harness-core
 - topic-workflow-orchestration
-- mod-documentation
+- mod-skills
 covers:
 - heading:Agent Config Schema
 - heading:General Agent Rules
+contradictions:
+- description: Wiki described JSON/YAML dual-format configuration system but code now uses markdown-based configuration files
+  source: _agents/agents/config-schema.md
+  detected_at: 2026-05-08T19:40:40Z
 ---
 
-The agent configuration schema defines the standardized structure for configuring AI agents within the E2G harness system. This schema enforces consistency across all agent types while providing the flexibility needed for different agent specializations and use cases.
+# Agent Configuration Schema
 
-## Configuration Structure
+The agent configuration schema defines the standardized structure for configuring AI agents within the E2G harness system. This schema has evolved from a complex JSON-based format to a simplified markdown-based configuration system that prioritizes clarity and maintainability.
 
-The configuration schema follows a layered approach with three primary sections that separate concerns between identity, capabilities, and runtime behavior:
+## Current Configuration Format
 
-**Identity Layer** (`agent_type`, `name`, `description`): Defines what the agent is and its purpose within the system. The `agent_type` field determines which agent class will be instantiated, while `name` and `description` provide human-readable identification for logging and debugging.
+The system has transitioned from the previous JSON/YAML dual-format approach to a **unified markdown-based configuration system**. Agent configurations are now defined as structured markdown documents located in `_agents/agents/` directories, with each agent having its own `.md` file containing both configuration and documentation.
 
-**Capabilities Layer** (`skills`, `tools`, `knowledge_base`): Specifies what the agent can do. The `skills` array references entries from the [[mod-skills]] system, `tools` defines available external integrations, and `knowledge_base` points to specialized domain knowledge.
+**New Structure**: Each agent configuration follows a standardized markdown format that combines:
+- Agent metadata and capabilities
+- Behavioral instructions and constraints  
+- Integration specifications with other system components
+- Human-readable documentation within the same file
 
-**Runtime Layer** (`config`, `environment`, `constraints`): Controls how the agent behaves during execution. This includes LLM parameters, resource limits, and behavioral constraints that govern the agent's decision-making process.
+This represents a significant departure from the previous layered approach of separate JSON schema files, YAML configurations, and external documentation.
 
-## Schema Design Rationale
+## Schema Design Evolution
 
-The schema design prioritizes **composability over inheritance** to avoid the complexity of deeply nested configuration hierarchies. Each agent configuration is self-contained, making it easier to reason about agent behavior and troubleshoot issues in production.
+The schema design has shifted from **composability over inheritance** to **documentation-driven configuration**. The new approach embeds configuration directly within markdown documentation, making agent behavior and capabilities self-documenting.
 
-**Type Safety**: The `agent_type` field serves as a discriminator that determines which configuration subset is valid. This prevents mismatched configurations where an agent receives parameters it cannot interpret.
+**Simplified Structure**: The complex three-layer system (Identity, Capabilities, Runtime) has been replaced with a more streamlined approach where agent definitions are human-readable markdown that can be directly processed by LLMs without intermediate parsing layers.
 
-**Environment Separation**: The `environment` section isolates deployment-specific settings (API keys, endpoints, resource limits) from logical configuration, enabling the same agent definition to work across development, staging, and production environments.
+**Type Safety**: Instead of using `agent_type` discriminators and complex validation rules, the system now relies on consistent markdown formatting and agent discovery mechanisms that can dynamically understand agent capabilities from their documentation.
 
-**Extensibility**: New agent types can be added without modifying existing configurations, as the schema uses a flexible key-value structure within each section while maintaining type safety at the agent level.
+## Configuration Discovery and Validation
 
-## Configuration Validation
+The new system employs **dynamic discovery** rather than static schema validation:
 
-The schema enforces several invariants that prevent common configuration errors:
+- Agent configurations are discovered through filesystem scanning of markdown files
+- Capabilities are inferred from the markdown content structure
+- Integration points are established through cross-references within the documentation
+- Domain-Driven Design (DDD) context influences agent discovery and configuration
 
-- Required fields must be present for the specified `agent_type`
-- Skill references must exist in the skills registry (validated by [[mod-skills]])
-- Resource constraints must be positive values within system limits
-- Tool configurations must match the expected interface contracts
+The [[harness/discovery_engine.py]] module now handles `discover_ddd_context()` and `discover_custom_agent()` functions that can dynamically generate agent configurations based on project context rather than requiring pre-defined schemas.
 
 ## Integration Points
 
-Agent configurations integrate with several system components:
+Agent configurations integrate with system components differently than before:
 
-- **Agent Factory** ([[mod-agents]]): Uses `agent_type` to instantiate the correct agent class
-- **Skills System** ([[mod-skills]]): Validates and loads referenced skills
-- **Workflow Engine** ([[topic-workflow-orchestration]]): Consumes agent metadata for task routing
-- **Documentation System** ([[mod-documentation]]): Generates agent inventories from configuration metadata
+- **Discovery Engine** ([[mod-harness-core]]): Uses markdown parsing and LLM analysis to understand agent capabilities
+- **Minting Engine**: Generates workspace configurations from discovered agent specifications
+- **Workflow Engine** ([[topic-workflow-orchestration]]): Consumes agent metadata directly from markdown documentation
+- **Skills System** ([[mod-skills]]): References skills through markdown cross-links rather than registry lookups
 
-The configuration schema serves as the contract between the declarative agent definitions and the runtime system, ensuring that agents are properly initialized with all required capabilities and constraints.
+The configuration system now serves as a **living documentation contract** that combines human-readable specifications with machine-processable agent definitions, enabling more flexible and maintainable agent lifecycle management.

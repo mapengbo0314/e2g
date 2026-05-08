@@ -1,1 +1,1 @@
-.gemini/AGENT.md
+.gemini/AGENT.md/

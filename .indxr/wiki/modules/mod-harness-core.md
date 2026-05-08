@@ -8,77 +8,69 @@ source_files:
 - harness/indexer_wrapper.py
 - harness/indexing/main.py
 - harness/minting_engine.py
-generated_at_ref: 703d472a00754a21da89f8b7ca2cde038b89e5b3
-generated_at: 2026-05-06T21:04:02Z
+generated_at_ref: f1af3b2fa46c98c92658d870947ac03b9020de8a
+generated_at: 2026-05-08T19:40:40Z
 links_to: []
 covers:
 - fn:parse_args
+- fn:run_ddd_grill
 - fn:main
+- fn:acquire_mcp_context
+- fn:fetch_remote_skill
 - fn:query_llm
-- fn:prune_context
 - fn:discover_agents
-- fn:check_indxr_installed
-- fn:acquire_context
-- fn:run_reindex
+- fn:discover_ddd_context
+- fn:discover_custom_agent
 - fn:mint_workspace
+contradictions:
+- description: Wiki stated the system requires indxr indexing tool but code has removed indexer_wrapper.py and indexing components
+  source: harness/indexer_wrapper.py
+  detected_at: 2026-05-08T19:40:40Z
 ---
 
-The core harness components form the operational backbone of the E2G system, orchestrating the discovery-to-deployment pipeline through five specialized modules that handle CLI interaction, codebase analysis, agent discovery, workspace generation, and indexing operations.
+# Core Harness Components
+
+The core harness components form the operational backbone of the E2G system, orchestrating the discovery-to-deployment pipeline through specialized modules that handle CLI interaction, agent discovery, and workspace generation. The system has evolved from a traditional indexing-based approach to a more lightweight, context-aware architecture focused on Domain-Driven Design (DDD) principles.
 
 ## Command Line Interface (cli.py)
 
-The CLI serves as the primary entry point, parsing user arguments and delegating to the appropriate subsystems. `parse_args()` returns an `argparse.Namespace` with fields for project path, output directory, and optional bundle override. The design assumes users will provide either a local project path or a pre-generated indxr bundle, with the CLI validating indxr availability before proceeding.
+The CLI serves as the primary entry point, parsing user arguments and delegating to the appropriate subsystems. `parse_args()` returns an `argparse.Namespace` with fields for project path, output directory, and optional bundle override. The system now emphasizes DDD-driven agent discovery over traditional code indexing.
 
-`main()` orchestrates the full pipeline: acquire context → discover agents → mint workspace. It terminates early if indxr is unavailable, ensuring the indexing dependency is satisfied before expensive operations.
+`main()` orchestrates the pipeline with optional DDD context grilling, where `run_ddd_grill()` interactively engages users with alignment questions to better understand project requirements and domain context. This human-in-the-loop approach replaces the previous automatic indexing dependency, making the system more accessible and context-aware.
 
 ## Discovery Engine (discovery_engine.py)
 
-The discovery engine bridges codebase analysis with LLM-based agent recommendations. `prune_context(index_data: dict) -> dict` strips implementation details from the full indxr output, retaining only structural information (file declarations, imports, relationships) to minimize context window usage while preserving architectural insights.
+The discovery engine has been redesigned around lightweight context acquisition and DDD principles. Key functions include:
 
-`discover_agents()` sends the pruned context to the LLM with a prompt requesting agent recommendations. The LLM returns a JSON array of agent specifications, each containing fields expected by the minting engine. The `query_llm()` function is currently stubbed but designed to accept provider-agnostic parameters (llm_provider, api_key).
+- **`acquire_mcp_context()`** - Provides lightweight project context from core wiki files, avoiding the token explosion issues of full codebase indexing
+- **`discover_ddd_context()`** - Extracts Domain-Driven Design context using remote skills, establishing the architectural foundation for agent recommendations
+- **`discover_agents()`** - Now accepts a context string and feature fetcher YAML path rather than full index data, with optional DDD context for enhanced recommendations
+- **`discover_custom_agent()`** - Generates custom user-defined agents based on specifications and project context
 
-**Key invariant**: The pruned context must retain enough structural information for meaningful agent discovery while staying within typical LLM context limits (~8K tokens).
+The engine integrates with remote skills through `fetch_remote_skill()`, enabling dynamic capability enhancement. The `query_llm()` function now supports model selection, providing flexibility across different LLM providers and capabilities.
 
-## Indexing Integration (indexer_wrapper.py)
-
-This module encapsulates the dependency on the external `indxr` tool, providing fallback mechanisms and error handling. `check_indxr_installed()` uses `shutil.which()` to verify indxr availability, enabling graceful degradation when the tool is missing.
-
-`acquire_context()` implements a two-path strategy: if `bundle_override` is provided, it returns that directly; otherwise, it spawns `indxr` as a subprocess to generate fresh index data. The subprocess execution captures both stdout (index JSON) and stderr (diagnostic output), with timeout handling to prevent hanging on large codebases.
-
-**Design decision**: The wrapper maintains separation between harness logic and indxr implementation details, enabling future migration to alternative indexing tools.
+**Key architectural shift**: The system moved from heavy indexing to lightweight, wiki-based context acquisition, reducing complexity while improving usability.
 
 ## Workspace Generation (minting_engine.py)
 
-The minting engine materializes discovered agents into executable workspace configurations. `mint_workspace()` performs three critical operations:
+The minting engine has been enhanced to support the new DDD-aware architecture. `mint_workspace()` now accepts additional parameters including model choice, bundle override, custom boilerplate directory, and DDD context. This enables more flexible workspace generation that can incorporate domain-specific insights into the agent configuration.
 
-1. **Template cloning**: Copies the boilerplate agent structure from `agents/boilerplate-agent/` to the target directory
-2. **Configuration injection**: Writes agent-specific configs, including MCP (Model Context Protocol) server definitions and skill mappings
-3. **Platform setup**: Generates platform-specific setup files (package.json for Node.js, requirements.txt for Python)
+The engine continues to perform its core operations:
+1. **Template cloning** from configurable boilerplate directories
+2. **Configuration injection** with DDD context integration
+3. **Platform setup** with model-aware configurations
 
-The engine writes a `agents.json` manifest containing the selected agent configurations, enabling downstream tools to understand the workspace structure. Each agent config includes fields for name, description, skills, and platform requirements.
-
-**Key invariant**: The generated workspace must be immediately executable without additional configuration, assuming the target platform runtime is available.
-
-## Indexing Orchestration (indexing/main.py)
-
-The internal indexing module provides an alternative to external indxr dependency through `run_reindex()`. This function coordinates several specialized components:
-
-- **State management**: Tracks indexing progress and handles incremental updates
-- **Work unit planning**: Breaks large codebases into manageable chunks
-- **LLM integration**: Uses `UniversalLlmPrompter` for provider-agnostic LLM access
-- **File system abstraction**: `RealFsManager` provides testable FS operations
-
-The orchestrator implements a work-stealing scheduler that distributes indexing tasks across available resources, with the `planner` module determining optimal work unit boundaries based on file dependencies and size heuristics.
+The generated workspace maintains immediate executability while incorporating the richer context provided by the DDD discovery process.
 
 ## Module Interactions
 
-The core components follow a strict data flow: CLI → indexer_wrapper → discovery_engine → minting_engine. Each stage transforms the data format:
+The redesigned data flow emphasizes context efficiency and user interaction: CLI → lightweight context acquisition → DDD discovery → agent recommendations → workspace generation. Each stage has been optimized:
 
-1. **Raw project** → **Index JSON** (indxr/indexing)
-2. **Index JSON** → **Pruned context** (discovery_engine)
-3. **Pruned context** → **Agent recommendations** (LLM via discovery_engine)
+1. **Raw project** → **Lightweight context** (acquire_mcp_context)
+2. **Project context** → **DDD context** (discover_ddd_context) 
+3. **DDD context + User input** → **Agent recommendations** (discover_agents)
 4. **Agent recommendations** → **Executable workspace** (minting_engine)
 
-Error handling propagates upward, with each module returning structured error responses rather than raising exceptions. This enables the CLI to provide actionable error messages and continue partial operations where possible.
+The architecture maintains clean separation of concerns while adding DDD-driven intelligence and user interaction capabilities. Error handling continues to propagate upward with structured responses, enabling graceful degradation and informative user feedback.
 
-The architecture separates concerns cleanly: indexing focuses on code analysis, discovery handles AI reasoning, and minting manages workspace materialization. This separation enables independent testing and future enhancement of each subsystem.
+**Removed Components**: The indexer_wrapper.py and indexing/main.py modules have been eliminated, reflecting the shift away from heavy indexing toward lightweight, wiki-based context acquisition. This reduces external dependencies and simplifies the operational model.

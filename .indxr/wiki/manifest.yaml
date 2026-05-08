@@ -1,6 +1,6 @@
 version: 1
-generated_at_ref: 703d472a00754a21da89f8b7ca2cde038b89e5b3
-generated_at: 2026-05-06T21:04:02Z
+generated_at_ref: f1af3b2fa46c98c92658d870947ac03b9020de8a
+generated_at: 2026-05-08T19:40:40Z
 pages:
 - id: architecture
   page_type: architecture
@@ -119,11 +119,6 @@ pages:
   source_files:
   - _agents/agents/config-schema.md
   - _agents/GEMINI.md
-- id: mod-demos
-  page_type: module
-  file: modules/mod-demos.md
-  source_files:
-  - boilerplate-agent/demo_feature_fetcher.sh
 - id: index
   page_type: index
   file: index.md

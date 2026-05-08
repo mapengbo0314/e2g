@@ -4,52 +4,115 @@ title: Demo Scripts and Examples
 page_type: module
 source_files:
 - boilerplate-agent/demo_feature_fetcher.sh
-generated_at_ref: 703d472a00754a21da89f8b7ca2cde038b89e5b3
-generated_at: 2026-05-06T21:04:02Z
+generated_at_ref: f1af3b2fa46c98c92658d870947ac03b9020de8a
+generated_at: 2026-05-08T19:40:40Z
 links_to:
-- mod-agents
-- mod-harness-core
-- topic-workflow-orchestration
-- mod-skills
 - mod-documentation
 - mod-testing
 - entity-agent-config
 covers: []
+contradictions:
+- description: Wiki stated demo scripts were shell-based located in boilerplate-agent/demo_feature_fetcher.sh, but this file has been removed
+  source: boilerplate-agent/demo_feature_fetcher.sh
+  detected_at: 2026-05-08T19:40:40Z
 ---
 
 # Demo Scripts and Examples
 
 The demos module provides practical examples and testing scripts for validating E2G system functionality through real-world scenarios. These scripts serve as both integration tests and reference implementations for common agentic workflows.
 
-## Shell-Based Demo Scripts
+## Agent Configuration Repository
 
-The module contains shell scripts that demonstrate end-to-end agent execution workflows. These are located in `boilerplate-agent/demo_feature_fetcher.sh` and follow a consistent pattern of setting up test environments, executing agent workflows, and validating outcomes.
+The module now contains comprehensive agent configuration files in Markdown format, located in `boilerplate-agent/agents/`. These configurations define specialized agents for different aspects of software development:
 
-### Design Philosophy
+### Core Development Agents
+- **feature-fetcher**: Analyzes codebases and extracts feature requirements
+- **implementer**: Handles code implementation tasks
+- **planner**: Creates development plans and task breakdowns  
+- **reviewer**: Performs code reviews and quality assessments
+- **verifier**: Validates implementations against requirements
 
-Demo scripts are designed to be self-contained and executable in various environments. They avoid dependencies on external services where possible, instead using mock data and local test harnesses to demonstrate core functionality. This approach ensures demos remain functional even when external APIs are unavailable.
+### Architecture and Design Agents
+- **architect**: Designs system architecture and technical specifications
+- **codesigner**: Collaborates on design decisions and technical approaches
+- **designdoc-drafter**: Creates comprehensive design documentation
 
-The scripts prioritize observable behavior over internal implementation details. Each demo produces clear output indicating success/failure states and intermediate results, making them suitable for both automated testing and manual verification.
+### Quality Assurance Agents
+- **adversary**: Performs adversarial testing and edge case analysis
+- **linter-agent**: Enforces code style and quality standards
+- **security-auditor**: Conducts security assessments
+- **performance-profiler**: Analyzes and optimizes performance
+- **refactorer**: Handles code refactoring and improvements
 
-### Integration with Core Systems
+## Orchestration and Skills Framework
 
-Demo scripts interact with [[mod-agents]] through standard configuration files, demonstrating how agent configurations are loaded and applied in practice. They exercise the [[mod-harness-core]] components by running complete agent lifecycles from initialization through task completion.
+### Central Orchestrator
+The `boilerplate-agent/orchestrator.md` defines the central coordination logic for multi-agent workflows, managing agent dispatch and task coordination.
 
-The scripts validate [[topic-workflow-orchestration]] by executing multi-phase workflows and verifying that phase transitions occur correctly. They also test [[mod-skills]] integration by invoking agents with skill-dependent tasks.
+### Core Mandates and Rules
+- **Core Mandates** (`boilerplate-agent/rules/core_mandates.md`): Fundamental operational principles
+- **Dispatch Rules** (`boilerplate-agent/rules/dispatch_rules.md`): Agent selection and task routing logic
 
-### Testing and Validation Patterns
+### Specialized Skills
+- **grill-me**: Interactive questioning and requirement gathering
+- **grill-with-docs**: Documentation-assisted requirement analysis  
+- **improve-codebase-architecture**: Architectural improvement workflows
 
-Each demo script follows a consistent structure:
-1. Environment setup and prerequisite validation
-2. Agent configuration loading and validation
-3. Task execution with progress monitoring
-4. Result validation and output formatting
-5. Cleanup and resource release
+## Domain-Driven Design Integration
 
-The scripts use exit codes to indicate success/failure states, making them suitable for inclusion in automated CI/CD pipelines. They also generate structured output that can be parsed by testing frameworks.
+The system now includes comprehensive Domain-Driven Design (DDD) capabilities through:
+
+### Enhanced Discovery Engine
+- **DDD Context Discovery**: `discover_ddd_context()` function extracts domain models and bounded contexts
+- **Custom Agent Discovery**: `discover_custom_agent()` creates specialized agents based on domain requirements
+- **MCP Context Acquisition**: `acquire_mcp_context()` integrates with Model Context Protocol
+
+### CLI Integration
+- **DDD Grilling**: `run_ddd_grill()` function enables interactive domain analysis sessions
+- Enhanced agent discovery with domain context awareness
+
+## Advanced Configuration System
+
+### Flexible Agent Definitions
+Agent configurations have migrated from JSON/YAML to Markdown format, providing:
+- Human-readable specifications
+- Rich documentation capabilities
+- Version control friendly format
+- Easier collaborative editing
+
+### Dynamic Workspace Minting
+The minting engine now supports:
+- Model choice selection
+- Bundle overrides for custom configurations
+- Boilerplate directory customization
+- Domain context integration
+
+## Testing and Validation Infrastructure
+
+### Comprehensive Test Coverage
+New test modules validate:
+- **CLI Cleanup**: `test_cli_cleanup.py` ensures proper resource cleanup
+- **Core Mandates**: `test_core_mandates_presence.py` validates rule presence
+- **Minting Engine**: `test_minting_engine.py` tests workspace generation
+
+### Enhanced Discovery Testing
+Discovery engine tests now cover:
+- DDD context discovery workflows
+- Custom agent creation scenarios
+- Remote skill fetching capabilities
+- Integration with domain models
+
+## Integration with Core Systems
+
+The demo system maintains its integration patterns while adding new capabilities:
+
+- **Agent Configuration**: Now uses Markdown-based definitions for improved maintainability
+- **Workflow Orchestration**: Enhanced with DDD-aware dispatch rules and domain context
+- **Skills Integration**: Expanded with specialized domain analysis capabilities
+- **Documentation System**: Agent specifications serve as living documentation
 
 ### Relationship to Other Components
 
-The demos serve as living documentation for the [[mod-documentation]] system, providing concrete examples of how theoretical concepts are implemented in practice. They complement the [[mod-testing]] infrastructure by providing higher-level integration tests that validate cross-system behavior.
+The demos continue to serve as living documentation for the [[mod-documentation]] system while adding domain-driven examples. They complement the [[mod-testing]] infrastructure with new integration tests for DDD workflows and custom agent discovery.
 
-The demo scripts are referenced by [[entity-agent-config]] examples, showing how different configuration patterns affect agent behavior in practice.
+The enhanced agent configurations demonstrate advanced [[entity-agent-config]] patterns, showing how domain context influences agent behavior and specialization.

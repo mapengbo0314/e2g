@@ -1,41 +1,28 @@
 # Codebase Index: e-2-g
 
-> Generated: 2026-05-06 20:59:19 UTC | Files: 78 | Lines: 6042
-> Languages: JSON (20), Markdown (23), Python (12), Shell (4), YAML (19)
+> Generated: 2026-05-08 19:45:03 UTC | Files: 85 | Lines: 8268
+> Languages: JSON (3), Markdown (71), Python (8), Shell (1), TOML (1), YAML (1)
 
 ## Directory Structure
 
 ```
 e-2-g/
+  ARCHITECTURE.md
+  GEMINI.md
   INDEX.md
+  ONBOARDING_GUIDE.md
   _agents/
     GEMINI.md
     agents/
+      adversary.md
+      architect.md
+      codesigner.md
       config-schema.md
-      adversary/
-        agent.json
-        config.yaml
-      architect/
-        agent.json
-        config.yaml
-      codesigner/
-        agent.json
-        config.yaml
-      designdoc_drafter/
-        agent.json
-        config.yaml
-      implementer/
-        agent.json
-        config.yaml
-      planner/
-        agent.json
-        config.yaml
-      reviewer/
-        agent.json
-        config.yaml
-      verifier/
-        agent.json
-        config.yaml
+      designdoc-drafter.md
+      implementer.md
+      planner.md
+      reviewer.md
+      verifier.md
     agents.json
     reload_agents.py
     rules/
@@ -57,177 +44,181 @@ e-2-g/
         scripts/
           detect_drift.py
     skills.json
+  artifacts/
+    agent_format_reference.md
+    agent_migration_plan.md
+    final_adversarial_report.md
+    implementation_plan.md
+    implementation_report.md
+    implementation_report_v2.md
+    verification_report.md
+    verification_report_v2.md
   boilerplate-agent/
+    AGENTS.md
     agent.json
     agents/
-      core/
-        implementer/
-          agent.json
-          config.yaml
-        planner/
-          agent.json
-          config.yaml
-        reviewer/
-          agent.json
-          config.yaml
-        verifier/
-          agent.json
-          config.yaml
-      discovery/
-        adversary/
-          agent.json
-          config.yaml
-        architect/
-          agent.json
-          config.yaml
-        codesigner/
-          agent.json
-          config.yaml
-        designdoc_drafter/
-          agent.json
-          config.yaml
-        feature-fetcher/
-          agent.json
-          config.yaml
-    config.yaml
-    demo_feature_fetcher.sh
+      adversary.md
+      architect.md
+      codesigner.md
+      designdoc-drafter.md
+      feature-fetcher.md
+      implementer.md
+      linter-agent.md
+      performance-profiler.md
+      planner.md
+      refactorer.md
+      reviewer.md
+      security-auditor.md
+      verifier.md
+    orchestrator.md
     rules/
-      orchestrator.md
+      dispatch_rules.md
       unified_superpower_workflow.md
-    scripts/
-      clone_harness.py
-      clone_harness.sh
-      setup_harness.sh
     skills/
-      harness-workflow/
-        SKILL.md
-        verify_tdd_gate.sh
+      grill-me.md
+      grill-with-docs.md
+      improve-codebase-architecture.md
   docs/
     superpowers/
       plans/
         2023-10-25-ast-grounded-enrichment.md
-        2026-05-06-harness-init-cli-plan.md
+        2026-05-06-active-agent-grounding-plan.md
+        2026-05-06-harness-redesign.md
+        2026-05-06-llm-integration.md
+        2026-05-06-skill-enhancement.md
+        2026-05-07-harness-pointer-architecture.md
+        2026-05-07-integration-fixes-plan.md
+        2026-05-07-omni-compatible-finalization-plan.md
+        2026-05-07-omni-compatible-refactor-plan.md
+        ddd-agent-discovery-plan.md
       specs/
         2024-05-20-sequential-prompter-refactor-design.md
         2024-05-24-tree-sitter-integration-design.md
         2025-05-14-deterministic-grounding-design.md
+        2026-05-06-active-agent-grounding-design.md
+        2026-05-06-ddd-agent-factory-design.md
+        2026-05-06-harness-dynamic-discovery-design.md
         2026-05-06-harness-init-cli-design.md
+        2026-05-07-omni-compatible-refactor-design.md
     walkthrough/
       agentic_harness_lifecycle.md
   harness/
     cli.py
     discovery_engine.py
-    indexer_wrapper.py
-    indexing/
-      main.py
     minting_engine.py
-  test_freshness.py
+  pyproject.toml
   tests/
     buglogger.md
-    test_cli_preflight.py
-    test_context_acquisition.py
+    test_cli_cleanup.py
     test_discovery_engine.py
+    test_minting_engine.py
+  update_wiki.sh
 ```
 
 ---
 
 ## Public API Surface
 
+**ARCHITECTURE.md**
+- `# Superpowers Agentic Harness: Architecture & Workflow`
+
 **INDEX.md**
 - `# Codebase Index: e-2-g`
+
+**ONBOARDING_GUIDE.md**
+- `# User Guide: Onboarding a New Repository with Harness-WF`
+- `# 1. Navigate to your project`
+- `# 2. Set your LLM API Key (Indxr uses this to process the code)`
+- `# 3. Generate the wiki bundle`
+- `# Initialize the harness using Gemini as the orchestrating LLM`
+- `# and the existing index for context`
 
 **_agents/GEMINI.md**
 - `# General Agent Rules`
 
+**_agents/agents/adversary.md**
+- `# Core Mandates`
+- `# Core Mandates (Universal Subagent Context)`
+- `# Role: Adversary`
+- `# Adversary Instructions`
+- `# Output Format`
+
+**_agents/agents/architect.md**
+- `# Core Mandates`
+- `# Core Mandates (Universal Subagent Context)`
+- `# Workspace Guidelines`
+- `# Skill: Repo Migration Planner`
+- `# Role: Architect`
+- `# Architect Instructions`
+- `# Architect Constraints`
+- `# Scratchpad Template`
+- `# Scratchpad`
+- `# Tool Usage Constraints`
+- `# Output Format`
+
+**_agents/agents/codesigner.md**
+- `# Core Mandates`
+- `# Core Mandates (Universal Subagent Context)`
+- `# Role: Codesigner`
+- `# Codesigner Instructions`
+- `# Tool Usage Constraints`
+
 **_agents/agents/config-schema.md**
 - `# Agent Config Schema`
 
-**_agents/agents/adversary/agent.json**
-- `"name": "adversary"`
-- `"description": "An adversarial agent that is hyper-skeptical, factual, and strictly avoids hallucination or flattery."`
+**_agents/agents/designdoc-drafter.md**
+- `# Core Mandates`
+- `# Core Mandates (Universal Subagent Context)`
+- `# Skill: ADK Document Structurer`
+- `# Role: Design Doc Drafter`
+- `# Design Doc Drafter Instructions`
+- `# Design Doc Drafter Constraints`
+- `# Examples`
+- `# Tool Usage Constraints`
 
-**_agents/agents/adversary/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
+**_agents/agents/implementer.md**
+- `# Core Mandates`
+- `# Core Mandates (Universal Subagent Context)`
+- `# Workspace Guidelines`
+- `# Role: Implementer`
+- `# Implementer Instructions`
+- `# Implementer Constraints`
+- `# Scratchpad Template`
+- `# Tool Usage Constraints`
+- `# Output Format`
 
-**_agents/agents/architect/agent.json**
-- `"name": "architect"`
-- `"description": "The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies. Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation, or to answer questions about the codebase that require investigation."`
-- `"configPath": {`
+**_agents/agents/planner.md**
+- `# Core Mandates`
+- `# Core Mandates (Universal Subagent Context)`
+- `# Workspace Guidelines`
+- `# Skill: Repo Migration Planner`
+- `# Role: Planner`
+- `# Mandates`
+- `# Planner Instructions`
+- `# Planner Constraints`
+- `# Scratchpad Template`
+- `# Tool Usage Constraints`
+- `# Output Format`
 
-**_agents/agents/architect/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
+**_agents/agents/reviewer.md**
+- `# Core Mandates`
+- `# Core Mandates (Universal Subagent Context)`
+- `# Workspace Guidelines`
+- `# Role: Reviewer`
+- `# Reviewer Instructions`
+- `# Reviewer Constraints`
+- `# Scratchpad Template`
+- `# Tool Usage Constraints`
+- `# Output Format`
 
-**_agents/agents/codesigner/agent.json**
-- `"name": "codesigner"`
-- `"description": "Specialized sub-agent that acts as an adversarial design partner to harden technical approaches and generate a design handoff."`
-- `"configPath": {`
-
-**_agents/agents/codesigner/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
-
-**_agents/agents/designdoc_drafter/agent.json**
-- `"name": "designdoc_drafter"`
-- `"description": "Specialized sub-agent that documents technical designs and performs an impact audit.\n"`
-- `"configPath": {`
-
-**_agents/agents/designdoc_drafter/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
-
-**_agents/agents/implementer/agent.json**
-- `"name": "implementer"`
-- `"description": "The specialized tool for TDD execution and production code changes. Delegate to this sub-agent for implementation tasks."`
-- `"configPath": {`
-
-**_agents/agents/implementer/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
-
-**_agents/agents/planner/agent.json**
-- `"name": "planner"`
-- `"description": "The specialized tool for breaking down a design into a detailed, step-by-step plan before execution."`
-- `"configPath": {`
-
-**_agents/agents/planner/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
-
-**_agents/agents/reviewer/agent.json**
-- `"name": "reviewer"`
-- `"description": "Senior Software Engineer for identifying issues and ensuring high standards in the codebase."`
-- `"configPath": {`
-
-**_agents/agents/reviewer/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
-
-**_agents/agents/verifier/agent.json**
-- `"name": "verifier"`
-- `"description": "The specialized tool for final QA, edge-case testing, transcript fidelity checks, and robustness verification."`
-- `"configPath": {`
-
-**_agents/agents/verifier/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
+**_agents/agents/verifier.md**
+- `# Core Mandates`
+- `# Core Mandates (Universal Subagent Context)`
+- `# Role: Verifier`
+- `# Verifier Goals`
+- `# Verifier Constraints`
+- `# Verification Focus`
+- `# Output Format`
 
 **_agents/agents.json**
 - `"defaultAgent": "planner"`
@@ -274,125 +265,100 @@ e-2-g/
 **_agents/skills.json**
 - `"skills": [`
 
+**artifacts/agent_format_reference.md**
+- `# Agent Format Reference`
+- `# Core Mandates`
+
+**artifacts/agent_migration_plan.md**
+- `# Agent Migration Plan`
+
+**artifacts/final_adversarial_report.md**
+- `# Final Adversarial Verification Report`
+
+**artifacts/implementation_plan.md**
+- `# Agent Schema Migration & Cleanup Implementation Plan`
+- `# Mocking the cleanup directly for the test`
+
+**artifacts/implementation_report.md**
+- `# Implementation Report`
+
+**artifacts/implementation_report_v2.md**
+- `# Implementation Report v2: Agent Schema Migration Fixes`
+
+**artifacts/verification_report.md**
+- `# Verification Report: Phase 4 Implementation`
+
+**artifacts/verification_report_v2.md**
+- `# Verification Report v2: Agent Schema Migration Fixes`
+
+**boilerplate-agent/AGENTS.md**
+- `# Agentic Harness Rules`
+
 **boilerplate-agent/agent.json**
 - `"name": "orchestrator"`
 - `"description": "Senior Project Manager & Router that manages the Hub-and-Spoke model."`
 - `"type": "router"`
 - `"version": "1.0"`
-- `"entrypoint": "config.yaml"`
+- `"entrypoint": "rules/dispatch_rules.md"`
+- `"skills": [`
+- `"related_agents": [`
 
-**boilerplate-agent/agents/core/implementer/agent.json**
-- `"name": "implementer"`
-- `"description": "The specialized tool for TDD execution and production code changes. Delegate to this sub-agent for implementation tasks."`
-- `"configPath": {`
+**boilerplate-agent/agents/adversary.md**
+- `# Adversary`
 
-**boilerplate-agent/agents/core/implementer/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
+**boilerplate-agent/agents/architect.md**
+- `# Architect`
+- `# Scratchpad`
 
-**boilerplate-agent/agents/core/planner/agent.json**
-- `"name": "planner"`
-- `"description": "The specialized tool for breaking down a design into a detailed, step-by-step plan before execution."`
-- `"configPath": {`
+**boilerplate-agent/agents/codesigner.md**
+- `# Codesigner`
 
-**boilerplate-agent/agents/core/planner/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
+**boilerplate-agent/agents/designdoc-drafter.md**
+- `# Design Doc Drafter`
 
-**boilerplate-agent/agents/core/reviewer/agent.json**
-- `"name": "reviewer"`
-- `"description": "Senior Software Engineer for identifying issues and ensuring high standards in the codebase."`
-- `"configPath": {`
+**boilerplate-agent/agents/feature-fetcher.md**
+- `# Feature Fetcher`
 
-**boilerplate-agent/agents/core/reviewer/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
+**boilerplate-agent/agents/implementer.md**
+- `# Implementer`
 
-**boilerplate-agent/agents/core/verifier/agent.json**
-- `"name": "verifier"`
-- `"description": "The specialized tool for final QA, edge-case testing, transcript fidelity checks, and robustness verification."`
-- `"configPath": {`
+**boilerplate-agent/agents/linter-agent.md**
+- `# Linter Agent`
 
-**boilerplate-agent/agents/core/verifier/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
+**boilerplate-agent/agents/performance-profiler.md**
+- `# Performance Profiler`
 
-**boilerplate-agent/agents/discovery/adversary/agent.json**
-- `"name": "adversary"`
-- `"description": "An adversarial agent that is hyper-skeptical, factual, and strictly avoids hallucination or flattery."`
+**boilerplate-agent/agents/planner.md**
+- `# Planner`
 
-**boilerplate-agent/agents/discovery/adversary/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
+**boilerplate-agent/agents/refactorer.md**
+- `# Refactorer`
 
-**boilerplate-agent/agents/discovery/architect/agent.json**
-- `"name": "architect"`
-- `"description": "The specialized tool for codebase analysis, architectural mapping, and understanding system-wide dependencies. Invoke this tool for tasks like vague requests, bug root-cause analysis, system refactoring, comprehensive feature implementation, or to answer questions about the codebase that require investigation."`
-- `"configPath": {`
+**boilerplate-agent/agents/reviewer.md**
+- `# Reviewer`
 
-**boilerplate-agent/agents/discovery/architect/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
+**boilerplate-agent/agents/security-auditor.md**
+- `# Security Auditor`
 
-**boilerplate-agent/agents/discovery/codesigner/agent.json**
-- `"name": "codesigner"`
-- `"description": "Specialized sub-agent that acts as an adversarial design partner to harden technical approaches and generate a design handoff."`
-- `"configPath": {`
+**boilerplate-agent/agents/verifier.md**
+- `# Verifier`
 
-**boilerplate-agent/agents/discovery/codesigner/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
+**boilerplate-agent/orchestrator.md**
+- `# Orchestrator`
 
-**boilerplate-agent/agents/discovery/designdoc_drafter/agent.json**
-- `"name": "designdoc_drafter"`
-- `"description": "Specialized sub-agent that documents technical designs and performs an impact audit.\n"`
-- `"configPath": {`
-
-**boilerplate-agent/agents/discovery/designdoc_drafter/config.yaml**
-- `coding_agent:`
-- `agentic_mode:`
-- `prompt_section_customization:`
-- `customization_config:`
-
-**boilerplate-agent/agents/discovery/feature-fetcher/agent.json**
-- `"name": "feature-fetcher"`
-- `"description": "The Agent Factory: Analyzes indices and proposes specialized domain agents for SME approval."`
-- `"type": "discovery"`
-- `"version": "1.0"`
-- `"entrypoint": "config.yaml"`
-
-**boilerplate-agent/agents/discovery/feature-fetcher/config.yaml**
-- `system_prompt:`
-
-**boilerplate-agent/config.yaml**
-- `system_prompt:`
-
-**boilerplate-agent/rules/orchestrator.md**
-- `# Orchestrator Rules`
+**boilerplate-agent/rules/dispatch_rules.md**
+- `# Dispatch Rules`
 - `# Primary Workflows (The Phased Goldfish Protocol + Superpowers)`
 
 **boilerplate-agent/rules/unified_superpower_workflow.md**
 - `# The Universal Agentic Harness Protocol`
 
-**boilerplate-agent/scripts/clone_harness.py**
-- `def main()`
+**boilerplate-agent/skills/grill-with-docs.md**
+- `## Domain awareness`
+- `## During the session`
 
-**boilerplate-agent/skills/harness-workflow/SKILL.md**
-- `# Harness Workflow`
+**boilerplate-agent/skills/improve-codebase-architecture.md**
+- `# Improve Codebase Architecture`
 
 **docs/superpowers/plans/2023-10-25-ast-grounded-enrichment.md**
 - `# AST-Grounded Enrichment Pipeline Implementation Plan`
@@ -400,14 +366,58 @@ e-2-g/
 - `# tests/test_ast_extractor.py`
 - `# tests/test_ast_merger.py`
 
-**docs/superpowers/plans/2026-05-06-harness-init-cli-plan.md**
-- `# Harness Init CLI Implementation Plan`
-- `# ... after api key check ...`
-- `# ... after context acquisition ...`
-- `# ... after discovery ...`
+**docs/superpowers/plans/2026-05-06-active-agent-grounding-plan.md**
+- `# Active Agent Grounding Implementation Plan`
+- `# OLD`
+- `# Load the full brain from the generated markdown file`
+- `# NEW`
+- `# Load the full brain from the generated markdown file`
+- `# OLD`
+- `# NEW`
+
+**docs/superpowers/plans/2026-05-06-harness-redesign.md**
+- `# Harness Dynamic Discovery Redesign Implementation Plan`
 - `# 1. Platform Specific Extension/Skill Installation`
 - `# 2. Install indxr MCP Server`
-- `# ... after HITL selection ...`
+- `# 3. Existing Wiki Detected`
+- `# 3. Generate initial Codebase Wiki`
+
+**docs/superpowers/plans/2026-05-06-llm-integration.md**
+- `# Real LLM Integration & DDD Alignment Plan`
+
+**docs/superpowers/plans/2026-05-06-skill-enhancement.md**
+- `# Engineering Skills Integration Plan`
+
+**docs/superpowers/plans/2026-05-07-harness-pointer-architecture.md**
+- `# Harness Pointer Architecture Implementation Plan`
+- `# Agentic Harness Rules`
+- `# Replace the old logic in harness/minting_engine.py (around lines 193-211)`
+- `# Pattern to remove the entire block related to urllib and downloading skills`
+- `# Create a python script to do the string replacement safely`
+- `# Pattern to find the old rules generation block`
+- `# The new logic generating the pointer`
+- `# Create a python script to safely update the setup_content string in minting_engine.py`
+- `# Find the end of the existing setup script generation block`
+- `# The new logic to append to the setup script`
+- `# 4. Generate Native Skill Pointers`
+- `# Source skills directory`
+
+**docs/superpowers/plans/2026-05-07-integration-fixes-plan.md**
+- `# Integration Fixes Implementation Plan`
+- `# Replace _agents/skills with the dynamic target path name`
+- `# Replace the agent loading loop`
+
+**docs/superpowers/plans/2026-05-07-omni-compatible-finalization-plan.md**
+- `# Omni-Compatible Finalization Plan`
+- `# Replace everything from setup_script_path = ... down to os.chmod`
+- `# MCP Configuration for Claude`
+- `# Replace the loop under `# Generate Specialized Agents``
+
+**docs/superpowers/plans/2026-05-07-omni-compatible-refactor-plan.md**
+- `# Omni-Compatible Refactor Implementation Plan`
+
+**docs/superpowers/plans/ddd-agent-discovery-plan.md**
+- `# DDD Agent Discovery Integration Plan`
 
 **docs/superpowers/specs/2024-05-20-sequential-prompter-refactor-design.md**
 - `# Sequential LLM Prompter Refactor Design`
@@ -418,49 +428,90 @@ e-2-g/
 **docs/superpowers/specs/2025-05-14-deterministic-grounding-design.md**
 - `# Deterministic Injection and Metadata Extraction Design`
 
+**docs/superpowers/specs/2026-05-06-active-agent-grounding-design.md**
+- `# Design Document: Active Agent Grounding`
+
+**docs/superpowers/specs/2026-05-06-ddd-agent-factory-design.md**
+- `# Design Document: DDD Agent Factory Integration (`harness init --ddd`)`
+
+**docs/superpowers/specs/2026-05-06-harness-dynamic-discovery-design.md**
+- `# Design Document: Harness Initialization & Dynamic Discovery Redesign`
+
 **docs/superpowers/specs/2026-05-06-harness-init-cli-design.md**
 - `# Design Document: Harness Initialization CLI (`harness init`)`
+
+**docs/superpowers/specs/2026-05-07-omni-compatible-refactor-design.md**
+- `# Omni-Compatible Refactor Design Spec`
 
 **docs/walkthrough/agentic_harness_lifecycle.md**
 - `# The Universal Agentic Harness Lifecycle`
 
 **harness/cli.py**
 - `def parse_args()`
+- `def run_ddd_grill(ddd_context: dict) -> dict`
 - `def main()`
 
 **harness/discovery_engine.py**
-- `def query_llm(prompt: str, llm_provider: str, api_key: str) -> str`
-- `def prune_context(index_data: dict) -> dict`
-- `def discover_agents(index_data: dict, llm_provider: str, api_key: str) -> list[dict]`
-
-**harness/indexer_wrapper.py**
-- `def check_indxr_installed() -> bool`
-- `def acquire_context(project_path: str, bundle_override: str | None = None) -> str`
-
-**harness/indexing/main.py**
-- `def run_reindex(index_dir: str)`
+- `def acquire_mcp_context(project_path: str) -> str`
+- `def fetch_remote_skill(skill_url: str) -> str`
+- `def query_llm(prompt: str, llm_provider: str, api_key: str, model: str = None) -> str`
+- `def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provider: str, api_key: str, model: str = None, ddd_context: dict = None) -> list[dict]`
+- `def discover_ddd_context(context_str: str, llm_provider: str, api_key: str, model: str = None) -> dict`
 
 **harness/minting_engine.py**
-- `def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: str, platform_choice: str)`
+- `def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: str, platform_choice: str, model_choice: str = None, bundle_override: str = None, boilerplate_dir: str = None, ddd_context: dict = None)`
+
+**pyproject.toml**
+- `[build-system]`
+- `[project]`
+- `[project.scripts]`
+- `[tool.setuptools.packages.find]`
 
 **tests/buglogger.md**
 - `# E2G Indexing Pipeline Bug Log`
 
-**tests/test_cli_preflight.py**
-- `def test_check_indxr_installed_fails_when_missing()`
-- `def test_check_indxr_installed_passes_when_present()`
-
-**tests/test_context_acquisition.py**
-- `@mock.patch("subprocess.run") def test_acquire_context_generates_metadata(mock_run, tmp_path)`
+**tests/test_cli_cleanup.py**
+- `def cleanup_other_platforms(project_path, chosen_platform)`
+- `def test_cleanup_other_platforms()`
 
 **tests/test_discovery_engine.py**
-- `@mock.patch("harness.discovery_engine.query_llm") def test_discover_agents(mock_query_llm)`
+- `@mock.patch("harness.discovery_engine.fetch_remote_skill") @mock.patch("harness.discovery_engine.query_llm") def test_discover_agents(mock_query_llm, mock_fetch_skill)`
+- `@mock.patch("harness.discovery_engine.fetch_remote_skill") @mock.patch("harness.discovery_engine.query_llm") def test_discover_agents_with_ddd_context(mock_query_llm, mock_fetch_skill)`
+- `@mock.patch("harness.discovery_engine.fetch_remote_skill") @mock.patch("harness.discovery_engine.query_llm") def test_discover_ddd_context(mock_query_llm, mock_fetch_skill)`
+
+**tests/test_minting_engine.py**
+- `def test_mint_workspace_agent_naming()`
+
+**update_wiki.sh**
+- `export ANTHROPIC_API_KEY="$1"`
+
+---
+
+## ARCHITECTURE.md
+
+**Language:** Markdown | **Size:** 3.8 KB | **Lines:** 69
+
+**Declarations:**
+
+---
+
+## GEMINI.md
+
+**Language:** Markdown | **Size:** 16 B | **Lines:** 1
 
 ---
 
 ## INDEX.md
 
-**Language:** Markdown | **Size:** 24.3 KB | **Lines:** 1128
+**Language:** Markdown | **Size:** 24.4 KB | **Lines:** 1140
+
+**Declarations:**
+
+---
+
+## ONBOARDING_GUIDE.md
+
+**Language:** Markdown | **Size:** 4.9 KB | **Lines:** 103
 
 **Declarations:**
 
@@ -474,6 +525,30 @@ e-2-g/
 
 ---
 
+## _agents/agents/adversary.md
+
+**Language:** Markdown | **Size:** 2.2 KB | **Lines:** 36
+
+**Declarations:**
+
+---
+
+## _agents/agents/architect.md
+
+**Language:** Markdown | **Size:** 6.1 KB | **Lines:** 99
+
+**Declarations:**
+
+---
+
+## _agents/agents/codesigner.md
+
+**Language:** Markdown | **Size:** 4.1 KB | **Lines:** 40
+
+**Declarations:**
+
+---
+
 ## _agents/agents/config-schema.md
 
 **Language:** Markdown | **Size:** 1.0 KB | **Lines:** 50
@@ -482,129 +557,41 @@ e-2-g/
 
 ---
 
-## _agents/agents/adversary/agent.json
+## _agents/agents/designdoc-drafter.md
 
-**Language:** JSON | **Size:** 148 B | **Lines:** 4
-
-**Declarations:**
-
----
-
-## _agents/agents/adversary/config.yaml
-
-**Language:** YAML | **Size:** 2.9 KB | **Lines:** 51
+**Language:** Markdown | **Size:** 5.3 KB | **Lines:** 70
 
 **Declarations:**
 
 ---
 
-## _agents/agents/architect/agent.json
+## _agents/agents/implementer.md
 
-**Language:** JSON | **Size:** 423 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## _agents/agents/architect/config.yaml
-
-**Language:** YAML | **Size:** 7.5 KB | **Lines:** 122
+**Language:** Markdown | **Size:** 4.4 KB | **Lines:** 77
 
 **Declarations:**
 
 ---
 
-## _agents/agents/codesigner/agent.json
+## _agents/agents/planner.md
 
-**Language:** JSON | **Size:** 239 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## _agents/agents/codesigner/config.yaml
-
-**Language:** YAML | **Size:** 4.8 KB | **Lines:** 55
+**Language:** Markdown | **Size:** 5.2 KB | **Lines:** 109
 
 **Declarations:**
 
 ---
 
-## _agents/agents/designdoc_drafter/agent.json
+## _agents/agents/reviewer.md
 
-**Language:** JSON | **Size:** 206 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## _agents/agents/designdoc_drafter/config.yaml
-
-**Language:** YAML | **Size:** 6.5 KB | **Lines:** 91
+**Language:** Markdown | **Size:** 4.5 KB | **Lines:** 87
 
 **Declarations:**
 
 ---
 
-## _agents/agents/implementer/agent.json
+## _agents/agents/verifier.md
 
-**Language:** JSON | **Size:** 234 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## _agents/agents/implementer/config.yaml
-
-**Language:** YAML | **Size:** 5.8 KB | **Lines:** 100
-
-**Declarations:**
-
----
-
-## _agents/agents/planner/agent.json
-
-**Language:** JSON | **Size:** 210 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## _agents/agents/planner/config.yaml
-
-**Language:** YAML | **Size:** 7.0 KB | **Lines:** 136
-
-**Declarations:**
-
----
-
-## _agents/agents/reviewer/agent.json
-
-**Language:** JSON | **Size:** 203 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## _agents/agents/reviewer/config.yaml
-
-**Language:** YAML | **Size:** 5.9 KB | **Lines:** 110
-
-**Declarations:**
-
----
-
-## _agents/agents/verifier/agent.json
-
-**Language:** JSON | **Size:** 221 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## _agents/agents/verifier/config.yaml
-
-**Language:** YAML | **Size:** 3.0 KB | **Lines:** 58
+**Language:** Markdown | **Size:** 2.2 KB | **Lines:** 39
 
 **Declarations:**
 
@@ -620,7 +607,7 @@ e-2-g/
 
 ## _agents/reload_agents.py
 
-**Language:** Python | **Size:** 3.5 KB | **Lines:** 90
+**Language:** Python | **Size:** 5.0 KB | **Lines:** 115
 
 **Imports:**
 - `import os`
@@ -727,175 +714,201 @@ e-2-g/
 
 ---
 
+## artifacts/agent_format_reference.md
+
+**Language:** Markdown | **Size:** 1.9 KB | **Lines:** 42
+
+**Declarations:**
+
+---
+
+## artifacts/agent_migration_plan.md
+
+**Language:** Markdown | **Size:** 4.0 KB | **Lines:** 118
+
+**Declarations:**
+
+---
+
+## artifacts/final_adversarial_report.md
+
+**Language:** Markdown | **Size:** 1.7 KB | **Lines:** 31
+
+**Declarations:**
+
+---
+
+## artifacts/implementation_plan.md
+
+**Language:** Markdown | **Size:** 7.4 KB | **Lines:** 231
+
+**Declarations:**
+
+---
+
+## artifacts/implementation_report.md
+
+**Language:** Markdown | **Size:** 1.8 KB | **Lines:** 23
+
+**Declarations:**
+
+---
+
+## artifacts/implementation_report_v2.md
+
+**Language:** Markdown | **Size:** 2.7 KB | **Lines:** 30
+
+**Declarations:**
+
+---
+
+## artifacts/verification_report.md
+
+**Language:** Markdown | **Size:** 2.0 KB | **Lines:** 22
+
+**Declarations:**
+
+---
+
+## artifacts/verification_report_v2.md
+
+**Language:** Markdown | **Size:** 2.5 KB | **Lines:** 31
+
+**Declarations:**
+
+---
+
+## boilerplate-agent/AGENTS.md
+
+**Language:** Markdown | **Size:** 1.7 KB | **Lines:** 27
+
+**Declarations:**
+
+---
+
 ## boilerplate-agent/agent.json
 
-**Language:** JSON | **Size:** 189 B | **Lines:** 7
+**Language:** JSON | **Size:** 536 B | **Lines:** 25
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/agents/core/implementer/agent.json
+## boilerplate-agent/agents/adversary.md
 
-**Language:** JSON | **Size:** 234 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## boilerplate-agent/agents/core/implementer/config.yaml
-
-**Language:** YAML | **Size:** 7.0 KB | **Lines:** 195
+**Language:** Markdown | **Size:** 3.6 KB | **Lines:** 69
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/agents/core/planner/agent.json
+## boilerplate-agent/agents/architect.md
 
-**Language:** JSON | **Size:** 210 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## boilerplate-agent/agents/core/planner/config.yaml
-
-**Language:** YAML | **Size:** 8.1 KB | **Lines:** 261
+**Language:** Markdown | **Size:** 6.4 KB | **Lines:** 110
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/agents/core/reviewer/agent.json
+## boilerplate-agent/agents/codesigner.md
 
-**Language:** JSON | **Size:** 203 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## boilerplate-agent/agents/core/reviewer/config.yaml
-
-**Language:** YAML | **Size:** 6.7 KB | **Lines:** 212
+**Language:** Markdown | **Size:** 5.5 KB | **Lines:** 76
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/agents/core/verifier/agent.json
+## boilerplate-agent/agents/designdoc-drafter.md
 
-**Language:** JSON | **Size:** 221 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## boilerplate-agent/agents/core/verifier/config.yaml
-
-**Language:** YAML | **Size:** 4.1 KB | **Lines:** 115
+**Language:** Markdown | **Size:** 6.1 KB | **Lines:** 99
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/agents/discovery/adversary/agent.json
+## boilerplate-agent/agents/feature-fetcher.md
 
-**Language:** JSON | **Size:** 148 B | **Lines:** 4
-
-**Declarations:**
-
----
-
-## boilerplate-agent/agents/discovery/adversary/config.yaml
-
-**Language:** YAML | **Size:** 3.7 KB | **Lines:** 89
+**Language:** Markdown | **Size:** 2.2 KB | **Lines:** 48
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/agents/discovery/architect/agent.json
+## boilerplate-agent/agents/implementer.md
 
-**Language:** JSON | **Size:** 423 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## boilerplate-agent/agents/discovery/architect/config.yaml
-
-**Language:** YAML | **Size:** 8.4 KB | **Lines:** 242
+**Language:** Markdown | **Size:** 5.9 KB | **Lines:** 121
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/agents/discovery/codesigner/agent.json
+## boilerplate-agent/agents/linter-agent.md
 
-**Language:** JSON | **Size:** 239 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## boilerplate-agent/agents/discovery/codesigner/config.yaml
-
-**Language:** YAML | **Size:** 6.1 KB | **Lines:** 139
+**Language:** Markdown | **Size:** 1.3 KB | **Lines:** 40
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/agents/discovery/designdoc_drafter/agent.json
+## boilerplate-agent/agents/performance-profiler.md
 
-**Language:** JSON | **Size:** 206 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## boilerplate-agent/agents/discovery/designdoc_drafter/config.yaml
-
-**Language:** YAML | **Size:** 7.5 KB | **Lines:** 170
+**Language:** Markdown | **Size:** 1.5 KB | **Lines:** 42
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/agents/discovery/feature-fetcher/agent.json
+## boilerplate-agent/agents/planner.md
 
-**Language:** JSON | **Size:** 218 B | **Lines:** 7
-
-**Declarations:**
-
----
-
-## boilerplate-agent/agents/discovery/feature-fetcher/config.yaml
-
-**Language:** YAML | **Size:** 1.7 KB | **Lines:** 20
+**Language:** Markdown | **Size:** 6.5 KB | **Lines:** 147
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/config.yaml
+## boilerplate-agent/agents/refactorer.md
 
-**Language:** YAML | **Size:** 1.5 KB | **Lines:** 18
+**Language:** Markdown | **Size:** 1.6 KB | **Lines:** 48
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/demo_feature_fetcher.sh
+## boilerplate-agent/agents/reviewer.md
 
-**Language:** Shell | **Size:** 1.3 KB | **Lines:** 29
+**Language:** Markdown | **Size:** 5.3 KB | **Lines:** 118
+
+**Declarations:**
 
 ---
 
-## boilerplate-agent/rules/orchestrator.md
+## boilerplate-agent/agents/security-auditor.md
 
-**Language:** Markdown | **Size:** 10.8 KB | **Lines:** 142
+**Language:** Markdown | **Size:** 1.5 KB | **Lines:** 44
+
+**Declarations:**
+
+---
+
+## boilerplate-agent/agents/verifier.md
+
+**Language:** Markdown | **Size:** 3.4 KB | **Lines:** 75
+
+**Declarations:**
+
+---
+
+## boilerplate-agent/orchestrator.md
+
+**Language:** Markdown | **Size:** 3.1 KB | **Lines:** 57
+
+**Declarations:**
+
+---
+
+## boilerplate-agent/rules/dispatch_rules.md
+
+**Language:** Markdown | **Size:** 10.6 KB | **Lines:** 142
 
 **Declarations:**
 
@@ -903,50 +916,31 @@ e-2-g/
 
 ## boilerplate-agent/rules/unified_superpower_workflow.md
 
-**Language:** Markdown | **Size:** 4.9 KB | **Lines:** 74
+**Language:** Markdown | **Size:** 5.2 KB | **Lines:** 77
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/scripts/clone_harness.py
+## boilerplate-agent/skills/grill-me.md
 
-**Language:** Python | **Size:** 3.0 KB | **Lines:** 86
+**Language:** Markdown | **Size:** 635 B | **Lines:** 10
 
-**Imports:**
-- `import os`
-- `import sys`
-- `import shutil`
-- `import argparse`
-- `from pathlib import Path`
+---
+
+## boilerplate-agent/skills/grill-with-docs.md
+
+**Language:** Markdown | **Size:** 3.5 KB | **Lines:** 88
 
 **Declarations:**
 
 ---
 
-## boilerplate-agent/scripts/clone_harness.sh
+## boilerplate-agent/skills/improve-codebase-architecture.md
 
-**Language:** Shell | **Size:** 1.9 KB | **Lines:** 60
-
----
-
-## boilerplate-agent/scripts/setup_harness.sh
-
-**Language:** Shell | **Size:** 967 B | **Lines:** 28
-
----
-
-## boilerplate-agent/skills/harness-workflow/SKILL.md
-
-**Language:** Markdown | **Size:** 3.0 KB | **Lines:** 62
+**Language:** Markdown | **Size:** 5.0 KB | **Lines:** 71
 
 **Declarations:**
-
----
-
-## boilerplate-agent/skills/harness-workflow/verify_tdd_gate.sh
-
-**Language:** Shell | **Size:** 1.6 KB | **Lines:** 41
 
 ---
 
@@ -958,9 +952,73 @@ e-2-g/
 
 ---
 
-## docs/superpowers/plans/2026-05-06-harness-init-cli-plan.md
+## docs/superpowers/plans/2026-05-06-active-agent-grounding-plan.md
 
-**Language:** Markdown | **Size:** 11.6 KB | **Lines:** 346
+**Language:** Markdown | **Size:** 4.6 KB | **Lines:** 131
+
+**Declarations:**
+
+---
+
+## docs/superpowers/plans/2026-05-06-harness-redesign.md
+
+**Language:** Markdown | **Size:** 20.9 KB | **Lines:** 572
+
+**Declarations:**
+
+---
+
+## docs/superpowers/plans/2026-05-06-llm-integration.md
+
+**Language:** Markdown | **Size:** 10.5 KB | **Lines:** 280
+
+**Declarations:**
+
+---
+
+## docs/superpowers/plans/2026-05-06-skill-enhancement.md
+
+**Language:** Markdown | **Size:** 6.1 KB | **Lines:** 142
+
+**Declarations:**
+
+---
+
+## docs/superpowers/plans/2026-05-07-harness-pointer-architecture.md
+
+**Language:** Markdown | **Size:** 9.4 KB | **Lines:** 247
+
+**Declarations:**
+
+---
+
+## docs/superpowers/plans/2026-05-07-integration-fixes-plan.md
+
+**Language:** Markdown | **Size:** 8.4 KB | **Lines:** 202
+
+**Declarations:**
+
+---
+
+## docs/superpowers/plans/2026-05-07-omni-compatible-finalization-plan.md
+
+**Language:** Markdown | **Size:** 8.5 KB | **Lines:** 233
+
+**Declarations:**
+
+---
+
+## docs/superpowers/plans/2026-05-07-omni-compatible-refactor-plan.md
+
+**Language:** Markdown | **Size:** 4.4 KB | **Lines:** 117
+
+**Declarations:**
+
+---
+
+## docs/superpowers/plans/ddd-agent-discovery-plan.md
+
+**Language:** Markdown | **Size:** 6.2 KB | **Lines:** 145
 
 **Declarations:**
 
@@ -990,9 +1048,41 @@ e-2-g/
 
 ---
 
+## docs/superpowers/specs/2026-05-06-active-agent-grounding-design.md
+
+**Language:** Markdown | **Size:** 2.1 KB | **Lines:** 36
+
+**Declarations:**
+
+---
+
+## docs/superpowers/specs/2026-05-06-ddd-agent-factory-design.md
+
+**Language:** Markdown | **Size:** 3.4 KB | **Lines:** 53
+
+**Declarations:**
+
+---
+
+## docs/superpowers/specs/2026-05-06-harness-dynamic-discovery-design.md
+
+**Language:** Markdown | **Size:** 4.2 KB | **Lines:** 49
+
+**Declarations:**
+
+---
+
 ## docs/superpowers/specs/2026-05-06-harness-init-cli-design.md
 
 **Language:** Markdown | **Size:** 3.6 KB | **Lines:** 61
+
+**Declarations:**
+
+---
+
+## docs/superpowers/specs/2026-05-07-omni-compatible-refactor-design.md
+
+**Language:** Markdown | **Size:** 3.1 KB | **Lines:** 45
 
 **Declarations:**
 
@@ -1008,14 +1098,16 @@ e-2-g/
 
 ## harness/cli.py
 
-**Language:** Python | **Size:** 3.1 KB | **Lines:** 84
+**Language:** Python | **Size:** 5.1 KB | **Lines:** 127
 
 **Imports:**
 - `import argparse`
 - `import sys`
 - `import getpass`
 - `import os`
-- `from harness.indexer_wrapper import check_indxr_installed`
+- `import tempfile`
+- `import subprocess`
+- `import shutil`
 
 **Declarations:**
 
@@ -1023,48 +1115,14 @@ e-2-g/
 
 ## harness/discovery_engine.py
 
-**Language:** Python | **Size:** 2.1 KB | **Lines:** 48
+**Language:** Python | **Size:** 9.2 KB | **Lines:** 194
 
 **Imports:**
 - `import json`
-- `import sys`
-
-**Declarations:**
-
----
-
-## harness/indexer_wrapper.py
-
-**Language:** Python | **Size:** 1.6 KB | **Lines:** 48
-
-**Imports:**
-- `import shutil`
-- `import sys`
-- `import json`
-- `import os`
 - `import subprocess`
-- `import datetime`
-
-**Declarations:**
-
----
-
-## harness/indexing/main.py
-
-**Language:** Python | **Size:** 1.8 KB | **Lines:** 56
-
-**Imports:**
-- `import argparse`
-- `import logging`
+- `import time`
+- `import urllib.request`
 - `import os`
-- `import sys`
-- `from indexing import orchestrator`
-- `from indexing import llm_indexer`
-- `from indexing import planner`
-- `from indexing import state`
-- `from indexing import work_unit`
-- `from indexing.fs_manager import RealFsManager`
-- *... and 1 more imports*
 
 **Declarations:**
 
@@ -1072,10 +1130,11 @@ e-2-g/
 
 ## harness/minting_engine.py
 
-**Language:** Python | **Size:** 5.0 KB | **Lines:** 135
+**Language:** Python | **Size:** 9.9 KB | **Lines:** 244
 
 **Imports:**
 - `import os`
+- `import re`
 - `import shutil`
 - `import json`
 - `from pathlib import Path`
@@ -1084,9 +1143,11 @@ e-2-g/
 
 ---
 
-## test_freshness.py
+## pyproject.toml
 
-**Language:** Python | **Size:** 33 B | **Lines:** 2
+**Language:** TOML | **Size:** 412 B | **Lines:** 20
+
+**Declarations:**
 
 ---
 
@@ -1098,30 +1159,15 @@ e-2-g/
 
 ---
 
-## tests/test_cli_preflight.py
+## tests/test_cli_cleanup.py
 
-**Language:** Python | **Size:** 465 B | **Lines:** 13
-
-**Imports:**
-- `import pytest`
-- `from unittest import mock`
-- `import sys`
-- `from harness.indexer_wrapper import check_indxr_installed`
-
-**Declarations:**
-
----
-
-## tests/test_context_acquisition.py
-
-**Language:** Python | **Size:** 728 B | **Lines:** 23
+**Language:** Python | **Size:** 1.2 KB | **Lines:** 38
 
 **Imports:**
-- `import json`
 - `import os`
+- `import tempfile`
 - `import pytest`
-- `from unittest import mock`
-- `from harness.indexer_wrapper import acquire_context`
+- `import shutil`
 
 **Declarations:**
 
@@ -1129,12 +1175,36 @@ e-2-g/
 
 ## tests/test_discovery_engine.py
 
-**Language:** Python | **Size:** 639 B | **Lines:** 21
+**Language:** Python | **Size:** 2.5 KB | **Lines:** 71
 
 **Imports:**
 - `import pytest`
 - `from unittest import mock`
-- `from harness.discovery_engine import discover_agents`
+- `from harness.discovery_engine import discover_agents, discover_ddd_context`
+
+**Declarations:**
+
+---
+
+## tests/test_minting_engine.py
+
+**Language:** Python | **Size:** 1.6 KB | **Lines:** 49
+
+**Imports:**
+- `import pytest`
+- `import shutil`
+- `import tempfile`
+- `from pathlib import Path`
+- `import os`
+- `from harness.minting_engine import mint_workspace`
+
+**Declarations:**
+
+---
+
+## update_wiki.sh
+
+**Language:** Shell | **Size:** 80 B | **Lines:** 4
 
 **Declarations:**
 
