@@ -2,6 +2,8 @@ import subprocess
 import sys
 import os
 
+from scripts.prune_logs import prune_logs
+
 def test_prune_logs_basic():
     input_text = """
 some/path/to/repo/file.py:10: in function
@@ -59,3 +61,16 @@ Traceback (most recent call last):
     # Should keep traceback even if it looks like vendor (though here it's repo)
     assert "Traceback" in stdout
     assert "Exception" in stdout
+
+def test_prune_logs_function_directly():
+    input_text = "line1\nnode_modules/lib.js\nError: boom\nvenv/lib.py"
+    expected = "line1\nnode_modules/lib.js\nError: boom"
+    assert prune_logs(input_text) == expected
+
+def test_prune_logs_empty_input():
+    assert prune_logs("") == ""
+
+def test_prune_logs_no_errors():
+    input_text = "line1\nnode_modules/lib.js\nline2"
+    # Without an error, vendor frames are kept
+    assert prune_logs(input_text) == input_text
