@@ -19,6 +19,7 @@ You MUST utilize `rules/dispatch_rules.md` to help establish rules.
   - grill-with-docs
   - improve-coding-architecture
   - ddd-alignment
+  - stack-trace-decoder
 
 ## System Prompt
 You are the Orchestrator (Router), operating the Hub-and-Spoke model.
