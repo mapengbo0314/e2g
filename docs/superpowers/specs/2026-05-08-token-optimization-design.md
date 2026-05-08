@@ -23,12 +23,12 @@ Extract the duplicated rules into a shared file to drastically shrink individual
 
 ### Part 2: The Triage Delegation (Stack Trace Intake)
 Introduce a mandatory compression step before debugging tasks.
-
+### 2. Pre-Delegation Triage Layer (The "Spoke" Guardrail)
 1.  **Install Compression Skill:**
-    *   Update the `setup_harness.sh` script templates in `minting_engine.py` to automatically install the `latestaiagents/agent-skills@stack-trace-decoder` skill during onboarding.
+    *   Update the `setup_harness.sh` script templates in `minting_engine.py` to automatically install the `token-optimizer` skill during onboarding.
 2.  **Update Orchestrator Routing Rules:**
     *   Modify `boilerplate-agent/rules/dispatch_rules.md` (and related Orchestrator instructions) to include a strict pre-delegation mandate:
-        *   *"If the user input contains a raw stack trace, CI failure, or explicitly requests a bug fix, DO NOT read the logs directly. Delegate to a triage agent (e.g., `architect` or `@generalist`) and instruct them to use the `stack-trace-decoder` skill. They must write a compressed artifact to `artifacts/triage.md`. When delegating to the `implementer`, pass `artifacts/triage.md` as the primary diagnostic frame, but always include the original user prompt to preserve intent."*
+        *   *"If the user input contains a raw stack trace, CI failure, or explicitly requests a bug fix, DO NOT read the logs directly. Delegate to a triage agent (e.g., `architect` or `@generalist`) and instruct them to write a compressed artifact to `artifacts/triage.md`. When delegating to the `implementer`, pass `artifacts/triage.md` as the primary diagnostic frame, but always include the original user prompt to preserve intent."*
 
 ## 3. Alternatives Considered
 *   **Orchestrator Prepending Mandates Runtime:** We considered keeping agents lean but having the Orchestrator inject the rules dynamically into the delegation prompt. *Rejected:* This bloats the Orchestrator's own context window, defeating the token-saving goal.
@@ -38,5 +38,4 @@ Introduce a mandatory compression step before debugging tasks.
 ## 4. Sphinch Marks
 - [ ] Verify `boilerplate-agent/rules/core_mandates.md` exists and contains the "Core Mandates" and "Workspace Guidelines".
 - [ ] Verify `harness/minting_engine.py` generates agent files using `@` inclusion for `gemini` and `claude` platforms pointing to `rules/core_mandates.md`.
-- [ ] Verify `harness/minting_engine.py` includes `npx skills add latestaiagents/agent-skills@stack-trace-decoder` in the setup script templates.
 - [ ] Verify `boilerplate-agent/rules/dispatch_rules.md` contains the new mandatory Failure Context Triage routing rule.

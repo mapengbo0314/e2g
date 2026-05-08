@@ -2,12 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Reduce token bloat by extracting common agent mandates into a shared file and establishing a pre-delegation stack-trace compression layer using `token-optimizer` and `stack-trace-decoder`.
+**Goal:** Reduce token bloat by extracting common agent mandates into a shared file and establishing a pre-delegation stack-trace compression layer using `token-optimizer`.
 
 **Architecture:** 
 1. `boilerplate-agent/rules/core_mandates.md` will hold the shared system prompt.
 2. `harness/minting_engine.py` will inject `@.gemini/rules/core_mandates.md` (or equivalent) instead of duplicating the string into agent files.
-3. `minting_engine.py` will update setup scripts to install `token-optimizer` and `stack-trace-decoder`.
+3. `minting_engine.py` will update setup scripts to install `token-optimizer`.
 4. `boilerplate-agent/rules/dispatch_rules.md` will receive updated routing instructions mandating triage via `architect` before delegating bugs to `implementer`.
 
 **Tech Stack:** Python (Minting Engine), Markdown (Prompts), npm (Skills).
@@ -135,12 +135,12 @@ git commit -m "feat(harness): implement platform-aware prompt deduplication and 
 Using an exact replace, insert the new mandate into `boilerplate-agent/rules/dispatch_rules.md` inside the `<orchestration_hierarchy>` section, right below the Adversarial Verification bullet.
 
 ```markdown
-- **Failure Context Triage (MANDATORY)**: If the user input contains a raw stack trace, CI failure, or explicitly requests a bug fix, DO NOT read the logs directly. You MUST delegate to a triage agent (e.g., `architect` or `@generalist`) and instruct them to use the `stack-trace-decoder` skill. They must write a compressed artifact to `workspace/artifacts/triage.md`. When delegating to the `implementer` to fix the bug, pass `artifacts/triage.md` as the primary diagnostic frame, but **always include the original user prompt** in the delegation message to preserve intent.
+- **Failure Context Triage (MANDATORY)**: If the user input contains a raw stack trace, CI failure, or explicitly requests a bug fix, DO NOT read the logs directly. You MUST delegate to a triage agent (e.g., `architect` or `@generalist`) and instruct them to write a compressed artifact to `workspace/artifacts/triage.md`. When delegating to the `implementer` to fix the bug, pass `artifacts/triage.md` as the primary diagnostic frame, but **always include the original user prompt** in the delegation message to preserve intent.
 ```
 
 - [ ] **Step 2: Write minimal implementation (orchestrator.md)**
 
-Using an exact replace, add `stack-trace-decoder` to the `Skills:` list in the Metadata header of `boilerplate-agent/orchestrator.md`.
+Using an exact replace, ensure `boilerplate-agent/orchestrator.md` is updated appropriately if needed (e.g. adding `token-optimizer` to the `Skills:` list if it's a skill).
 
 ```markdown
 ## Metadata
@@ -154,7 +154,6 @@ Using an exact replace, add `stack-trace-decoder` to the `Skills:` list in the M
   - grill-with-docs
   - improve-coding-architecture
   - ddd-alignment
-  - stack-trace-decoder
 ```
 
 - [ ] **Step 3: Commit**

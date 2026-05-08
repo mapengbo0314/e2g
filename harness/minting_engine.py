@@ -110,8 +110,6 @@ echo "=== Setting up Superpowers for Gemini CLI ==="
 if command -v gemini &> /dev/null; then
     gemini extensions install https://github.com/obra/superpowers || true
     gemini extensions install https://github.com/mattpocock/skills || true
-    echo "Installing stack-trace-decoder..."
-    gemini extensions install https://github.com/latestaiagents/agent-skills@stack-trace-decoder || true
 else
     echo "Warning: gemini command not found."
 fi
