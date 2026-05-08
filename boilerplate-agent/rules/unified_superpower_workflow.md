@@ -12,6 +12,8 @@ At each stage of this workflow, the Orchestrator or corresponding subagent **MUS
 
 ## The State Machine
 
+> **COMPLEXITY BYPASS (FAST PATH)**: If the Orchestrator determines the user's request is of **Low Complexity** (e.g., a simple typo fix, single-file isolated change), it MUST bypass States 1 and 2 and jump directly to State 3 (Execution). The full State Machine is reserved for **High Complexity** features.
+
 ### State 0: Bootstrap & Factory Minting
 *   **Action:** The user launches their chosen AI within the `boilerplate-agent` directory.
 *   **Interaction:** The Orchestrator delegates to `feature-fetcher`. 
