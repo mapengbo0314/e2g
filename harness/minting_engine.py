@@ -91,9 +91,21 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
     active_platform = platform_map.get(platform_choice, platform_choice).lower()
 
     escaped_project_path = os.path.abspath(project_path).replace("'", "'\\''")
+    
+    key_check_snippet = """
+# Check for indxr API keys
+if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
+    echo "⚠️  Warning: indxr requires an ANTHROPIC_API_KEY or OPENAI_API_KEY for background wiki updates."
+    echo "Background auto-indexing will be disabled until a key is exported in your terminal."
+    echo "Example: export ANTHROPIC_API_KEY='sk-ant-...' "
+    echo ""
+fi
+"""
+
     scripts_to_generate = {
         "gemini": f"""#!/usr/bin/env bash
 set -e
+{key_check_snippet}
 echo "=== Setting up Superpowers for Gemini CLI ==="
 if command -v gemini &> /dev/null; then
     gemini extensions install https://github.com/obra/superpowers || true
@@ -107,6 +119,7 @@ fi
 """,
         "claude": f"""#!/usr/bin/env bash
 set -e
+{key_check_snippet}
 echo "=== Setting up Superpowers for Claude Code ==="
 echo "To install Superpowers and Skills for Claude Code, run these commands inside the Claude Code interface:"
 echo "  /plugin install superpowers@claude-plugins-official"
@@ -124,6 +137,7 @@ fi
 """,
         "cursor": f"""#!/usr/bin/env bash
 set -e
+{key_check_snippet}
 echo "=== Setting up Superpowers for Cursor ==="
 echo "To install Superpowers and Skills for Cursor, run these commands inside the Cursor Agent chat:"
 echo "  /add-plugin superpowers"
