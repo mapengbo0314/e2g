@@ -2,6 +2,38 @@
 
 This guide explains how to ground a completely new project into the Superpowers Agentic Harness using an existing `indxr` bundle.
 
+## Overarching Architecture & Workflow
+
+The Harness-WF operates on a **Hub-and-Spoke** model where the "Hub" is the **Orchestrator** (Router) and the "Spokes" are **Specialized Agents** tailored to your specific codebase.
+
+### 1. Discovery & Alignment (The Brain)
+- **Indxr Wiki**: Before initialization, `indxr` generates a semantic map (`.indxr/wiki/`).
+- **DDD Alignment Grill**: The CLI uses this wiki to identify ambiguities and asks you "Grill" questions. Your answers are woven into the identity of every agent generated.
+- **Feature Fetcher**: A specialized LLM routine analyzes the wiki and your DDD answers to recommend 3-5 agents (e.g., `trust-agent`, `api-specialist`) with comprehensive system prompts.
+
+### 2. Minting (The Body)
+The `mint_workspace` engine creates a platform-specific hidden directory (e.g., `.gemini/`) and populates it with:
+- **`agents/`**: Markdown definitions for the Orchestrator and specialized agents.
+- **`rules/`**: The strictly deterministic workflow state machine (Brainstorming -> Planning -> TDD -> Implementation -> Verification).
+- **`skills/`**: Local copies of Superpower skills.
+- **`mcp.json`**: Configuration that connects the AI to the `indxr` server.
+
+### 3. Root Pointers (The Entryway)
+A platform-specific file is dropped into the root of your project:
+- **Gemini CLI**: `GEMINI.md` (uses `@.gemini/orchestrator.md` inclusion syntax).
+- **Claude Code**: `CLAUDE.md` (Markdown link/pointer).
+- **Cursor**: `.cursorrules` (Instructions to use the harness).
+
+### 4. Runtime Workflow
+1. **Launch**: You start your AI (e.g., `gemini`). It automatically loads the root pointer.
+2. **Orchestrate**: The AI assumes the **Orchestrator** role defined in `.gemini/orchestrator.md`.
+3. **Analyze**: For any task, the Orchestrator uses the `indxr` MCP to search the wiki first.
+4. **Delegate**: The Orchestrator **Zero-Work Rule** kicks in; it delegates to `architect` for research or `planner` for roadmapping.
+5. **Implement**: Tasks are handed to `implementer`, which **MUST** use the `test-driven-development` skill.
+6. **Verify**: The `verifier` or `adversary` agent ruthlessly checks the output against the original plan before completion.
+
+---
+
 ## Prerequisites
 - `harness-wf` installed (`pip install -e .` from this repo root).
 - `indxr` CLI installed and configured.
@@ -20,7 +52,6 @@ cd ~/my-awesome-app
 export ANTHROPIC_API_KEY="sk-..." 
 
 # 3. Generate the wiki bundle
-# Replace {my-awesome-app} with your project name or identifier
 indxr wiki generate {my-awesome-app}
 ```
 
@@ -29,7 +60,7 @@ This creates a hidden `.indxr/` folder in your project root containing the full 
 ---
 
 ## Step 2: Initialize the Agentic Harness
-Now, run the `harness-wf` tool to mint your agents and universal routing pointers. We use the `--bundle` flag to point to the existing index so the harness can instantly understand your repo.
+Run the `harness-wf` tool to mint your agents and platform-specific pointers. Use the `--bundle` flag to point to the existing index so the harness can instantly understand your repo.
 
 ```bash
 # Initialize the harness using Gemini as the orchestrating LLM
@@ -38,15 +69,16 @@ harness-wf init --project-path . --llm gemini --bundle .indxr --ddd
 ```
 
 ### What to expect:
-- **DDD Alignment**: The CLI will ask you a series of Domain-Driven Design questions based on your code.
-- **Agent Discovery**: It will recommend specialized agents (e.g., `trust-agent`, `auth-expert`) tailored to your project.
-- **Omni-Compatibility**: It will drop `GEMINI.md`, `CLAUDE.md`, and `.cursorrules` pointers into your root.
-- **Segregated Scripts**: Hidden platform folders (e.g., `.gemini/`, `.claude/`) will be created with their own setup scripts.
+- **DDD Alignment**: The CLI will grill you with Domain-Driven Design questions based on your code to align the agents' terminology with your business logic.
+- **Agent Discovery**: The "Feature Fetcher" analyzes your index and recommends specialized agents (e.g., `trust-agent`, `auth-expert`) tailored to your project.
+- **Platform Selection**: You will choose a target platform (Gemini CLI, Claude Code, or Cursor).
+- **Pointer Generation**: A root-level pointer (e.g., `GEMINI.md`, `CLAUDE.md`, or `.cursorrules`) will be dropped into your project root. This file uses the `@include` syntax for Gemini to automatically load the harness.
+- **Clean Workspace**: The tool will automatically prune unused platform directories to keep your repo clean.
 
 ---
 
 ## Step 3: Platform Setup
-Once the minting is finished, run the setup script for the specific tool you want to use for this project.
+Once the minting is finished, run the setup script for the specific tool you selected.
 
 ### If using Gemini CLI:
 ```bash
@@ -66,4 +98,6 @@ sh .cursor/scripts/setup_harness.sh
 ---
 
 ## Success!
-Your repository is now fully grounded. You can now open your preferred AI client (Gemini, Claude, or Cursor), and it will automatically follow the pointers to `_agents/AGENTS.md`, assume the **Orchestrator** role, and follow the mandated Superpower workflows.
+Your repository is now fully grounded. When you launch your AI (e.g., `gemini`), it will read the root pointer, follow it to the hidden platform folder (e.g., `.gemini/orchestrator.md`), and assume the **Orchestrator** role. 
+
+From there, it will follow the mandated Superpower workflows (Brainstorming -> Planning -> TDD -> Implementation -> Verification) and delegate tasks to the specialized agents it discovered for your project.

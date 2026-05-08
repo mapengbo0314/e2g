@@ -41,3 +41,9 @@ def test_mint_workspace_agent_naming():
         content = agent_file.read_text()
         assert "name: architecture-deepener" in content
         assert "name: ArchitectureDeepener" not in content
+
+        # Check root pointer
+        gemini_md = project_path / "GEMINI.md"
+        assert gemini_md.exists(), "Expected GEMINI.md to exist in project root"
+        pointer_content = gemini_md.read_text()
+        assert ".gemini/orchestrator.md" in pointer_content

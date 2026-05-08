@@ -17,6 +17,22 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
         
     if boilerplate_dir and os.path.exists(boilerplate_dir):
         shutil.copytree(boilerplate_dir, target_path, ignore=ignore_patterns, dirs_exist_ok=True)
+        
+        # Fix broken include pointers inside the copied files
+        target_dir_name = target_path.name
+        for root, _, files in os.walk(target_path):
+            for file in files:
+                if file.endswith((".md", ".json", ".yaml", ".yml")):
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, "r") as f:
+                            content = f.read()
+                        if "@boilerplate-agent" in content:
+                            new_content = content.replace("@boilerplate-agent", f"@{target_dir_name}")
+                            with open(filepath, "w") as f:
+                                f.write(new_content)
+                    except Exception as e:
+                        print(f"Warning: Failed to process {filepath}: {e}")
     else:
         print("Error: Boilerplate directory not found.")
         return
@@ -62,11 +78,21 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
             existing_wiki = True
             
     # Generate specialized setup_harness.sh (Prerequisites)
-        # Generate Segregated Setup Scripts
+    # Generate Segregated Setup Scripts
     project_root = Path(project_path)
+    
+    # Normalize platform choice
+    platform_map = {
+        "1": "gemini",
+        "2": "claude",
+        "3": "cursor",
+        "4": "agents"
+    }
+    active_platform = platform_map.get(platform_choice, platform_choice).lower()
+
     escaped_project_path = os.path.abspath(project_path).replace("'", "'\\''")
     scripts_to_generate = {
-        ".gemini": f"""#!/usr/bin/env bash
+        "gemini": f"""#!/usr/bin/env bash
 set -e
 echo "=== Setting up Superpowers for Gemini CLI ==="
 if command -v gemini &> /dev/null; then
@@ -77,7 +103,7 @@ else
 fi
 
 """,
-        ".claude": f"""#!/usr/bin/env bash
+        "claude": f"""#!/usr/bin/env bash
 set -e
 echo "=== Setting up Superpowers for Claude Code ==="
 echo "To install Superpowers and Skills for Claude Code, run these commands inside the Claude Code interface:"
@@ -91,7 +117,7 @@ if command -v claude &> /dev/null; then
     claude mcp add indxr -- bash -c "cd '{escaped_project_path}' && indxr $indxr_serve_args_str" || true
 fi
 """,
-        ".cursor": f"""#!/usr/bin/env bash
+        "cursor": f"""#!/usr/bin/env bash
 set -e
 echo "=== Setting up Superpowers for Cursor ==="
 echo "To install Superpowers and Skills for Cursor, run these commands inside the Cursor Agent chat:"
@@ -100,14 +126,32 @@ echo "  /add-plugin mattpocock/skills"
 """
     }
 
-    for platform_dir, script_content in scripts_to_generate.items():
-        if platform_dir == f".{platform_choice}":
-            script_dir = project_root / platform_dir / "scripts"
-            script_dir.mkdir(parents=True, exist_ok=True)
-            script_path = script_dir / "setup_harness.sh"
-            with open(script_path, "w") as f:
-                f.write(script_content)
-            os.chmod(script_path, 0o755)
+    # Write setup script
+    if active_platform in scripts_to_generate:
+        script_content = scripts_to_generate[active_platform]
+        script_dir = project_root / f".{active_platform}" / "scripts"
+        script_dir.mkdir(parents=True, exist_ok=True)
+        script_path = script_dir / "setup_harness.sh"
+        with open(script_path, "w") as f:
+            f.write(script_content)
+        os.chmod(script_path, 0o755)
+    
+    # Generate Root Level Pointers
+    root_pointers = {
+        "gemini": "GEMINI.md",
+        "claude": "CLAUDE.md",
+        "cursor": ".cursorrules",
+        "agents": "AGENTS.md"
+    }
+    
+    if active_platform in root_pointers:
+        pointer_file = root_pointers[active_platform]
+        harness_dir = f".{active_platform}"
+        with open(project_root / pointer_file, "w") as f:
+            if active_platform == "gemini":
+                f.write(f"@{harness_dir}/AGENTS.md\n@{harness_dir}/orchestrator.md\n")
+            else:
+                f.write(f"# Agentic Harness\n\nPlease read `{harness_dir}/orchestrator.md` for core repository instructions and routing rules.\n")
         
     print("\nTo install skills & MCPs, run the setup_harness.sh script inside your platform's hidden folder (e.g. `sh .gemini/scripts/setup_harness.sh`).")
 
@@ -141,8 +185,12 @@ echo "  /add-plugin mattpocock/skills"
     # Generate Specialized Agents
     for agent in selected_agents:
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1-\2', agent["name"])
-        safe_name = re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1).lower().replace(" ", "-")
-        agent_file_path = target_path / "agents" / f"{safe_name}.md" 
+        safe_name = re.sub('([a-z0-9])([A-Z])', r'\1-\2', s1).lower().replace(" ", "-").replace("_", "-")
+        safe_name = re.sub(r'-+', '-', safe_name).strip('-')
+        
+        agent_dir_path = target_path / "agents"
+        agent_dir_path.mkdir(parents=True, exist_ok=True)
+        agent_file_path = agent_dir_path / f"{safe_name}.md" 
         
         frontmatter = f"""---
 name: {safe_name}
