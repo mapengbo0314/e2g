@@ -20,7 +20,6 @@ tools:
 - Related Agents:
   - verifier
   - reviewer
-  - codesigner
 
 ## System Prompt
 
@@ -61,5 +60,4 @@ customization_config:
       related_agents:
         - verifier
         - reviewer
-        - codesigner
 ```

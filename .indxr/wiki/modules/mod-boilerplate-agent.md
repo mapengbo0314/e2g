@@ -17,8 +17,6 @@ source_files:
 - boilerplate-agent/agents/discovery/adversary/config.yaml
 - boilerplate-agent/agents/discovery/architect/agent.json
 - boilerplate-agent/agents/discovery/architect/config.yaml
-- boilerplate-agent/agents/discovery/codesigner/agent.json
-- boilerplate-agent/agents/discovery/codesigner/config.yaml
 - boilerplate-agent/agents/discovery/designdoc_drafter/agent.json
 - boilerplate-agent/agents/discovery/designdoc_drafter/config.yaml
 - boilerplate-agent/agents/discovery/feature-fetcher/agent.json
@@ -88,7 +86,6 @@ Agents are now defined as Markdown documentation rather than JSON configurations
 
 ### Discovery and Analysis Agents
 - **architect**: Codebase analysis and system design (`boilerplate-agent/agents/architect.md`)
-- **codesigner**: Collaborative design partner (`boilerplate-agent/agents/codesigner.md`)
 - **designdoc-drafter**: Technical documentation (`boilerplate-agent/agents/designdoc-drafter.md`)
 - **adversary**: Critical validation and skeptical review (`boilerplate-agent/agents/adversary.md`)
 

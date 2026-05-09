@@ -2,7 +2,6 @@
   "defaultAgent": "planner",
   "agents": [
     "architect",
-    "codesigner",
     "designdoc_drafter",
     "implementer",
     "planner",

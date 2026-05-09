@@ -16,7 +16,6 @@ e-2-g/
     agents/
       adversary.md
       architect.md
-      codesigner.md
       config-schema.md
       designdoc-drafter.md
       implementer.md
@@ -59,7 +58,6 @@ e-2-g/
     agents/
       adversary.md
       architect.md
-      codesigner.md
       designdoc-drafter.md
       feature-fetcher.md
       implementer.md
@@ -156,11 +154,8 @@ e-2-g/
 - `# Tool Usage Constraints`
 - `# Output Format`
 
-**_agents/agents/codesigner.md**
 - `# Core Mandates`
 - `# Core Mandates (Universal Subagent Context)`
-- `# Role: Codesigner`
-- `# Codesigner Instructions`
 - `# Tool Usage Constraints`
 
 **_agents/agents/config-schema.md**
@@ -310,8 +305,6 @@ e-2-g/
 - `# Architect`
 - `# Scratchpad`
 
-**boilerplate-agent/agents/codesigner.md**
-- `# Codesigner`
 
 **boilerplate-agent/agents/designdoc-drafter.md**
 - `# Design Doc Drafter`
@@ -541,7 +534,6 @@ e-2-g/
 
 ---
 
-## _agents/agents/codesigner.md
 
 **Language:** Markdown | **Size:** 4.1 KB | **Lines:** 40
 
@@ -810,7 +802,6 @@ e-2-g/
 
 ---
 
-## boilerplate-agent/agents/codesigner.md
 
 **Language:** Markdown | **Size:** 5.5 KB | **Lines:** 76
 

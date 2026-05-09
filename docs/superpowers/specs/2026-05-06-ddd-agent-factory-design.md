@@ -11,8 +11,6 @@ We will integrate a Domain-Driven Design (DDD) onboarding sequence into the `har
 - The `architect` agent will use `indxr` output to identify core domain entities and potential conflicts between docs and code.
 - Output: A draft `ubiquitous_language.md`.
 
-### 2. Alignment Phase (Codesigner / Grill-me)
-- The `cli.py` will implement an interactive session where it pulls questions from a specialized `codesigner` prompt.
 - The user answers these questions in the CLI to resolve conflicts and define business rules.
 - Output: Finalized `ubiquitous_language.md` and a `translation_map.md` (Domain -> Legacy).
 

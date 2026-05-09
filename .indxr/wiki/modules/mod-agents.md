@@ -10,8 +10,6 @@ source_files:
 - _agents/agents/adversary/config.yaml
 - _agents/agents/architect/agent.json
 - _agents/agents/architect/config.yaml
-- _agents/agents/codesigner/agent.json
-- _agents/agents/codesigner/config.yaml
 - _agents/agents/designdoc_drafter/agent.json
 - _agents/agents/designdoc_drafter/config.yaml
 - _agents/agents/implementer/agent.json
@@ -70,7 +68,6 @@ The system maintains the same specialized agent roles, now defined in Markdown f
 
 - **Planner**: Primary orchestration agent for task decomposition and workflow coordination
 - **Architect**: Deep codebase analysis and system-wide dependency mapping
-- **Codesigner**: Adversarial design validation and technical approach hardening  
 - **Implementer**: TDD execution and production code changes
 - **Reviewer**: Code quality assessment and standards enforcement
 - **Verifier**: Final QA, edge-case testing, and robustness verification

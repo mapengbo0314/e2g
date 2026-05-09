@@ -41,7 +41,6 @@ To delegate to specialized subagents, you MUST use their system prompts found in
 - `@reviewer`: Checks code quality and style.
 - `@verifier`: Performs QA and robustness verification.
 - `@architect`: System map and root-cause analysis.
-- `@codesigner`: Challenges approaches before coding.
 - `@designdoc-drafter`: Writes the formal design spec.
 - `@refactorer`: Specialized in structural refactoring and technical debt reduction.
 - `@linter-agent`: Specialized in fixing lint, type errors, and formatting issues.

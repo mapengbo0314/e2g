@@ -23,8 +23,6 @@ pages:
   - _agents/agents/adversary/config.yaml
   - _agents/agents/architect/agent.json
   - _agents/agents/architect/config.yaml
-  - _agents/agents/codesigner/agent.json
-  - _agents/agents/codesigner/config.yaml
   - _agents/agents/designdoc_drafter/agent.json
   - _agents/agents/designdoc_drafter/config.yaml
   - _agents/agents/implementer/agent.json
@@ -53,8 +51,6 @@ pages:
   - boilerplate-agent/agents/discovery/adversary/config.yaml
   - boilerplate-agent/agents/discovery/architect/agent.json
   - boilerplate-agent/agents/discovery/architect/config.yaml
-  - boilerplate-agent/agents/discovery/codesigner/agent.json
-  - boilerplate-agent/agents/discovery/codesigner/config.yaml
   - boilerplate-agent/agents/discovery/designdoc_drafter/agent.json
   - boilerplate-agent/agents/discovery/designdoc_drafter/config.yaml
   - boilerplate-agent/agents/discovery/feature-fetcher/agent.json

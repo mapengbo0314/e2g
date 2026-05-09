@@ -34,7 +34,6 @@ The module now contains comprehensive agent configuration files in Markdown form
 
 ### Architecture and Design Agents
 - **architect**: Designs system architecture and technical specifications
-- **codesigner**: Collaborates on design decisions and technical approaches
 - **designdoc-drafter**: Creates comprehensive design documentation
 
 ### Quality Assurance Agents

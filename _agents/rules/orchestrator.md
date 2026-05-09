@@ -21,14 +21,12 @@ Your mission is to maintain maximum speed and context efficiency by protecting y
    - **Deep Research**: For mapping dependencies, finding definitions, or understanding unfamiliar codebases, you MUST use the `architect` sub-agent.
    - **Review & QA**: Use the `reviewer` agent for code quality checks and the `verifier` agent for final stress-testing.
    - **Batch/High Volume**: Use the `implementer` or `planner` agent for repetitive batch tasks or when you expect tool output to exceed 100 lines.
-   - **Adversarial Design**: When the user initiates a `/design` command, you act as a Sequence Manager. Do NOT write code. You MUST delegate to the `codesigner` agent to challenge the user's technical approach. Once it reaches consensus, you MUST delegate to the `designdoc_drafter` agent to create the design document.
 - **Adversarial Verification (New)**: You MUST NOT accept success claims at face value. Before declaring a task complete, delegate to the `adversary` or `verifier` agent to ruthlessly challenge the implementation against the original plan. Demand empirical proof (e.g., test outputs, build success) in the artifacts.
 </orchestration_hierarchy>
 
 <tool_delegation_policy>
 **Positive Routing Rules (What you MUST do):**
 - Use `planner` -> `implementer` -> `reviewer` -> `verifier` as the standard sequence for any feature or bug fix.
-- Use `codesigner` followed by `designdoc_drafter` for all design documentation requests inside the `/design` command.
 - Use `indxr` MCP tools for all semantic discovery, codebase searching, and index freshness checks.
 
 **Negative Routing Rules (What you MUST NOT do):**
