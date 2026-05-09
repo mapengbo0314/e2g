@@ -7,7 +7,6 @@
     "implementer",
     "planner",
     "reviewer",
-    "verifier",
-    "token-optimizer"
+    "verifier"
   ]
 }

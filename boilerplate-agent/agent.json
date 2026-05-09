@@ -20,7 +20,6 @@
     "linter-agent",
     "refactorer",
     "performance-profiler",
-    "security-auditor",
-    "token-optimizer"
+    "security-auditor"
   ]
 }
