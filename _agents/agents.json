@@ -7,6 +7,11 @@
     "implementer",
     "planner",
     "reviewer",
-    "verifier"
+    "verifier",
+    {
+      "name": "token-optimizer",
+      "description": "Measures and optimizes token usage across the harness.",
+      "location": "agents/token-optimizer.md"
+    }
   ]
 }
