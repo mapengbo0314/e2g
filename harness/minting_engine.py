@@ -105,6 +105,17 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
                         if "@boilerplate-agent" in new_content:
                             new_content = new_content.replace("@boilerplate-agent", target_dir_name)
                             
+                        # Apply specialized agents injection specifically for dispatch_rules.md
+                        if file == "dispatch_rules.md" and selected_agents:
+                            agent_names = [agent['name'] for agent in selected_agents]
+                            agents_str = ", ".join([f"`@{name}`" for name in agent_names])
+                            injection = f"\n- **Domain Specific Routing**: You MUST delegate domain-specific tasks to the newly minted specialized agents: {agents_str}. Refer to their markdown files in the agents directory for their specific mandates.\n"
+                            
+                            # Inject right before the Negative Routing Rules section
+                            if "**Negative Routing Rules" in new_content:
+                                new_content = new_content.replace("**Negative Routing Rules", injection + "**Negative Routing Rules")
+
+                            
                         # Apply tool mappings if any
                         for old_tool, new_tool in tool_replacements.items():
                             new_content = new_content.replace(old_tool, new_tool)
