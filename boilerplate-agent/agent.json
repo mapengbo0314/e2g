@@ -20,6 +20,11 @@
     "linter-agent",
     "refactorer",
     "performance-profiler",
-    "security-auditor"
+    "security-auditor",
+    {
+      "name": "token-optimizer",
+      "description": "Measures and optimizes token usage across the harness.",
+      "location": "agents/token-optimizer.md"
+    }
   ]
 }
