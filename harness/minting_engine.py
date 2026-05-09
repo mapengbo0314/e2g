@@ -271,26 +271,9 @@ echo "  /add-plugin mattpocock/skills"
     harness_prefix = f".{active_platform}" if active_platform in ["gemini", "claude", "cursor"] else target_dir_name
     pointer_content = f"""# Agentic Harness
     
-Please read `AGENTS.md` for core repository instructions and routing rules.
+Please read `{harness_prefix}/AGENTS.md` for core repository instructions and routing rules.
 The Orchestrator agent and core rules are located in `{harness_prefix}/orchestrator.md`.
 """
-
-    # Cleanup existing potential pointer files to avoid pollution
-    all_pointer_files = ["GEMINI.md", "CLAUDE.md", ".cursorrules"]
-    for old_file in all_pointer_files:
-        old_path = project_root / old_file
-        if old_path.exists():
-            try:
-                old_path.unlink()
-            except Exception as e:
-                print(f"Warning: Could not remove old pointer file {old_path}: {e}")
-                
-    copilot_file = project_root / ".github" / "copilot-instructions.md"
-    if copilot_file.exists():
-        try:
-            copilot_file.unlink()
-        except Exception as e:
-            print(f"Warning: Could not remove old copilot instructions {copilot_file}: {e}")
 
     # Map the platform to its specific pointer files
     pointer_files_map = {
