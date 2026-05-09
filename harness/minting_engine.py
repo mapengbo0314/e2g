@@ -80,7 +80,12 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
                 "- replace": "- Edit",
                 "- write_file": "- Write",
                 "- run_shell_command": "- Bash",
-                "- glob": "- Glob"
+                "- glob": "- Glob",
+                "{{SUBAGENT_SYNTAX}}": "Task tool: "
+            }
+        else:
+            tool_replacements = {
+                "{{SUBAGENT_SYNTAX}}": "@"
             }
 
         # Step 1: Apply placeholders and tool mappings to all files
@@ -257,15 +262,43 @@ echo "  /add-plugin mattpocock/skills"
 Please read `AGENTS.md` for core repository instructions and routing rules.
 The Orchestrator agent and core rules are located in `{harness_prefix}/orchestrator.md`.
 """
-    pointer_files = ["GEMINI.md", "CLAUDE.md", ".cursorrules"]
-    for rules_file in pointer_files:
+
+    # Cleanup existing potential pointer files to avoid pollution
+    all_pointer_files = ["GEMINI.md", "CLAUDE.md", ".cursorrules"]
+    for old_file in all_pointer_files:
+        old_path = project_root / old_file
+        if old_path.exists():
+            try:
+                old_path.unlink()
+            except Exception as e:
+                print(f"Warning: Could not remove old pointer file {old_path}: {e}")
+                
+    copilot_file = project_root / ".github" / "copilot-instructions.md"
+    if copilot_file.exists():
+        try:
+            copilot_file.unlink()
+        except Exception as e:
+            print(f"Warning: Could not remove old copilot instructions {copilot_file}: {e}")
+
+    # Map the platform to its specific pointer files
+    pointer_files_map = {
+        "gemini": ["GEMINI.md"],
+        "claude": ["CLAUDE.md"],
+        "cursor": [".cursorrules"],
+        "agents": []
+    }
+    
+    files_to_generate = pointer_files_map.get(active_platform, [])
+    
+    for rules_file in files_to_generate:
         with open(project_root / rules_file, "w") as f:
             f.write(pointer_content)
             
-    copilot_dir = project_root / ".github"
-    copilot_dir.mkdir(exist_ok=True)
-    with open(copilot_dir / "copilot-instructions.md", "w") as f:
-        f.write(pointer_content)
+    if active_platform == "cursor":
+        copilot_dir = project_root / ".github"
+        copilot_dir.mkdir(exist_ok=True)
+        with open(copilot_dir / "copilot-instructions.md", "w") as f:
+            f.write(pointer_content)
         
     print("\nTo install skills & MCPs, run the setup_harness.sh script inside your platform's hidden folder (e.g. `sh .gemini/scripts/setup_harness.sh`).")
 
