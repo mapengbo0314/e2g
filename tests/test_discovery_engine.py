@@ -1,3 +1,6 @@
+import os
+import tempfile
+from harness.discovery_engine import acquire_mcp_context
 import pytest
 from unittest import mock
 from harness.discovery_engine import discover_agents, discover_ddd_context, discover_custom_agent
@@ -84,3 +87,36 @@ def test_discover_ddd_context(mock_query_llm, mock_fetch_skill):
     assert "legacy_hints" in result
     mock_query_llm.assert_called_once()
     assert mock_fetch_skill.call_count == 2
+
+
+def test_acquire_mcp_context_with_bundle():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = os.path.join(temp_dir, "my_bundle")
+        wiki_dir = os.path.join(bundle_dir, "wiki")
+        os.makedirs(wiki_dir)
+        with open(os.path.join(wiki_dir, "index.md"), "w") as f:
+            f.write("Bundle Index")
+        with open(os.path.join(wiki_dir, "architecture.md"), "w") as f:
+            f.write("Bundle Arch")
+
+        # project_path is dummy, it should prioritize bundle
+        context = acquire_mcp_context("/dummy/path", bundle_path=bundle_dir)
+        assert context is not None
+        assert "Bundle Index" in context
+        assert "Bundle Arch" in context
+
+def test_acquire_mcp_context_no_wiki():
+    context = acquire_mcp_context("/dummy/path", bundle_path=None)
+    assert context is None
+
+def test_acquire_mcp_context_bundle_indxr_path():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        bundle_dir = os.path.join(temp_dir, ".indxr")
+        wiki_dir = os.path.join(bundle_dir, "wiki")
+        os.makedirs(wiki_dir)
+        with open(os.path.join(wiki_dir, "index.md"), "w") as f:
+            f.write("Indxr Index")
+            
+        context = acquire_mcp_context("/dummy/path", bundle_path=bundle_dir)
+        assert context is not None
+        assert "Indxr Index" in context

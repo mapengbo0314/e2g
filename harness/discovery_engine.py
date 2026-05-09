@@ -4,28 +4,45 @@ import time
 import urllib.request
 import os
 
-def acquire_mcp_context(project_path: str) -> str:
+def acquire_mcp_context(project_path: str, bundle_path: str = None) -> str:
     """Acquires lightweight project context from the core wiki files to avoid token explosion."""
-    
-    wiki_path = os.path.join(project_path, ".indxr", "wiki")
+
+    # Check bundle path first if provided
+    if bundle_path:
+        bundle_wiki_path = os.path.join(bundle_path, "wiki") if not bundle_path.endswith("wiki") else bundle_path
+        # If the user passed the path to the indxr folder itself
+        if not os.path.exists(bundle_wiki_path) and os.path.basename(bundle_path) == ".indxr":
+            bundle_wiki_path = os.path.join(bundle_path, "wiki")
+        elif not os.path.exists(bundle_wiki_path):
+             bundle_wiki_path = os.path.join(bundle_path, ".indxr", "wiki")
+
+        if os.path.exists(bundle_wiki_path):
+            wiki_path = bundle_wiki_path
+            print(f"Found existing wiki in bundle at {wiki_path}. Reading core architecture...")
+        else:
+            wiki_path = os.path.join(project_path, ".indxr", "wiki")
+    else:
+        wiki_path = os.path.join(project_path, ".indxr", "wiki")
+
     context_parts = []
-    
+
     if os.path.exists(wiki_path):
-        print(f"Found existing .indxr/wiki at {wiki_path}. Reading core architecture...")
-        
+        if not bundle_path or wiki_path == os.path.join(project_path, ".indxr", "wiki"):
+             print(f"Found existing .indxr/wiki at {wiki_path}. Reading core architecture...")
+
         # Read ONLY the index and architecture to avoid token explosion
         for core_file in ["index.md", "architecture.md"]:
             p = os.path.join(wiki_path, core_file)
             if os.path.exists(p):
                 with open(p, 'r') as f:
                     context_parts.append(f"=== {core_file.upper()} ===\n" + f.read())
-                    
+
         if context_parts:
             return "\n\n".join(context_parts)
 
-    # Fallback if wiki doesn't exist
-    print(f"No usable .indxr/wiki found at {wiki_path}. Please ensure `indxr wiki generate` has been run.")
-    return "No codebase wiki found. Architecture unknown."
+    # Return None instead of a string if no wiki is found so caller can handle fallback
+    return None
+
 
 def fetch_remote_skill(skill_url: str) -> str:
     """Fetches a skill definition from a raw GitHub URL."""
