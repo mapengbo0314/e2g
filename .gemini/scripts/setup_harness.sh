@@ -14,21 +14,6 @@ if command -v gemini &> /dev/null; then
     echo "Installing Superpowers extension..."
     gemini extensions install https://github.com/obra/superpowers --consent || true
     
-    echo "Installing Matt Pocock skills..."
-    # The mattpocock/skills repository contains multiple nested skills.
-    # We must clone it temporarily and install each valid skill directory individually.
-    TEMP_DIR=$(mktemp -d)
-    git clone --depth 1 https://github.com/mattpocock/skills "$TEMP_DIR" &> /dev/null
-    
-    # Find all directories containing a SKILL.md (excluding deprecated ones to save time/space)
-    find "$TEMP_DIR" -type f -name "SKILL.md" | grep -v "/deprecated/" | while read -r skill_file; do
-        skill_dir=$(dirname "$skill_file")
-        echo "Installing skill from $(basename "$skill_dir")..."
-        gemini skills install "$skill_dir" --scope workspace --consent || true
-    done
-    
-    rm -rf "$TEMP_DIR"
-    
     echo "Adding indxr to Gemini CLI project MCP configuration..."
     indxr_serve_args_str="serve --watch --wiki-auto-update --all-tools"
     gemini mcp add indxr bash -c "cd '/Users/pengbolicious/pengbo-apps/e-2-g' && indxr $indxr_serve_args_str" -e GEMINI_API_KEY=\$GEMINI_API_KEY -e ANTHROPIC_API_KEY=\$ANTHROPIC_API_KEY -e OPENAI_API_KEY=\$OPENAI_API_KEY || true
@@ -36,4 +21,24 @@ else
     echo "Warning: gemini command not found."
 fi
 
-echo "To activate it, run Gemini from the project root and use '/mcp reload'."
+echo ""
+echo "=== Setting up Superpowers for Claude Code ==="
+if command -v claude &> /dev/null; then
+    echo "Installing Superpowers plugin..."
+    claude plugin install --scope local superpowers@claude-plugins-official || true
+else
+    echo "Warning: claude command not found."
+fi
+
+echo ""
+echo "=== Installing Matt Pocock Skills (All Agents) ==="
+if command -v npx &> /dev/null; then
+    # Use the official skills installer to handle all nested skills correctly across both Gemini and Claude
+    npx -y skills@latest add mattpocock/skills --all || true
+else
+    echo "Warning: npx command not found. Cannot install Matt Pocock skills automatically."
+    echo "Please ensure Node.js is installed."
+fi
+
+echo ""
+echo "Setup complete. To activate indxr in Gemini, run Gemini from the project root and use '/mcp reload'."
