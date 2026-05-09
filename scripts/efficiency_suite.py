@@ -1,30 +1,39 @@
 import os
 import argparse
+import re
 from pathlib import Path
+from collections import defaultdict
 from google import genai
+
+FALLBACK_CHARS_PER_TOKEN = 4
+MIN_OVERLAP_LINE_LENGTH = 20
 
 def count_tokens(text: str, model: str = "gemini-1.5-flash") -> int:
     api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key: return max(1, len(text) // 4)
+    if not api_key: return max(1, len(text) // FALLBACK_CHARS_PER_TOKEN)
     client = genai.Client(api_key=api_key)
     try:
         return client.models.count_tokens(model=model, contents=text).total_tokens
-    except: return max(1, len(text) // 4)
+    except Exception: return max(1, len(text) // FALLBACK_CHARS_PER_TOKEN)
 
 def test_static(target_dir: Path):
     print(f"--- Static Analysis: {target_dir} ---")
     md_files = list(target_dir.rglob("*.md"))
     results = []
-    for f in md_files:
-        content = f.read_text()
-        results.append({"file": str(f), "tokens": count_tokens(content)})
+    line_map = defaultdict(list)
     
-    # Simple overlap check: find common lines > 20 chars
-    line_map = {}
     for f in md_files:
-        lines = [l.strip() for l in f.read_text().splitlines() if len(l.strip()) > 20]
+        try:
+            content = f.read_text()
+        except Exception as e:
+            print(f"Error reading {f}: {e}")
+            continue
+            
+        results.append({"file": str(f), "tokens": count_tokens(content)})
+        
+        # Simple overlap check: find common lines > MIN_OVERLAP_LINE_LENGTH
+        lines = [l.strip() for l in content.splitlines() if len(l.strip()) > MIN_OVERLAP_LINE_LENGTH]
         for l in lines:
-            if l not in line_map: line_map[l] = []
             line_map[l].append(str(f))
             
     overlaps = {l: files for l, files in line_map.items() if len(files) > 1}
@@ -33,10 +42,26 @@ def test_static(target_dir: Path):
 
 def test_goldfish(doc_path: Path):
     print(f"--- Goldfish Simulation: {doc_path} ---")
-    doc_content = doc_path.read_text()
+    try:
+        doc_content = doc_path.read_text()
+    except Exception as e:
+        print(f"Error reading {doc_path}: {e}")
+        return 0
+        
     # Simulate loading referenced files
     referenced_tokens = 0
-    # ... logic to parse [file](path) ...
+    # Basic regex parsing to find markdown links pointing to local files
+    links = re.findall(r"\[.*?\]\((.*?\.md)\)", doc_content)
+    for link in links:
+        # Resolve path relative to the doc_path
+        ref_path = doc_path.parent / link
+        if ref_path.exists() and ref_path.is_file():
+            try:
+                ref_content = ref_path.read_text()
+                referenced_tokens += count_tokens(ref_content)
+            except Exception as e:
+                print(f"Error reading referenced file {ref_path}: {e}")
+                
     total_payload = count_tokens(doc_content) + referenced_tokens
     print(f"Goldfish Payload: {total_payload} tokens")
     return total_payload
