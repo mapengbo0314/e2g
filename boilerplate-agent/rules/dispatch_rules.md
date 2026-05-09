@@ -77,18 +77,23 @@ When assigning follow-up work or corrections, you MUST intelligently decide whet
 </subagent_reuse_policy>
 
 <indxr_mcp_tools>
-You and your subagents have access to the following `indxr` MCP tools. You MUST use these instead of raw file reads or grep whenever possible:
-- `find`: Find files/symbols by concept, name, callers, or signature pattern.
-- `summarize`: Understand files/symbols without reading source.
-- `explain_symbol`: Signature, doc comment, relationships, metadata.
-- `get_public_api`: Public declarations with signatures for a module.
-- `get_callers`: Find who references a symbol across all files.
-- `get_health`: Codebase health summary, and complexity metrics. (Note: Index freshness is maintained automatically in the background; you do not need to manually check for staleness).
-- `get_diff_summary`: Structural changes since a git ref or GitHub PR.
-- `get_dependency_graph`: Map file and symbol dependencies.
-- `get_tree`: Directory/file tree.
-- `search_relevant`: Multi-signal relevance search.
-- `wiki_*` tools: Use if a wiki exists for knowledge management.
+You and your subagents have access to the following `indxr` MCP tools. You MUST use these instead of raw file reads, grep, or manual directory iteration whenever possible. **Do not iterate through files manually or read raw files blindly** if the indexer can provide the necessary structural context.
+
+**Wiki Knowledge Base Integration (MANDATORY)**:
+The `indxr` MCP server maintains an auto-updating codebase wiki. You MUST enforce a "Wiki-First Discovery" approach, prioritizing these tools:
+- **Read-Only Tools** (`wiki_search`, `wiki_read`, `wiki_status`): Require agents to use these for initial context gathering to prevent duplicating known patterns. You are FORBIDDEN from updating the wiki.
+
+After querying the wiki, you and your agents may use these structural tools:
+- `wiki_find`: Find files/symbols by concept, name, callers, or signature pattern.
+- `wiki_summarize`: Understand files/symbols without reading source.
+- `wiki_explain_symbol`: Signature, doc comment, relationships, metadata.
+- `wiki_get_public_api`: Public declarations with signatures for a module.
+- `wiki_get_callers`: Find who references a symbol across all files.
+- `wiki_get_health`: Codebase health summary, and complexity metrics.
+- `wiki_get_diff_summary`: Structural changes since a git ref or GitHub PR.
+- `wiki_get_dependency_graph`: Map file and symbol dependencies.
+- `wiki_get_tree`: Directory/file tree.
+- `wiki_search_relevant`: Multi-signal relevance search.
 </indxr_mcp_tools>
 
 <superpower_skills>

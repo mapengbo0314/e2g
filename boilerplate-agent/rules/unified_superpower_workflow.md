@@ -17,35 +17,35 @@ At each stage of this workflow, the Orchestrator or corresponding subagent **MUS
 ### State 0: Bootstrap & Factory Minting
 *   **Action:** The user launches their chosen AI within the `boilerplate-agent` directory.
 *   **Interaction:** The Orchestrator delegates to `feature-fetcher`. 
-*   **MCP Integration:** `feature-fetcher` uses `indxr` MCP tools (`get_tree`, `get_public_api`, `get_health`) to understand the repository structure without reading raw files. It proposes specialized agents. 
+*   **MCP Integration:** `feature-fetcher` uses `indxr` MCP tools (`wiki_get_tree`, `wiki_get_public_api`, `wiki_get_health`) to understand the repository structure without reading raw files. It proposes specialized agents. 
 *   **Handoff:** The user approves, the factory is minted, and the user restarts the AI in the new project directory.
 
 ### State 1: Feature Refinement
 *   **Required Superpower Skill:** `brainstorming`
 *   **Action:** The Orchestrator engages the user to define a feature or fix.
 *   **Interaction:** The Orchestrator or specialized subagent MUST invoke the `brainstorming` skill to explore the project context and ask clarifying questions. 
-*   **MCP Integration:** Before proposing approaches, the agent uses `indxr` tools (`find`, `search_relevant`, `summarize`, `get_health`) to verify its assumptions against the real codebase. 
+*   **MCP Integration:** Before proposing approaches, the agent uses `indxr` tools (`wiki_find`, `wiki_search_relevant`, `wiki_summarize`, `wiki_get_health`) to verify its assumptions against the real codebase. 
 *   **Handoff:** Requirements are finalized and written to a spec document (as dictated by the `brainstorming` skill).
 
 ### State 2: Planning
 *   **Required Superpower Skill:** `writing-plans`
 *   **Action:** The Orchestrator delegates to the `planner` agent.
 *   **Interaction:** The `planner` agent MUST invoke the `writing-plans` skill to draft a deterministic execution plan.
-*   **MCP Integration:** The `planner` uses `indxr` tools (`explain_symbol`, `get_dependency_graph`, `get_callers`) to map out exact interfaces and ensure the plan relies on existing architecture.
+*   **MCP Integration:** The `planner` uses `indxr` tools (`wiki_explain_symbol`, `wiki_get_dependency_graph`, `wiki_get_callers`) to map out exact interfaces and ensure the plan relies on existing architecture.
 *   **Handoff:** The state is committed to disk at `workspace/artifacts/plan.md`.
 
 ### State 3: Execution & Testing
 *   **Required Superpower Skills:** `test-driven-development` and `systematic-debugging`
 *   **Action:** The Orchestrator delegates to the `implementer` (or specialized coding agent).
 *   **Interaction:** The agent reads the plan. It MUST invoke `test-driven-development` to write failing tests first. If bugs occur, it MUST invoke `systematic-debugging` to trace root causes.
-*   **MCP Integration:** During debugging, the agent queries `indxr` using `get_callers` or `get_type_flow` to understand how a changed symbol affects the rest of the application.
+*   **MCP Integration:** During debugging, the agent queries `indxr` using `wiki_get_callers` or `wiki_get_type_flow` to understand how a changed symbol affects the rest of the application.
 *   **Handoff:** The codebase is mutated, tests pass.
 
 ### State 4: Adversarial Verification
 *   **Required Superpower Skill:** `verification-before-completion`
 *   **Action:** The Orchestrator delegates to the `adversary` or `verifier` agent.
 *   **Interaction:** The agent MUST invoke the `verification-before-completion` skill. It must ruthlessly challenge the implementer's success claims and demand empirical proof (test outputs).
-*   **MCP Integration:** The `verifier` uses `indxr` (`get_diff_summary`, `get_public_api`) to ensure no new architectural violations were introduced.
+*   **MCP Integration:** The `verifier` uses `indxr` (`wiki_get_diff_summary`, `wiki_get_public_api`) to ensure no new architectural violations were introduced.
 *   **Handoff:** The state is physically committed to disk as a verification report.
 
 ### State 5: Wrap-up & Review
@@ -57,16 +57,16 @@ At each stage of this workflow, the Orchestrator or corresponding subagent **MUS
 ---
 
 ## Quick Reference: Indxr MCP Tools
-*   `find`: Find files/symbols by concept, name, callers, or signature pattern.
-*   `summarize`: Understand files/symbols without reading source.
-*   `explain_symbol`: Signature, doc comment, relationships, metadata.
-*   `get_public_api`: Public declarations with signatures for a module.
-*   `get_callers`: Find who references a symbol across all files.
-*   `get_health`: Codebase health summary, and complexity metrics. (Index freshness is maintained automatically).
-*   `get_diff_summary`: Structural changes since a git ref or GitHub PR.
-*   `get_dependency_graph`: Map file and symbol dependencies.
-*   `get_tree`: Directory/file tree.
-*   `search_relevant`: Multi-signal relevance search.
+*   `wiki_find`: Find files/symbols by concept, name, callers, or signature pattern.
+*   `wiki_summarize`: Understand files/symbols without reading source.
+*   `wiki_explain_symbol`: Signature, doc comment, relationships, metadata.
+*   `wiki_get_public_api`: Public declarations with signatures for a module.
+*   `wiki_get_callers`: Find who references a symbol across all files.
+*   `wiki_get_health`: Codebase health summary, and complexity metrics. (Index freshness is maintained automatically).
+*   `wiki_get_diff_summary`: Structural changes since a git ref or GitHub PR.
+*   `wiki_get_dependency_graph`: Map file and symbol dependencies.
+*   `wiki_get_tree`: Directory/file tree.
+*   `wiki_search_relevant`: Multi-signal relevance search.
 
 ## Quick Reference: Superpower Skills
 *   `brainstorming`

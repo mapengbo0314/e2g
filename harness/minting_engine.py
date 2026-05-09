@@ -18,7 +18,22 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
     if boilerplate_dir and os.path.exists(boilerplate_dir):
         shutil.copytree(boilerplate_dir, target_path, ignore=ignore_patterns, dirs_exist_ok=True)
         
-        # Fix broken include pointers inside the copied files
+        # Tool mapping for specific platforms
+        platform_map_normalized = {"1": "gemini", "2": "claude", "3": "cursor", "4": "agents"}
+        current_platform = platform_map_normalized.get(platform_choice, platform_choice).lower()
+        
+        tool_replacements = {}
+        if current_platform == "claude":
+            tool_replacements = {
+                "- read_file": "- Read",
+                "- grep_search": "- Grep",
+                "- replace": "- Edit",
+                "- write_file": "- Write",
+                "- run_shell_command": "- Bash",
+                "- glob": "- Glob"
+            }
+
+        # Fix broken include pointers inside the copied files and map tool names
         target_dir_name = target_path.name
         for root, _, files in os.walk(target_path):
             for file in files:
@@ -27,8 +42,16 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
                     try:
                         with open(filepath, "r") as f:
                             content = f.read()
-                        if "@boilerplate-agent" in content:
-                            new_content = content.replace("@boilerplate-agent", f"@{target_dir_name}")
+                            
+                        new_content = content
+                        if "@boilerplate-agent" in new_content:
+                            new_content = new_content.replace("@boilerplate-agent", f"@{target_dir_name}")
+                            
+                        # Apply tool mappings if any
+                        for old_tool, new_tool in tool_replacements.items():
+                            new_content = new_content.replace(old_tool, new_tool)
+                            
+                        if new_content != content:
                             with open(filepath, "w") as f:
                                 f.write(new_content)
                     except Exception as e:
@@ -110,10 +133,15 @@ echo "=== Setting up Superpowers for Gemini CLI ==="
 if command -v gemini &> /dev/null; then
     gemini extensions install https://github.com/obra/superpowers || true
     gemini extensions install https://github.com/mattpocock/skills || true
+    
+    echo "Adding indxr to Gemini CLI project MCP configuration..."
+    indxr_serve_args_str="serve --watch --wiki-auto-update --all-tools"
+    gemini mcp add indxr bash -c "cd '{escaped_project_path}' && indxr $indxr_serve_args_str" -e GEMINI_API_KEY=\\$GEMINI_API_KEY -e ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY -e OPENAI_API_KEY=\\$OPENAI_API_KEY || true
 else
     echo "Warning: gemini command not found."
 fi
 
+echo "To activate it, run Gemini from the project root and use '/mcp reload'."
 """,
         "claude": f"""#!/usr/bin/env bash
 set -e
@@ -125,9 +153,9 @@ echo "  /plugin install skills@mattpocock"
 
 # MCP Configuration for Claude
 if command -v claude &> /dev/null; then
-    echo "Adding indxr to Claude Code global MCP configuration..."
-    indxr_serve_args_str="serve --watch --wiki-auto-update"
-    claude mcp add indxr -- bash -c "cd '{escaped_project_path}' && indxr $indxr_serve_args_str" || true
+    echo "Adding indxr to Claude Code project MCP configuration..."
+    indxr_serve_args_str="serve --watch --wiki-auto-update --all-tools"
+    claude mcp add --scope project indxr --env GEMINI_API_KEY=\\$GEMINI_API_KEY --env ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY --env OPENAI_API_KEY=\\$OPENAI_API_KEY -- bash -c "cd '{escaped_project_path}' && indxr $indxr_serve_args_str" || true
 fi
 """,
         "cursor": f"""#!/usr/bin/env bash
@@ -143,6 +171,7 @@ echo "  /add-plugin mattpocock/skills"
     # Write setup script
     if active_platform in scripts_to_generate:
         script_content = scripts_to_generate[active_platform]
+        
         script_dir = project_root / f".{active_platform}" / "scripts"
         script_dir.mkdir(parents=True, exist_ok=True)
         script_path = script_dir / "setup_harness.sh"
@@ -151,9 +180,11 @@ echo "  /add-plugin mattpocock/skills"
         os.chmod(script_path, 0o755)
     
     # Generate Platform Rules Pointers IN THE ROOT DIRECTORY
-    pointer_content = """# Agentic Harness
+    harness_prefix = f".{active_platform}" if active_platform in ["gemini", "claude", "cursor"] else target_dir_name
+    pointer_content = f"""# Agentic Harness
     
 Please read `AGENTS.md` for core repository instructions and routing rules.
+The Orchestrator agent and core rules are located in `{harness_prefix}/orchestrator.md`.
 """
     pointer_files = ["GEMINI.md", "CLAUDE.md", ".cursorrules"]
     for rules_file in pointer_files:
@@ -168,7 +199,7 @@ Please read `AGENTS.md` for core repository instructions and routing rules.
     print("\nTo install skills & MCPs, run the setup_harness.sh script inside your platform's hidden folder (e.g. `sh .gemini/scripts/setup_harness.sh`).")
 
     # Create an MCP config that points to the indxr server running in the project root
-    indxr_serve_args = ["serve", "--watch", "--wiki-auto-update"]
+    indxr_serve_args = ["serve", "--watch", "--wiki-auto-update", "--all-tools"]
     if model_choice:
         indxr_serve_args.extend(["--wiki-model", model_choice])
     
@@ -190,6 +221,7 @@ Please read `AGENTS.md` for core repository instructions and routing rules.
         }
     }
     
+    # Generate mcp.json as a fallback/reference configuration
     mcp_path = target_path / "mcp.json"
     with open(mcp_path, 'w') as f:
          json.dump(mcp_config, f, indent=2)
@@ -212,14 +244,23 @@ Please read `AGENTS.md` for core repository instructions and routing rules.
         agent_dir_path.mkdir(parents=True, exist_ok=True)
         agent_file_path = agent_dir_path / f"{safe_name}.md" 
         
+        # Select base tools based on platform
+        if active_platform == "claude":
+            tools_list = """  - Read
+  - Grep
+  - Edit
+  - Bash"""
+        else:
+            tools_list = """  - read_file
+  - grep_search
+  - replace
+  - run_shell_command"""
+        
         frontmatter = f"""---
 name: {safe_name}
 description: {agent["role"]}
 tools:
-  - read_file
-  - grep_search
-  - replace
-  - run_shell_command
+{tools_list}
 ---
 """
         system_prompt = agent.get("system_prompt", f"# {agent['name']}\n\n{agent['role']}")
@@ -241,13 +282,11 @@ Ensure your implementation aligns with these definitions.
 
         # Determine the correct include syntax based on platform
         include_pointer = ""
-        if active_platform == "gemini":
-            include_pointer = f"@.{active_platform}/rules/core_mandates.md\n\n"
-        elif active_platform == "claude":
-            include_pointer = f"@.{active_platform}/rules/core_mandates.md\n\n"
+        if active_platform in ["gemini", "claude"]:
+            include_pointer = "@../rules/core_mandates.md\n\n"
         else:
             # Fallback for cursor/agents where include syntax might not be natively supported
-            include_pointer = "<!-- Core Mandates should be read from rules/core_mandates.md -->\n\n"
+            include_pointer = "<!-- Core Mandates should be read from ../rules/core_mandates.md -->\n\n"
 
         final_content = frontmatter + include_pointer + system_prompt + "\n" + ddd_section
         
