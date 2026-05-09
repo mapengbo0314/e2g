@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# DEPRECATED: Use efficiency_suite.py instead
 """
 Token Efficiency Benchmark Utility
 
