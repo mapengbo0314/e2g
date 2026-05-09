@@ -124,6 +124,8 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
     print("Fetching remote skills for Agent Discovery...")
     arch_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture/SKILL.md")
     grill_docs_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md")
+    agentic_eval_skill = fetch_remote_skill("https://raw.githubusercontent.com/github/awesome-copilot/main/skills/agentic-eval/SKILL.md")
+    prompt_engineer_skill = fetch_remote_skill("https://raw.githubusercontent.com/Jeffallan/claude-skills/main/skills/prompt-engineer/SKILL.md")
 
     ddd_prompt_section = ""
     if ddd_context:
@@ -134,7 +136,8 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
             f"Translation Map (User Answers): {json.dumps(ddd_context.get('translation_map', {}))}\n"
             f"Legacy Hints: {json.dumps(ddd_context.get('legacy_hints', {}))}\n"
             f"Additional Knowledge: {ddd_context.get('additional_domain_knowledge', 'None provided')}\n\n"
-            "Ensure the agents' system prompts incorporate this domain-specific knowledge intrinsically. Do not just append it; use it to specialize their roles.\n\n"
+            "Ensure the agents' system prompts incorporate this domain-specific knowledge intrinsically. Do not just append it; use it to specialize their roles.\n"
+            "Specifically, you MUST use the Translation Map to bridge legacy terms with the Ubiquitous Language, and define their responsibilities based on the boundaries identified in these DDD concepts.\n\n"
         )
 
     full_prompt = (
@@ -181,13 +184,20 @@ def discover_ddd_context(context_str: str, llm_provider: str, api_key: str, mode
     print("Fetching remote skills for DDD alignment...")
     grill_me_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/productivity/grill-me/SKILL.md")
     grill_with_docs_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md")
+    agentic_eval_skill = fetch_remote_skill("https://raw.githubusercontent.com/github/awesome-copilot/main/skills/agentic-eval/SKILL.md")
+    prompt_engineer_skill = fetch_remote_skill("https://raw.githubusercontent.com/Jeffallan/claude-skills/main/skills/prompt-engineer/SKILL.md")
 
     prompt = (
-        "You are a strict Domain-Driven Design architect. Analyze the following project context and execute the provided skills.\n\n"
+        "You are a strict Domain-Driven Design architect. Analyze the following project context (sourced from indxr MCP) and execute the provided skills.\n\n"
+        "Apply the 'agentic-eval' and 'prompt-engineer' skills to rigorously self-critique and refine your domain definitions and output JSON structure against the provided codebase architecture.\n\n"
         "=== GRILL-WITH-DOCS SKILL ===\n"
         f"{grill_with_docs_skill}\n\n"
         "=== GRILL-ME SKILL ===\n"
         f"{grill_me_skill}\n\n"
+        "=== AGENTIC EVAL ===\n"
+        f"{agentic_eval_skill}\n\n"
+        "=== PROMPT ENGINEER ===\n"
+        f"{prompt_engineer_skill}\n\n"
         "Your task:\n"
         "1. Draft a context definition (context.md style) based on the codebase.\n"
         "2. Identify ambiguities or missing domain definitions.\n"

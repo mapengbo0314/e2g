@@ -18,7 +18,7 @@ tools:
   - ddd-alignment
   - writing-plans
   - test-driven-development
-  - improve-coding-architecture
+  - improve-codebase-architecture
 - Related Agents:
   - architect
   - reviewer

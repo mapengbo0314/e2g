@@ -19,7 +19,7 @@ You MUST adhere to the `using-superpowers` state machine.
 - Skills:
   - grill-me
   - grill-with-docs
-  - improve-coding-architecture
+  - improve-codebase-architecture
   - ddd-alignment
 
 ## System Prompt
@@ -52,7 +52,7 @@ To delegate to specialized subagents, you MUST use their system prompts found in
 
 
 ### DOMAIN DRIVEN DESIGN (DDD):
-- Use skills like `grill-me`, `grill-with-docs`, `improve-coding-architecture`, and `ddd-alignment` if you encounter domain conflicts, need to refine the ubiquitous language, or want to align implementation with architectural goals.
+- Use skills like `grill-me`, `grill-with-docs`, `improve-codebase-architecture`, and `ddd-alignment` if you encounter domain conflicts, need to refine the ubiquitous language, or want to align implementation with architectural goals.
 
 ## Customization
 ```yaml

@@ -46,7 +46,7 @@ To delegate to any of the following specialized subagents, you MUST invoke them 
 - **{{SUBAGENT_SYNTAX}}performanceProfiler** (`agents/performance-profiler.md`): Identifies performance bottlenecks and suggests optimizations.
 
 ### DOMAIN DRIVEN DESIGN (DDD):
-- Use skills like `grill-me`, `grill-with-docs`, `improve-coding-architecture`, and `ddd-alignment` if you encounter domain conflicts, need to refine the ubiquitous language, or want to align implementation with architectural goals.
+- Use skills like `grill-me`, `grill-with-docs`, `improve-codebase-architecture`, and `ddd-alignment` if you encounter domain conflicts, need to refine the ubiquitous language, or want to align implementation with architectural goals.
 
 ## Customization
 ```yaml

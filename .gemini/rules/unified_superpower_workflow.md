@@ -6,7 +6,7 @@ This document defines the strictly deterministic, filesystem-backed state machin
 At each stage of this workflow, the Orchestrator or corresponding subagent **MUST** explicitly invoke the listed `Superpower Skill` using their AI's skill invocation tool.
 
 ## DOMAIN DRIVEN DESIGN (DDD) mandate:
-- Use skills like `grill-me`, `grill-with-docs`, `improve-coding-architecture`, and `ddd-alignment` if you encounter domain conflicts, need to refine the ubiquitous language, or want to align implementation with architectural goals.
+- Use skills like `grill-me`, `grill-with-docs`, `improve-codebase-architecture`, and `ddd-alignment` if you encounter domain conflicts, need to refine the ubiquitous language, or want to align implementation with architectural goals.
 
 ---
 

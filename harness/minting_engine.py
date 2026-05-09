@@ -109,7 +109,7 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
                         if file == "dispatch_rules.md" and selected_agents:
                             agent_names = [agent['name'] for agent in selected_agents]
                             agents_str = ", ".join([f"`@{name}`" for name in agent_names])
-                            injection = f"\n- **Domain Specific Routing**: You MUST delegate domain-specific tasks to the newly minted specialized agents: {agents_str}. Refer to their markdown files in the agents directory for their specific mandates.\n"
+                            injection = f"\n- **Domain Specific Routing**: If the task involves domain-specific areas similar to the domains defined by the newly minted specialized agents ({agents_str}), you MUST route to those agents. Refer to their markdown files in the agents directory for their specific mandates.\n"
                             
                             # Inject right before the Negative Routing Rules section
                             if "**Negative Routing Rules" in new_content:
