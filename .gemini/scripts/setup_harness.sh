@@ -11,8 +11,23 @@ fi
 
 echo "=== Setting up Superpowers for Gemini CLI ==="
 if command -v gemini &> /dev/null; then
-    gemini extensions install https://github.com/obra/superpowers || true
-    gemini extensions install https://github.com/mattpocock/skills || true
+    echo "Installing Superpowers extension..."
+    gemini extensions install https://github.com/obra/superpowers --consent || true
+    
+    echo "Installing Matt Pocock skills..."
+    # The mattpocock/skills repository contains multiple nested skills.
+    # We must clone it temporarily and install each valid skill directory individually.
+    TEMP_DIR=$(mktemp -d)
+    git clone --depth 1 https://github.com/mattpocock/skills "$TEMP_DIR" &> /dev/null
+    
+    # Find all directories containing a SKILL.md (excluding deprecated ones to save time/space)
+    find "$TEMP_DIR" -type f -name "SKILL.md" | grep -v "/deprecated/" | while read -r skill_file; do
+        skill_dir=$(dirname "$skill_file")
+        echo "Installing skill from $(basename "$skill_dir")..."
+        gemini skills install "$skill_dir" --scope workspace --consent || true
+    done
+    
+    rm -rf "$TEMP_DIR"
     
     echo "Adding indxr to Gemini CLI project MCP configuration..."
     indxr_serve_args_str="serve --watch --wiki-auto-update --all-tools"
