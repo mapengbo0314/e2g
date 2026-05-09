@@ -2,6 +2,7 @@ import pytest
 from pathlib import Path
 import tempfile
 import json
+import shutil
 from harness.minting_engine import mint_workspace
 
 def test_mcp_config_filename_gemini():
@@ -27,6 +28,10 @@ def test_mcp_config_filename_gemini():
             config = json.load(f)
             assert "mcpServers" in config
             assert "indxr" in config["mcpServers"]
+            command_args = " ".join(config["mcpServers"]["indxr"]["args"])
+            # The command inside bash -c should use an absolute path, not just 'indxr'
+            assert " && indxr " not in command_args
+            assert "bin/indxr" in command_args or shutil.which("indxr") in command_args
 
 def test_mcp_config_filename_claude():
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -67,6 +72,9 @@ def test_setup_harness_contains_mcp_instructions_claude():
         content = setup_script.read_text()
         assert "claude mcp add --scope project indxr" in content
         assert "--env GEMINI_API_KEY" in content
+        # It should not just use 'indxr' in the bash -c portion
+        assert "&& indxr " not in content
+        assert "bin/indxr" in content or (shutil.which("indxr") and shutil.which("indxr") in content)
 
 def test_setup_harness_contains_mcp_instructions_gemini():
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -89,3 +97,5 @@ def test_setup_harness_contains_mcp_instructions_gemini():
         content = setup_script.read_text()
         assert "gemini mcp add indxr bash -c" in content
         assert "/mcp reload" in content
+        assert "&& indxr " not in content
+        assert "bin/indxr" in content or (shutil.which("indxr") and shutil.which("indxr") in content)

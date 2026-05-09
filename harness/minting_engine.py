@@ -201,6 +201,7 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
     active_platform = platform_map.get(platform_choice, platform_choice).lower()
 
     escaped_project_path = os.path.abspath(project_path).replace("'", "'\\''")
+    indxr_abs_path = shutil.which("indxr") or "~/.cargo/bin/indxr"
     
     key_check_snippet = """
 # Check for indxr API keys
@@ -223,7 +224,7 @@ if command -v gemini &> /dev/null; then
     
     echo "Adding indxr to Gemini CLI project MCP configuration..."
     indxr_serve_args_str="serve --watch --wiki-auto-update --all-tools"
-    gemini mcp add indxr bash -c "cd '{escaped_project_path}' && indxr $indxr_serve_args_str" -e GEMINI_API_KEY=\\$GEMINI_API_KEY -e ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY -e OPENAI_API_KEY=\\$OPENAI_API_KEY || true
+    gemini mcp add indxr bash -c "cd '{escaped_project_path}' && {indxr_abs_path} $indxr_serve_args_str" -e GEMINI_API_KEY=\\$GEMINI_API_KEY -e ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY -e OPENAI_API_KEY=\\$OPENAI_API_KEY || true
 else
     echo "Warning: gemini command not found."
 fi
@@ -242,7 +243,7 @@ echo "  /plugin install skills@mattpocock"
 if command -v claude &> /dev/null; then
     echo "Adding indxr to Claude Code project MCP configuration..."
     indxr_serve_args_str="serve --watch --wiki-auto-update --all-tools"
-    claude mcp add --scope project indxr --env GEMINI_API_KEY=\\$GEMINI_API_KEY --env ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY --env OPENAI_API_KEY=\\$OPENAI_API_KEY -- bash -c "cd '{escaped_project_path}' && indxr $indxr_serve_args_str" || true
+    claude mcp add --scope project indxr --env GEMINI_API_KEY=\\$GEMINI_API_KEY --env ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY --env OPENAI_API_KEY=\\$OPENAI_API_KEY -- bash -c "cd '{escaped_project_path}' && {indxr_abs_path} $indxr_serve_args_str" || true
 fi
 """,
         "cursor": f"""#!/usr/bin/env bash
@@ -319,14 +320,12 @@ The Orchestrator agent and core rules are located in `{harness_prefix}/orchestra
         indxr_serve_args.extend(["--wiki-model", model_choice])
     
     indxr_serve_cmd = " ".join(indxr_serve_args)
-    # Securely quote the path for bash -c to prevent command injection
-    escaped_project_path = os.path.abspath(project_path).replace("'", "'\\''")
 
     mcp_config = {
         "mcpServers": {
             "indxr": {
                 "command": "bash",
-                "args": ["-c", f"cd '{escaped_project_path}' && indxr {indxr_serve_cmd}"],
+                "args": ["-c", f"cd '{escaped_project_path}' && {indxr_abs_path} {indxr_serve_cmd}"],
                 "env": {
                     "GEMINI_API_KEY": "$GEMINI_API_KEY",
                     "ANTHROPIC_API_KEY": "$ANTHROPIC_API_KEY",
