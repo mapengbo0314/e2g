@@ -1,0 +1,16 @@
+{
+  "skills": {
+    "grill-me": {
+      "path": "grill-me/SKILL.md"
+    },
+    "grill-with-docs": {
+      "path": "grill-with-docs/SKILL.md"
+    },
+    "improve-codebase-architecture": {
+      "path": "improve-codebase-architecture/SKILL.md"
+    },
+    "context-intake": {
+      "path": "context-intake/SKILL.md"
+    }
+  }
+}
