@@ -12,7 +12,7 @@ def parse_args():
     parser.add_argument("--project-path", required=True, help="Path to the repository")
     parser.add_argument("--llm", required=True, choices=["gemini", "openai", "anthropic"], help="LLM provider")
     parser.add_argument("--model", help="Optional specific model to use (e.g., gemini-3.1-pro-preview, claude-3-5-sonnet-20241022)")
-    parser.add_argument("--bundle", help="Optional path to an existing indxr JSON bundle")
+    parser.add_argument("--bundle", help="Optional path to an existing .indxr directory or wiki")
     parser.add_argument("--ddd", action="store_true", help="Enable DDD Onboarding sequence")
     return parser.parse_args()
 
@@ -49,6 +49,93 @@ def main():
         
     print("Pre-flight checks passed.")
     
+    # --- New: Fast Path Bundle Resolution & Fallback ---
+    resolved_bundle_path = None
+    if args.bundle:
+        resolved_bundle_path = os.path.abspath(args.bundle)
+
+    # Check for index existence
+    index_found = False
+    
+    # 1. Check bundle if provided
+    if resolved_bundle_path:
+        base_name = os.path.basename(resolved_bundle_path)
+        if base_name == "wiki":
+            if os.path.exists(os.path.join(resolved_bundle_path, "index.md")):
+                index_found = True
+        elif base_name == ".indxr":
+            if os.path.exists(os.path.join(resolved_bundle_path, "INDEX.md")) or os.path.exists(os.path.join(resolved_bundle_path, "wiki", "index.md")):
+                index_found = True
+        else:
+            bundle_indxr = os.path.join(resolved_bundle_path, ".indxr")
+            if os.path.exists(os.path.join(bundle_indxr, "INDEX.md")) or os.path.exists(os.path.join(bundle_indxr, "wiki", "index.md")):
+                index_found = True
+            elif os.path.exists(os.path.join(resolved_bundle_path, "INDEX.md")):
+                index_found = True
+
+    # 2. Check project path
+    project_indxr = os.path.join(args.project_path, ".indxr")
+    if not index_found and (os.path.exists(os.path.join(project_indxr, "INDEX.md")) or os.path.exists(os.path.join(project_indxr, "wiki", "index.md"))):
+        index_found = True
+
+    if not index_found:
+        print("\nNo existing indxr database found.")
+        choice = input("Would you like to generate one now using 'indxr wiki generate'? (Y/n): ").strip().lower()
+        if choice in ['', 'y', 'yes']:
+            print("Generating indxr wiki...")
+            
+            # Prepare environment variables with the collected API key
+            env = os.environ.copy()
+            if args.llm == "anthropic":
+                env["ANTHROPIC_API_KEY"] = api_key
+            elif args.llm == "openai":
+                env["OPENAI_API_KEY"] = api_key
+            elif args.llm == "gemini":
+                 # Currently indxr wiki generate requires ANTHROPIC or OPENAI, but we pass what we have.
+                 # If indxr adds Gemini support, this will be needed.
+                 env["GEMINI_API_KEY"] = api_key
+                 # Fallback warning if Gemini is selected for harness but indexer needs Anthropic
+                 if not env.get("ANTHROPIC_API_KEY") and not env.get("OPENAI_API_KEY"):
+                      print("Warning: 'indxr wiki generate' currently requires ANTHROPIC_API_KEY or OPENAI_API_KEY.")
+            
+            # Execute indxr in the project directory
+            os.makedirs(args.project_path, exist_ok=True)
+            try:
+                if shutil.which("npx"):
+                    result = subprocess.run(
+                        ["npx", "--yes", "indxr", "wiki", "generate"], 
+                        cwd=args.project_path, 
+                        env=env,
+                        check=False
+                    )
+                    if result.returncode != 0:
+                        print("npx failed, attempting global indxr...")
+                        subprocess.run(
+                            ["indxr", "wiki", "generate"], 
+                            cwd=args.project_path, 
+                            env=env,
+                            check=True
+                        )
+                else:
+                    subprocess.run(
+                        ["indxr", "wiki", "generate"], 
+                        cwd=args.project_path, 
+                        env=env,
+                        check=True
+                    )
+            except subprocess.CalledProcessError as e:
+                print(f"\nFailed to generate indxr wiki: {e}")
+                print("Context will be severely limited.")
+            except FileNotFoundError:
+                print(f"\nError: Neither 'npx' nor 'indxr' command found.")
+                print("Context will be severely limited.")
+            except Exception as e:
+                print(f"\nError running indexer: {e}")
+                print("Context will be severely limited.")
+        else:
+             print("Proceeding without codebase index. Architecture context will be severely limited.")
+    # --- End Fast Path ---
+
     print("Stage 1: Cloning boilerplate for discovery...")
     repo_url = "https://github.com/mapengbo0314/e2g.git"
     
@@ -62,7 +149,10 @@ def main():
         from harness.discovery_engine import discover_agents, discover_ddd_context, acquire_mcp_context
         
         # Acquire context once
-        context_str = acquire_mcp_context(args.project_path)
+        context_str = acquire_mcp_context(args.project_path, bundle_path=resolved_bundle_path)
+        if context_str is None:
+             context_str = "No codebase wiki found. Architecture unknown."
+             print("No usable .indxr/wiki found. Proceeding with empty context.")
         
         final_ddd_context = None
         if args.ddd:
@@ -143,7 +233,7 @@ def main():
         
         from harness.minting_engine import mint_workspace
         # We pass the cloned boilerplate_dir so minting engine doesn't have to clone again
-        mint_workspace(target_dir, selected_agents, args.project_path, platform_choice, args.model, args.bundle, boilerplate_dir, ddd_context=final_ddd_context)
+        mint_workspace(target_dir, selected_agents, args.project_path, platform_choice, args.model, resolved_bundle_path, boilerplate_dir, ddd_context=final_ddd_context)
 
 if __name__ == "__main__":
     main()
