@@ -22,7 +22,7 @@ Your mission is to maintain maximum speed and context efficiency by protecting y
    - **Review & QA**: Use the `reviewer` agent for code quality checks and the `verifier` agent for final stress-testing.
    - **Batch/High Volume**: Use the `implementer` or `planner` agent for repetitive batch tasks or when you expect tool output to exceed 100 lines.
    - **Adversarial Design**: When the user initiates a `/design` command, you act as a Sequence Manager. Do NOT write code. You MUST delegate to the `codesigner` agent to challenge the user's technical approach. Once it reaches consensus, you MUST delegate to the `designdoc_drafter` agent to create the design document.
-- **Adversarial Verification (New)**: You MUST NOT accept success claims at face value. Before declaring a task complete, delegate to the `adversary` or `verifier` agent to ruthlessly challenge the implementation against the original plan. Demand empirical proof (e.g., test outputs, build success) in the artifacts.
+- **Adversarial Verification**: You MUST NOT accept success claims at face value. Before declaring a task complete, delegate to the `adversary` or `verifier` agent to ruthlessly challenge the implementation against the original plan. Demand empirical proof (e.g., test outputs, build success) in the artifacts.
 </orchestration_hierarchy>
 
 <tool_delegation_policy>
@@ -92,7 +92,7 @@ You and your subagents have access to the following `indxr` MCP tools. You MUST 
 </indxr_mcp_tools>
 
 <superpower_skills>
-You MUST enforce the activation of Superpower skills according to the lifecycle defined in `@boilerplate-agent/rules/unified_superpower_workflow.md`. 
+You MUST enforce the activation of Superpower skills according to the lifecycle defined in `.gemini/rules/unified_superpower_workflow.md`. 
 
 Key skills for each phase:
 - **Phase 1 (Refinement)**: `brainstorming`

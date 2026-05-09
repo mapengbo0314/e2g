@@ -4,9 +4,59 @@ import shutil
 import json
 from pathlib import Path
 
+def process_includes(content: str, current_file_path: str, target_root: Path, tool_replacements: dict, target_dir_name: str, visited: set = None) -> str:
+    """Recursively resolves @path includes at the start of lines, applying placeholders."""
+    if visited is None:
+        visited = set()
+        
+    lines = content.splitlines()
+    new_lines = []
+    
+    for line in lines:
+        if line.strip().startswith("@") and not line.strip().startswith("@ "):
+            include_path_str = line.strip()[1:].strip()
+            
+            # Resolve the path relative to the current file
+            current_dir = os.path.dirname(current_file_path)
+            include_path = Path(os.path.normpath(os.path.join(current_dir, include_path_str)))
+            
+            abs_path_str = str(include_path.absolute())
+            if abs_path_str in visited:
+                print(f"Warning: Circular include detected for {include_path}")
+                new_lines.append(line)
+                continue
+                
+            if include_path.exists() and include_path.is_file():
+                try:
+                    with open(include_path, "r") as f:
+                        include_content = f.read()
+                        
+                    # Apply placeholders and tool mappings to the included content FIRST
+                    include_content = include_content.replace("{{HARNESS_DIR}}", target_dir_name)
+                    for old_tool, new_tool in tool_replacements.items():
+                        include_content = include_content.replace(old_tool, new_tool)
+                        
+                    visited.add(abs_path_str)
+                    # Recursively process includes in the included file
+                    resolved_content = process_includes(include_content, str(include_path), target_root, tool_replacements, target_dir_name, visited)
+                    visited.remove(abs_path_str)
+                    new_lines.append(resolved_content)
+                except Exception as e:
+                    print(f"Warning: Failed to inline {include_path}: {e}")
+                    new_lines.append(line)
+            else:
+                # If it doesn't exist, maybe it's a subagent name like @agent
+                # or it hasn't been minted yet. We leave it as is if it's not a valid file.
+                new_lines.append(line)
+        else:
+            new_lines.append(line)
+            
+    return "\n".join(new_lines)
+
 def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: str, platform_choice: str, model_choice: str = None, bundle_override: str = None, boilerplate_dir: str = None, ddd_context: dict = None):
     """Copies boilerplate, injects styled configs, and writes setup prerequisites."""
     target_path = Path(target_dir)
+    target_dir_name = target_path.name
     
     if target_path.exists():
         print(f"Warning: Target directory {target_dir} already exists. Minting may overwrite files.")
@@ -33,8 +83,7 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
                 "- glob": "- Glob"
             }
 
-        # Fix broken include pointers inside the copied files and map tool names
-        target_dir_name = target_path.name
+        # Step 1: Apply placeholders and tool mappings to all files
         for root, _, files in os.walk(target_path):
             for file in files:
                 if file.endswith((".md", ".json", ".yaml", ".yml")):
@@ -44,8 +93,12 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
                             content = f.read()
                             
                         new_content = content
+                        
+                        # Handle placeholders
+                        new_content = new_content.replace("{{HARNESS_DIR}}", target_dir_name)
+                        
                         if "@boilerplate-agent" in new_content:
-                            new_content = new_content.replace("@boilerplate-agent", f"@{target_dir_name}")
+                            new_content = new_content.replace("@boilerplate-agent", target_dir_name)
                             
                         # Apply tool mappings if any
                         for old_tool, new_tool in tool_replacements.items():
@@ -55,7 +108,25 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
                             with open(filepath, "w") as f:
                                 f.write(new_content)
                     except Exception as e:
-                        print(f"Warning: Failed to process {filepath}: {e}")
+                        print(f"Warning: Failed to process placeholders in {filepath}: {e}")
+
+        # Step 2: Process @ includes (Inlining)
+        # Now that all files have placeholders resolved, it's safe to inline them
+        for root, _, files in os.walk(target_path):
+            for file in files:
+                if file.endswith((".md", ".json", ".yaml", ".yml")):
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, "r") as f:
+                            content = f.read()
+                            
+                        new_content = process_includes(content, filepath, target_path, tool_replacements, target_dir_name)
+                            
+                        if new_content != content:
+                            with open(filepath, "w") as f:
+                                f.write(new_content)
+                    except Exception as e:
+                        print(f"Warning: Failed to process includes in {filepath}: {e}")
     else:
         print("Error: Boilerplate directory not found.")
         return
@@ -289,6 +360,10 @@ Ensure your implementation aligns with these definitions.
             include_pointer = "<!-- Core Mandates should be read from ../rules/core_mandates.md -->\n\n"
 
         final_content = frontmatter + include_pointer + system_prompt + "\n" + ddd_section
+        
+        # Final post-processing for placeholders and includes
+        final_content = final_content.replace("{{HARNESS_DIR}}", target_dir_name)
+        final_content = process_includes(final_content, str(agent_file_path), target_path, tool_replacements, target_dir_name)
         
         with open(agent_file_path, 'w') as f:
             f.write(final_content)

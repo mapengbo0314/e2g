@@ -59,11 +59,11 @@ class CLIRunnerError(Exception):
     """Exception raised when a CLI command fails."""
     pass
 
-def run_gemini_command(args: list[str]) -> str:
+def run_cli_command(cli_binary: str, args: list[str]) -> str:
     """
-    Executes a gemini command and returns the STDOUT.
+    Executes a cli command and returns the STDOUT.
     """
-    cmd = ["gemini"] + args
+    cmd = [cli_binary] + args
     try:
         result = subprocess.run(
             cmd,
@@ -73,7 +73,7 @@ def run_gemini_command(args: list[str]) -> str:
         )
         return result.stdout
     except FileNotFoundError:
-        error_msg = "The 'gemini' executable was not found in the system PATH."
+        error_msg = f"The '{cli_binary}' executable was not found in the system PATH."
         print(error_msg, file=sys.stderr)
         raise CLIRunnerError(error_msg)
     except subprocess.CalledProcessError as e:
@@ -204,7 +204,7 @@ def run_multi_benchmark(tasks: list[str], rules_content: str, harness_dir: Path)
         print(f"Task {i}: Orch({res['orch_in']}+{res['orch_out']}) + Arch({res['arch_in']}+{res['arch_out']}) + Impl({res['impl_in']}+{res['impl_out']}) = {res['total']}")
 
 
-def run_monolith_benchmark(task_prompt: str, rules_content: str):
+def run_monolith_benchmark(task_prompt: str, rules_content: str, cli_tool: str = "gemini"):
     full_prompt = f"Instructions:\n{rules_content}\n\nTASK: {task_prompt}"
     
     print("Running Monolith Benchmark...")
@@ -212,7 +212,10 @@ def run_monolith_benchmark(task_prompt: str, rules_content: str):
     
     try:
         # Using -p for non-interactive prompt mode
-        output = run_gemini_command(["-y", "-p", f"You are a monolithic agent. Read these instructions:\n\n{rules_content}\n\nTask: {task_prompt}"])
+        args = ["-p", f"You are a monolithic agent. Read these instructions:\n\n{rules_content}\n\nTask: {task_prompt}"]
+        if cli_tool == "gemini":
+            args = ["-y"] + args
+        output = run_cli_command(cli_tool, args)
         output_tokens = count_tokens(output)
     except Exception as e:
         print(f"Warning: CLI call failed, using estimation for output tokens. Error: {e}")
@@ -220,7 +223,7 @@ def run_monolith_benchmark(task_prompt: str, rules_content: str):
             
     return input_tokens + output_tokens
 
-def run_harness_benchmark(task_prompt: str, harness_dir: Path):
+def run_harness_benchmark(task_prompt: str, harness_dir: Path, cli_tool: str = "gemini"):
     rules_path = harness_dir / "rules" / "core_mandates.md"
     rules_content = rules_path.read_text() if rules_path.exists() else ""
     
@@ -236,7 +239,10 @@ def run_harness_benchmark(task_prompt: str, harness_dir: Path):
     architect_input_tokens = count_tokens(arch_input_full)
     
     try:
-        arch_output = run_gemini_command(["-y", "-p", f"Role: Architect\n\nInstructions:\n{rules_content}\n\n{arch_base}\n\nTask: {task_prompt}"])
+        args = ["-p", f"Role: Architect\n\nInstructions:\n{rules_content}\n\n{arch_base}\n\nTask: {task_prompt}"]
+        if cli_tool == "gemini":
+            args = ["-y"] + args
+        arch_output = run_cli_command(cli_tool, args)
     except Exception as e:
         print(f"Warning: Architect CLI call failed, using estimation. Error: {e}")
         arch_output = "Simulated architect plan"
@@ -249,7 +255,10 @@ def run_harness_benchmark(task_prompt: str, harness_dir: Path):
     impl_input_tokens = count_tokens(impl_input_full)
     
     try:
-        impl_output = run_gemini_command(["-y", "-p", f"Role: Implementer\n\nInstructions:\n{rules_content}\n\n{impl_base}\n\nSummary of research: {arch_output}\n\nTask: {task_prompt}"])
+        args = ["-p", f"Role: Implementer\n\nInstructions:\n{rules_content}\n\n{impl_base}\n\nSummary of research: {arch_output}\n\nTask: {task_prompt}"]
+        if cli_tool == "gemini":
+            args = ["-y"] + args
+        impl_output = run_cli_command(cli_tool, args)
     except Exception as e:
         print(f"Warning: Implementer CLI call failed, using estimation. Error: {e}")
         impl_output = "Simulated implementation output"
@@ -264,6 +273,7 @@ def main():
     parser.add_argument("--baseline", action="store_true", help="Run the single-task baseline")
     parser.add_argument("--multi", action="store_true", help="Run the multi-task (4 iterations) benchmark")
     parser.add_argument("--prompt", type=str, help="Run a custom single task")
+    parser.add_argument("--cli", type=str, default="gemini", choices=["gemini", "claude"], help="CLI binary to run")
     args = parser.parse_args()
     
     if not (args.baseline or args.multi or args.prompt):
@@ -286,8 +296,8 @@ def main():
             run_multi_benchmark(BASELINE_MULTI, rules, harness_dir)
         else:
             task = args.prompt or BASELINE_SINGLE
-            monolith_total = run_monolith_benchmark(task, rules)
-            harness_total = run_harness_benchmark(task, harness_dir)
+            monolith_total = run_monolith_benchmark(task, rules, args.cli)
+            harness_total = run_harness_benchmark(task, harness_dir, args.cli)
             
             print("\n" + "="*30)
             print("SINGLE TASK RESULTS")
