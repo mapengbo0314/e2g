@@ -1,5 +1,0 @@
-name: adk_document_structurer
-eval_targets:
-  - produces structured markdown
-  - preserves headings and sections
-  - keeps evidence traceable
