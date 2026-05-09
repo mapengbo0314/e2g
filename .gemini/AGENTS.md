@@ -19,9 +19,9 @@ IF A SKILL APPLIES TO YOUR TASK, YOU MUST USE IT BEFORE ACTING.
 ## Wiki Knowledge Base Integration
 
 The `indxr` MCP server maintains an auto-updating codebase wiki. You MUST utilize these tools when working:
-- `wiki_search`: Search wiki by keyword/concept before reading raw source code.
-- `wiki_read`: Read full content and metadata of a wiki page.
-- `wiki_status`: Check wiki health, page count, and source file coverage.
-- `wiki_suggest_contribution`: Find which page to update based on your analysis.
-- `wiki_compound`: Auto-route your synthesized knowledge to the best matching page.
-- `wiki_record_failure`: Record failed fix attempts so future agents learn from them.
+- `mcp_indxr_wiki_search`: Search wiki by keyword/concept before reading raw source code.
+- `mcp_indxr_wiki_read`: Read full content and metadata of a wiki page.
+- `mcp_indxr_wiki_status`: Check wiki health, page count, and source file coverage.
+- `mcp_indxr_wiki_suggest_contribution`: Find which page to update based on your analysis.
+- `mcp_indxr_wiki_compound`: Auto-route your synthesized knowledge to the best matching page.
+- `mcp_indxr_wiki_record_failure`: Record failed fix attempts so future agents learn from them.

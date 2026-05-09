@@ -19,6 +19,6 @@ IF A SKILL APPLIES TO YOUR TASK, YOU MUST USE IT BEFORE ACTING.
 ## Wiki Knowledge Base Integration
 
 The `indxr` MCP server maintains an auto-updating codebase wiki. You MUST adopt a **Wiki-First Discovery** approach. Before reading raw source files, always query the wiki. You have access to exactly these tools:
-- `wiki_search`: Search wiki by keyword/concept before reading raw source code.
-- `wiki_read`: Read full content and metadata of a wiki page.
-- `wiki_status`: Check wiki health, page count, and source file coverage.
+- `mcp_indxr_wiki_search`: Search wiki by keyword/concept before reading raw source code.
+- `mcp_indxr_wiki_read`: Read full content and metadata of a wiki page.
+- `mcp_indxr_wiki_status`: Check wiki health, page count, and source file coverage.

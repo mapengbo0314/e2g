@@ -2,6 +2,20 @@
 name: implementer
 description: The specialized tool for TDD execution and production code changes. Delegate
   to this sub-agent for implementation tasks.
+tools:
+  - mcp_indxr_find
+  - mcp_indxr_summarize
+  - mcp_indxr_read
+  - mcp_indxr_read_source
+  - mcp_indxr_get_public_api
+  - mcp_indxr_wiki_search
+  - mcp_indxr_wiki_read
+  - mcp_indxr_wiki_record_failure
+  - read_file
+  - grep_search
+  - replace
+  - write_file
+  - run_shell_command
 ---
 
 # Core Mandates
