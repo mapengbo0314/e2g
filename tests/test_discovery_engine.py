@@ -3,7 +3,7 @@ import tempfile
 from harness.discovery_engine import acquire_mcp_context
 import pytest
 from unittest import mock
-from harness.discovery_engine import discover_agents, discover_ddd_context, discover_custom_agent
+from harness.discovery_engine import discover_agents, discover_ddd_context, discover_custom_agent, generate_onboarding_domain_doc
 
 @mock.patch("harness.discovery_engine.fetch_remote_skill")
 @mock.patch("harness.discovery_engine.query_llm")
@@ -120,3 +120,19 @@ def test_acquire_mcp_context_bundle_indxr_path():
         context = acquire_mcp_context("/dummy/path", bundle_path=bundle_dir)
         assert context is not None
         assert "Indxr Index" in context
+
+def test_generate_onboarding_domain_doc(tmp_path):
+    project_path = str(tmp_path)
+    mock_llm_response = "Identified Domain: Financial Ledger"
+    
+    generate_onboarding_domain_doc(project_path, mock_llm_response)
+    
+    doc_path = os.path.join(project_path, "ONBOARDING_DOMAIN.md")
+    assert os.path.exists(doc_path)
+    
+    with open(doc_path, 'r') as f:
+        content = f.read()
+        assert "Proposed Domain SME Agent" in content
+        assert "Financial Ledger" in content
+        assert "Domain Invariants" in content
+        assert "Ubiquitous Language" in content
