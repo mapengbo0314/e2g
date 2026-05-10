@@ -146,7 +146,7 @@ def main():
         feature_fetcher_yaml = os.path.join(boilerplate_dir, "agents", "feature-fetcher.md")
         
         print("Stage 2: Dynamic Context Acquisition")
-        from harness.discovery_engine import discover_agents, discover_ddd_context, acquire_mcp_context
+        from harness.discovery_engine import discover_agents, discover_ddd_context, acquire_mcp_context, generate_onboarding_domain_doc
         
         # Acquire context once
         context_str = acquire_mcp_context(args.project_path, bundle_path=resolved_bundle_path)
@@ -221,9 +221,23 @@ def main():
 
         target_dir = os.path.join(args.project_path, harness_folder)
         
-        from harness.minting_engine import mint_workspace
+        from harness.minting_engine import (
+            mint_workspace,
+            wait_for_user_review_and_read_domain,
+            synthesize_domain_sme_agent,
+            patch_orchestrator_rules
+        )
+
+        print("\nStage 2.7: Phased Onboarding & Domain SME Discovery")
+        generate_onboarding_domain_doc(args.project_path, "Analyzed Codebase Context")
+        domain_content = wait_for_user_review_and_read_domain(args.project_path)
+
         # We pass the cloned boilerplate_dir so minting engine doesn't have to clone again
         mint_workspace(target_dir, selected_agents, args.project_path, platform_choice, args.model, resolved_bundle_path, boilerplate_dir, ddd_context=final_ddd_context)
+
+        from harness.discovery_engine import query_llm
+        sme_agent_name = synthesize_domain_sme_agent(target_dir, domain_content, query_llm, args.llm, api_key)
+        patch_orchestrator_rules(target_dir, sme_agent_name)
 
 if __name__ == "__main__":
     main()
