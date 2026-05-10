@@ -254,5 +254,27 @@ def main():
         sme_agent_name = synthesize_domain_sme_agent(args.project_path, domain_content, query_llm, args.llm, api_key)
         patch_orchestrator_rules(args.project_path, sme_agent_name)
 
+        print(f"\n{'='*60}")
+        print("🚀 ONBOARDING COMPLETE")
+        print(f"{'='*60}")
+        print(f"\n1. Workspace Minted: {target_dir}")
+        print(f"2. Domain SME Created: @{sme_agent_name}")
+        
+        if skills_to_install:
+            print(f"3. Local Skills Installed: {', '.join([s['name'] for s in skills_to_install])}")
+        
+        if mcps_to_install:
+            print(f"4. MCP Tools Configured: {', '.join([m['name'] for m in mcps_to_install])}")
+            print("\n[ACTION REQUIRED] MCP Authorization:")
+            if platform_choice == "1":
+                print("   - In Gemini CLI, you will be prompted to 'Allow' each tool on first use.")
+            elif platform_choice == "2":
+                print("   - In Claude Code, ensure you restart your session to load the new mcp.json.")
+            print("   - Review your workspace mcp.json to verify the command paths.")
+
+        print(f"\n5. Context: The @{sme_agent_name} is now the gateway for all planning.")
+        print(f"   Dispatch rules in {harness_folder}/rules/dispatch_rules.md have been updated.")
+        print(f"{'='*60}\n")
+
 if __name__ == "__main__":
     main()
