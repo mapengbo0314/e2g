@@ -421,3 +421,80 @@ Ensure your implementation aligns with these definitions.
     print(f"1. cd {target_dir}")
     print("2. ./scripts/setup_harness.sh (Install prerequisites)")
     print("3. Activate your environment and Launch AI")
+
+def synthesize_domain_sme_agent(target_dir: str, domain_content: str, query_llm_fn, llm_provider: str, api_key: str):
+    """Uses the LLM to synthesize the domain SME agent based on the filled doc."""
+    if not domain_content:
+        return None
+
+    # Extract proposed name, fallback to domain-sme
+    agent_name = "domain-sme"
+    name_match = re.search(r'Proposed Agent Name:\s*`?@([a-zA-Z0-9_-]+)`?', domain_content)
+    if name_match:
+        agent_name = name_match.group(1).lower()
+
+    prompt = f"""
+    You are an expert systems architect. Based on the following ONBOARDING_DOMAIN.md content, 
+    generate a strict Markdown file defining a specialized Domain SME agent.
+    
+    The agent name MUST be: {agent_name}
+    
+    The file MUST follow this exact format:
+    ---
+    name: {agent_name}
+    description: Subject Matter Expert and Guardian. Consult this agent before modifying core logic.
+    type: architect_variant
+    ---
+    # Role: Domain Subject Matter Expert
+    You are the definitive authority on the business logic, ubiquitous language, and architectural constraints.
+    
+    # Core Mandates
+    1. **Security & System Integrity:** Never log, print, or commit secrets.
+    2. **Context Efficiency:** Your context window is isolated.
+    3. **No Chitchat:** Focus exclusively on intent and technical rationale.
+    
+    # Domain-Specific Invariants (The MOAT)
+    <invariants>
+    [Extract the invariants from the provided content]
+    </invariants>
+    
+    # Ubiquitous Language (Glossary)
+    <glossary>
+    [Extract the glossary from the provided content]
+    </glossary>
+    
+    # Operational Instructions
+    1. **Audit:** Review proposed plans against your <invariants>. 
+    2. **Correct:** Identify any misuse of terms.
+    3. **Reject:** Reject plans that violate domain rules. Provide architectural corrections, NOT implementation code.
+    
+    DO NOT output markdown code blocks (```markdown). Output the raw file content.
+    
+    CONTENT:
+    {domain_content}
+    """
+    
+    try:
+        agent_markdown = query_llm_fn(prompt, llm_provider, api_key)
+        
+        # Clean up if LLM wrapped in code block
+        if agent_markdown.startswith("```markdown"):
+            agent_markdown = agent_markdown[len("```markdown"):].strip()
+        if agent_markdown.startswith("```"):
+            agent_markdown = agent_markdown[3:].strip()
+        if agent_markdown.endswith("```"):
+            agent_markdown = agent_markdown[:-3].strip()
+            
+        agents_dir = os.path.join(target_dir, ".gemini", "agents")
+        os.makedirs(agents_dir, exist_ok=True)
+        
+        file_path = os.path.join(agents_dir, f"{agent_name}.md")
+        with open(file_path, "w") as f:
+            f.write(agent_markdown.strip() + "\n")
+            
+        print(f"[HARNESS] Synthesized {agent_name} at {file_path}")
+        return agent_name
+        
+    except Exception as e:
+        print(f"Error synthesizing domain agent: {e}")
+        return None

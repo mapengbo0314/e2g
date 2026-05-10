@@ -61,3 +61,20 @@ def test_wait_for_user_review_and_read_domain(mock_input, tmp_path):
     
     assert mock_input.called
     assert content == "TEST CONTENT"
+
+@patch('harness.discovery_engine.query_llm') 
+def test_synthesize_domain_sme_agent(mock_query_llm, tmp_path):
+    target_dir = str(tmp_path)
+    domain_content = "Proposed Agent Name: @test-sme\nInvariants: None"
+    
+    # Mock LLM to return valid agent markdown
+    mock_query_llm.return_value = "---\nname: test-sme\ndescription: SME\n---\n# Role\nSME"
+    
+    from harness.minting_engine import synthesize_domain_sme_agent
+    
+    synthesize_domain_sme_agent(target_dir, domain_content, mock_query_llm, "provider", "key")
+    
+    agent_file = os.path.join(target_dir, ".gemini", "agents", "test-sme.md")
+    assert os.path.exists(agent_file)
+    with open(agent_file, 'r') as f:
+        assert "name: test-sme" in f.read()
