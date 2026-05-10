@@ -225,19 +225,34 @@ def main():
             mint_workspace,
             wait_for_user_review_and_read_domain,
             synthesize_domain_sme_agent,
-            patch_orchestrator_rules
+            patch_orchestrator_rules,
+            parse_tool_checklists,
+            install_workspace_tools
         )
 
         print("\nStage 2.7: Phased Onboarding & Domain SME Discovery")
-        generate_onboarding_domain_doc(args.project_path, "Analyzed Codebase Context")
+        from harness.discovery_engine import query_llm
+        generate_onboarding_domain_doc(
+            args.project_path, 
+            "Analyzed Codebase Context", 
+            query_llm, 
+            args.llm, 
+            api_key, 
+            context_str
+        )
         domain_content = wait_for_user_review_and_read_domain(args.project_path)
+
+        # Parse tools
+        skills_to_install, mcps_to_install = parse_tool_checklists(domain_content)
 
         # We pass the cloned boilerplate_dir so minting engine doesn't have to clone again
         mint_workspace(target_dir, selected_agents, args.project_path, platform_choice, args.model, resolved_bundle_path, boilerplate_dir, ddd_context=final_ddd_context)
 
-        from harness.discovery_engine import query_llm
-        sme_agent_name = synthesize_domain_sme_agent(target_dir, domain_content, query_llm, args.llm, api_key)
-        patch_orchestrator_rules(target_dir, sme_agent_name)
+        # Install tools
+        install_workspace_tools(args.project_path, harness_folder, skills_to_install, mcps_to_install)
+
+        sme_agent_name = synthesize_domain_sme_agent(args.project_path, domain_content, query_llm, args.llm, api_key)
+        patch_orchestrator_rules(args.project_path, sme_agent_name)
 
 if __name__ == "__main__":
     main()
