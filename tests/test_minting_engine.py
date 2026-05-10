@@ -4,7 +4,23 @@ import tempfile
 from pathlib import Path
 import os
 from unittest.mock import patch
-from harness.minting_engine import mint_workspace, wait_for_user_review_and_read_domain
+from harness.minting_engine import mint_workspace, wait_for_user_review_and_read_domain, patch_orchestrator_rules
+
+def test_patch_orchestrator_rules(tmp_path):
+    target_dir = str(tmp_path)
+    rules_dir = os.path.join(target_dir, ".gemini", "rules")
+    os.makedirs(rules_dir)
+    rules_path = os.path.join(rules_dir, "dispatch_rules.md")
+    
+    with open(rules_path, "w") as f:
+        f.write("# Rules\nSome generic rules.\n<orchestration_hierarchy>\nRules here\n</orchestration_hierarchy>")
+        
+    patch_orchestrator_rules(target_dir, "test-sme")
+    
+    with open(rules_path, "r") as f:
+        content = f.read()
+        assert "@test-sme" in content
+        assert "Domain SME Gateway" in content
 
 def test_mint_workspace_agent_naming():
     with tempfile.TemporaryDirectory() as tmp_dir:

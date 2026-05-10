@@ -498,3 +498,37 @@ def synthesize_domain_sme_agent(target_dir: str, domain_content: str, query_llm_
     except Exception as e:
         print(f"Error synthesizing domain agent: {e}")
         return None
+
+def patch_orchestrator_rules(target_dir: str, agent_name: str):
+    """Injects the new Domain SME into the Orchestrator's dispatch rules."""
+    if not agent_name:
+        return
+        
+    rules_path = os.path.join(target_dir, ".gemini", "rules", "dispatch_rules.md")
+    if not os.path.exists(rules_path):
+         # If rules don't exist yet, try orchestrator.md directly
+         rules_path = os.path.join(target_dir, ".gemini", "orchestrator.md")
+         if not os.path.exists(rules_path):
+             print("Warning: Could not find rules to patch Domain SME.")
+             return
+
+    with open(rules_path, "r") as f:
+        content = f.read()
+        
+    # Construct the patch
+    sme_rule = f"""
+- **Domain SME Gateway**: If a task touches core logic or invariants, you MUST first dispatch the `@{agent_name}` to generate a "Domain Constraints Brief" before allowing the `@planner` to create the implementation plan.
+"""
+    
+    # Try to insert after the Hierarchy section or at the top of Tool Delegation
+    if "</orchestration_hierarchy>" in content:
+        parts = content.split("</orchestration_hierarchy>")
+        new_content = parts[0] + "\n" + sme_rule + "\n</orchestration_hierarchy>" + parts[1]
+    else:
+        # Fallback append to bottom
+        new_content = content + "\n\n### Domain SME Gateway\n" + sme_rule
+        
+    with open(rules_path, "w") as f:
+        f.write(new_content)
+        
+    print(f"[HARNESS] Patched Orchestrator rules with @{agent_name}")
