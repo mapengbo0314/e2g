@@ -136,3 +136,24 @@ def test_generate_onboarding_domain_doc(tmp_path):
         assert "Financial Ledger" in content
         assert "Domain Invariants" in content
         assert "Ubiquitous Language" in content
+
+@mock.patch('harness.discovery_engine.query_llm')
+def test_generate_onboarding_domain_doc_with_tools(mock_query_llm, tmp_path):
+    project_path = str(tmp_path)
+    mock_llm_response = "Identified Domain: Financial Ledger"
+    
+    # Mock the tool scout response
+    mock_query_llm.return_value = '{"skills": [{"name": "pytest", "url": "http://test"}], "mcps": [{"name": "sql", "command": "npx -y sql-mcp"}]}'
+    
+    # We need to pass the query_llm fn and keys to generate_onboarding_domain_doc now
+    generate_onboarding_domain_doc(project_path, mock_llm_response, query_llm_fn=mock_query_llm, llm_provider="provider", api_key="key", context_str="some context")
+    
+    doc_path = os.path.join(project_path, "ONBOARDING_DOMAIN.md")
+    assert os.path.exists(doc_path)
+    
+    with open(doc_path, 'r') as f:
+        content = f.read()
+        assert "## Proposed Skills" in content
+        assert "- [x] pytest (http://test)" in content
+        assert "## Proposed MCP Tools" in content
+        assert "- [x] sql (npx -y sql-mcp)" in content

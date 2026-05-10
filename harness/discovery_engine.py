@@ -266,8 +266,8 @@ def discover_custom_agent(name: str, specs: str, context_str: str, ddd_context: 
         print(f"Error generating custom agent: {e}")
         return {"name": name, "role": specs, "zone": "Core", "system_prompt": f"# {name}\n\n{specs}"}
 
-def generate_onboarding_domain_doc(project_path: str, domain_summary: str):
-    """Generates the ONBOARDING_DOMAIN.md template for the user to fill out."""
+def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query_llm_fn=None, llm_provider=None, api_key=None, context_str=""):
+    """Generates the ONBOARDING_DOMAIN.md template, now including Tool Scout recommendations."""
     doc_path = os.path.join(project_path, "ONBOARDING_DOMAIN.md")
     
     # Simple heuristic to extract a name from the summary if possible, otherwise generic
@@ -278,6 +278,32 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str):
         # Remove punctuation
         import re
         domain_name = re.sub(r'[^\w\s]', '', domain_name)
+
+    # Tool Scout LLM Call
+    skills_md = "- [ ] No skills recommended"
+    mcps_md = "- [ ] No MCPs recommended"
+    
+    if query_llm_fn and llm_provider and api_key:
+        prompt = f"""
+        You are the 'Tool Scout'. Based on the following project context, recommend up to 3 specific Agent Skills (URLs to raw Markdown files) and up to 2 MCP servers (ephemeral npx or uvx commands).
+        
+        Return ONLY valid JSON in this format:
+        {{"skills": [{{"name": "skill-name", "url": "https://..."}}], "mcps": [{{"name": "mcp-name", "command": "npx -y ..."}}]}}
+        
+        Context:
+        {context_str[:2000]}
+        """
+        try:
+            res = query_llm_fn(prompt, llm_provider, api_key)
+            cleaned = res.replace("```json", "").replace("```", "").strip()
+            data = json.loads(cleaned)
+            
+            if data.get("skills"):
+                skills_md = "\n".join([f"- [x] {s['name']} ({s['url']})" for s in data["skills"]])
+            if data.get("mcps"):
+                mcps_md = "\n".join([f"- [x] {m['name']} ({m['command']})" for m in data["mcps"]])
+        except Exception as e:
+            print(f"Warning: Tool scout failed: {e}")
 
     template = f"""# Project Onboarding Domain
 
@@ -295,6 +321,14 @@ Based on the codebase scan, I have identified **{domain_summary}** as a core com
 **Ubiquitous Language (Key terms to define):**
 *   **[Term 1]**: [LLM guessed definition]
 *   **[Term 2]**: [USER INPUT REQUIRED: Define this term]
+
+## Proposed Skills
+*(Delete the line of any skill you do NOT want installed)*
+{skills_md}
+
+## Proposed MCP Tools
+*(Delete the line of any MCP you do NOT want installed)*
+{mcps_md}
 
 *(When you have finished editing this file, return to the terminal and press ENTER to continue minting)*
 """
