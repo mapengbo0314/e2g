@@ -4,7 +4,33 @@ import tempfile
 from pathlib import Path
 import os
 from unittest.mock import patch
-from harness.minting_engine import mint_workspace, wait_for_user_review_and_read_domain, patch_orchestrator_rules
+from harness.minting_engine import (
+    mint_workspace,
+    wait_for_user_review_and_read_domain,
+    patch_orchestrator_rules,
+    parse_tool_checklists,
+)
+
+def test_parse_tool_checklists():
+    content = """
+## Proposed Skills
+- [x] pytest (http://pytest)
+- [ ] ignore_me (http://ignore)
+- [x] debug (http://debug)
+
+## Proposed MCP Tools
+- [x] sql (npx -y sql)
+- [ ] bad (npx bad)
+    """
+
+    skills, mcps = parse_tool_checklists(content)
+
+    assert len(skills) == 2
+    assert skills[0] == {"name": "pytest", "url": "http://pytest"}
+    assert skills[1] == {"name": "debug", "url": "http://debug"}
+
+    assert len(mcps) == 1
+    assert mcps[0] == {"name": "sql", "command": "npx -y sql"}
 
 def test_patch_orchestrator_rules(tmp_path):
     target_dir = str(tmp_path)

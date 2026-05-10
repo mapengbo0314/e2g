@@ -4,6 +4,35 @@ import shutil
 import json
 from pathlib import Path
 
+def parse_tool_checklists(domain_content: str) -> tuple[list[dict], list[dict]]:
+    """Parses selected skills and MCPs from the ONBOARDING_DOMAIN.md content."""
+    skills = []
+    mcps = []
+    
+    if not domain_content:
+        return skills, mcps
+        
+    # Find Skills block
+    skills_match = re.search(r'## Proposed Skills\n.*?(?=##|$)', domain_content, re.DOTALL)
+    if skills_match:
+        for line in skills_match.group(0).split('\n'):
+            if line.strip().startswith('- [x]'):
+                # match: - [x] name (url)
+                m = re.match(r'- \[x\]\s+([^\(]+)\s*\((.*?)\)', line.strip())
+                if m:
+                    skills.append({"name": m.group(1).strip(), "url": m.group(2).strip()})
+                    
+    # Find MCPs block
+    mcps_match = re.search(r'## Proposed MCP Tools\n.*?(?=##|$)', domain_content, re.DOTALL)
+    if mcps_match:
+        for line in mcps_match.group(0).split('\n'):
+            if line.strip().startswith('- [x]'):
+                 m = re.match(r'- \[x\]\s+([^\(]+)\s*\((.*?)\)', line.strip())
+                 if m:
+                     mcps.append({"name": m.group(1).strip(), "command": m.group(2).strip()})
+                     
+    return skills, mcps
+
 def wait_for_user_review_and_read_domain(project_path: str) -> str:
     """Pauses execution waiting for the user, then reads the domain doc."""
     doc_path = os.path.join(project_path, "ONBOARDING_DOMAIN.md")
