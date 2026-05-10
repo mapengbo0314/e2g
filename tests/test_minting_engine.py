@@ -3,7 +3,8 @@ import shutil
 import tempfile
 from pathlib import Path
 import os
-from harness.minting_engine import mint_workspace
+from unittest.mock import patch
+from harness.minting_engine import mint_workspace, wait_for_user_review_and_read_domain
 
 def test_mint_workspace_agent_naming():
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -47,3 +48,16 @@ def test_mint_workspace_agent_naming():
         assert gemini_md.exists(), "Expected GEMINI.md to exist in project root"
         pointer_content = gemini_md.read_text()
         assert ".gemini/orchestrator.md" in pointer_content
+
+@patch('builtins.input', return_value='')
+def test_wait_for_user_review_and_read_domain(mock_input, tmp_path):
+    project_path = str(tmp_path)
+    doc_path = os.path.join(project_path, "ONBOARDING_DOMAIN.md")
+    
+    with open(doc_path, 'w') as f:
+        f.write("TEST CONTENT")
+        
+    content = wait_for_user_review_and_read_domain(project_path)
+    
+    assert mock_input.called
+    assert content == "TEST CONTENT"

@@ -4,6 +4,28 @@ import shutil
 import json
 from pathlib import Path
 
+def wait_for_user_review_and_read_domain(project_path: str) -> str:
+    """Pauses execution waiting for the user, then reads the domain doc."""
+    doc_path = os.path.join(project_path, "ONBOARDING_DOMAIN.md")
+    
+    if not os.path.exists(doc_path):
+        print(f"Warning: {doc_path} not found. Skipping pause.")
+        return ""
+
+    print(f"\n{'='*60}")
+    print(f"ACTION REQUIRED: Please open {doc_path}")
+    print("Fill in the domain invariants and ubiquitous language.")
+    print(f"{'='*60}\n")
+    
+    input("Press ENTER when you have saved your changes to ONBOARDING_DOMAIN.md...")
+    
+    try:
+        with open(doc_path, 'r') as f:
+            return f.read()
+    except Exception as e:
+        print(f"Error reading {doc_path}: {e}")
+        return ""
+
 def process_includes(content: str, current_file_path: str, target_root: Path, tool_replacements: dict, target_dir_name: str, visited: set = None) -> str:
     """Recursively resolves @path includes at the start of lines, applying placeholders."""
     if visited is None:
