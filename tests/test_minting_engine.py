@@ -1,6 +1,7 @@
 import pytest
 import shutil
 import tempfile
+import json
 from pathlib import Path
 import os
 from unittest.mock import patch
@@ -120,3 +121,42 @@ def test_synthesize_domain_sme_agent(mock_query_llm, tmp_path):
     assert os.path.exists(agent_file)
     with open(agent_file, 'r') as f:
         assert "name: test-sme" in f.read()
+
+@patch('urllib.request.urlopen')
+def test_install_workspace_tools(mock_urlopen, tmp_path):
+    target_dir = str(tmp_path)
+    
+    # Setup mock response for urlopen
+    class MockResponse:
+        def read(self): return b"# Mock Skill Content"
+        def __enter__(self): return self
+        def __exit__(self, exc_type, exc_val, exc_tb): pass
+    mock_urlopen.return_value = MockResponse()
+    
+    # Create empty skills.json and mcp.json to simulate boilerplate
+    os.makedirs(os.path.join(target_dir, ".gemini"), exist_ok=True)
+    with open(os.path.join(target_dir, ".gemini", "skills.json"), "w") as f:
+        f.write('{"skills": {}}')
+    with open(os.path.join(target_dir, ".gemini", "mcp.json"), "w") as f:
+         f.write('{"mcpServers": {}}')
+         
+    skills = [{"name": "test-skill", "url": "http://mock"}]
+    mcps = [{"name": "test-mcp", "command": "npx mock"}]
+    
+    from harness.minting_engine import install_workspace_tools
+    install_workspace_tools(target_dir, ".gemini", skills, mcps)
+    
+    # Verify Skill downloaded
+    skill_path = os.path.join(target_dir, ".gemini", "skills", "test-skill", "SKILL.md")
+    assert os.path.exists(skill_path)
+    
+    # Verify Configs updated
+    with open(os.path.join(target_dir, ".gemini", "skills.json"), "r") as f:
+        s_data = json.load(f)
+        assert "test-skill" in s_data["skills"]
+        
+    with open(os.path.join(target_dir, ".gemini", "mcp.json"), "r") as f:
+        m_data = json.load(f)
+        assert "test-mcp" in m_data["mcpServers"]
+        assert m_data["mcpServers"]["test-mcp"]["command"] == "bash"
+        assert "npx mock" in m_data["mcpServers"]["test-mcp"]["args"][1]

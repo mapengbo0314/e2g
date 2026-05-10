@@ -2,6 +2,7 @@ import os
 import re
 import shutil
 import json
+import urllib.request
 from pathlib import Path
 
 def parse_tool_checklists(domain_content: str) -> tuple[list[dict], list[dict]]:
@@ -561,3 +562,62 @@ def patch_orchestrator_rules(target_dir: str, agent_name: str):
         f.write(new_content)
         
     print(f"[HARNESS] Patched Orchestrator rules with @{agent_name}")
+
+def install_workspace_tools(target_dir: str, harness_folder_name: str, skills: list[dict], mcps: list[dict]):
+    """Downloads remote skills and configures MCPs locally for the workspace."""
+    harness_dir = os.path.join(target_dir, harness_folder_name)
+    
+    # Install Skills
+    if skills:
+        skills_json_path = os.path.join(harness_dir, "skills.json")
+        skills_data = {"skills": {}}
+        if os.path.exists(skills_json_path):
+            try:
+                with open(skills_json_path, "r") as f:
+                    skills_data = json.load(f)
+            except json.JSONDecodeError:
+                pass
+
+        for skill in skills:
+            try:
+                print(f"[HARNESS] Downloading skill: {skill['name']}...")
+                req = urllib.request.Request(skill['url'], headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    content = response.read().decode('utf-8')
+                    
+                skill_dir = os.path.join(harness_dir, "skills", skill['name'])
+                os.makedirs(skill_dir, exist_ok=True)
+                skill_file = os.path.join(skill_dir, "SKILL.md")
+                with open(skill_file, "w") as f:
+                    f.write(content)
+                    
+                # Update skills.json with LOCAL path relative to workspace
+                skills_data["skills"][skill['name']] = {"path": f"skills/{skill['name']}/SKILL.md"}
+            except Exception as e:
+                print(f"Failed to install skill {skill['name']}: {e}")
+                
+        with open(skills_json_path, "w") as f:
+             json.dump(skills_data, f, indent=2)
+
+    # Configure MCPs
+    if mcps:
+        mcp_json_path = os.path.join(harness_dir, "mcp.json")
+        mcp_data = {"mcpServers": {}}
+        if os.path.exists(mcp_json_path):
+             try:
+                 with open(mcp_json_path, "r") as f:
+                     mcp_data = json.load(f)
+             except json.JSONDecodeError:
+                 pass
+                 
+        for mcp in mcps:
+            print(f"[HARNESS] Configuring MCP: {mcp['name']}...")
+            # Wrap ephemeral command in bash -c to ensure it executes correctly in the target env
+            mcp_data["mcpServers"][mcp['name']] = {
+                "command": "bash",
+                "args": ["-c", mcp['command']]
+            }
+            
+        with open(mcp_json_path, "w") as f:
+             json.dump(mcp_data, f, indent=2)
+
