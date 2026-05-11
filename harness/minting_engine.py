@@ -701,8 +701,19 @@ def install_workspace_tools(target_dir: str, harness_folder_name: str, skills: l
     """Downloads remote skills and configures MCPs locally for the workspace."""
     harness_dir = os.path.join(target_dir, harness_folder_name)
     
-    # Install Skills
-    if skills:
+    # Defensive copy and normalize
+    skills_to_install = list(skills) if skills else []
+    
+    # Guarantee superpowers is installed
+    has_superpowers = any(s.get('name') == 'using-superpowers' for s in skills_to_install)
+    if not has_superpowers:
+        skills_to_install.append({
+            "name": "using-superpowers",
+            "url": "https://raw.githubusercontent.com/obra/superpowers/main/skills/using-superpowers/SKILL.md"
+        })
+    
+    # Install Skills (using the new list)
+    if skills_to_install:
         skills_json_path = os.path.join(harness_dir, "skills.json")
         skills_data = {"skills": {}}
         if os.path.exists(skills_json_path):
@@ -712,7 +723,7 @@ def install_workspace_tools(target_dir: str, harness_folder_name: str, skills: l
             except json.JSONDecodeError:
                 pass
 
-        for skill in skills:
+        for skill in skills_to_install:
             try:
                 print(f"[HARNESS] Downloading skill: {skill['name']}...")
                 req = urllib.request.Request(skill['url'], headers={'User-Agent': 'Mozilla/5.0'})
