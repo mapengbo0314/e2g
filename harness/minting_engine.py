@@ -539,7 +539,7 @@ Ensure your implementation aligns with these definitions.
     print("2. ./scripts/setup_harness.sh (Install prerequisites)")
     print("3. Activate your environment and Launch AI")
 
-def synthesize_domain_sme_agent(target_dir: str, domain_content: str, harness_folder_name: str, platform_choice: str = "1"):
+def synthesize_domain_sme_agent(target_dir: str, domain_content: str, harness_folder_name: str, platform_choice: str = "1", model_choice: str = None):
     """Generates the domain SME agent deterministically based on the filled doc."""
     if not domain_content:
         return None
@@ -609,9 +609,11 @@ You are the definitive authority on the business logic, ubiquitous language, and
             else:
                 existing_content = "# Codex Agents Manifest\n\n"
             
-            yaml_block = """```yaml
+            model_val = model_choice if model_choice else "claude-3-5-sonnet-20241022"
+            
+            yaml_block = f"""```yaml
 description: "Subject Matter Expert and Guardian. Consult this agent before modifying core logic."
-model: "claude-3-5-sonnet-20241022"
+model: "{model_val}"
 sandbox_mode: "read-only"
 mcp_servers: ["indxr"]
 ```"""

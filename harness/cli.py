@@ -170,7 +170,7 @@ def main():
         boilerplate_dir = os.path.join(temp_dir, "boilerplate-agent")
         
         print("Stage 2: Dynamic Context Acquisition")
-        from harness.discovery_engine import discover_agents, discover_ddd_context, acquire_mcp_context, generate_onboarding_domain_doc
+        from harness.discovery_engine import discover_ddd_context, acquire_mcp_context, generate_onboarding_domain_doc
         
         # Acquire context once
         context_str = acquire_mcp_context(args.project_path, bundle_path=resolved_bundle_path, detailed=args.detailed)
@@ -256,7 +256,7 @@ def main():
         elif platform_choice == "5": # Codex
             target_syntax = "Hand off to "
 
-        sme_agent_name = synthesize_domain_sme_agent(args.project_path, domain_content, harness_folder, platform_choice=platform_choice)
+        sme_agent_name = synthesize_domain_sme_agent(args.project_path, domain_content, harness_folder, platform_choice=platform_choice, model_choice=args.model)
         patch_orchestrator_rules(args.project_path, sme_agent_name, harness_folder, target_syntax=target_syntax)
 
         print(f"\n{'='*60}")
