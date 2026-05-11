@@ -338,7 +338,12 @@ def detect_tech_stack(project_path: str) -> str:
     if "Node.js/TypeScript" in stacks and "Node.js/JavaScript" in stacks:
         stacks.remove("Node.js/JavaScript")
 
-    return ", ".join(sorted(list(stacks))) if stacks else "Unknown Stack"
+    # Add Frontend marker for Node projects
+    final_stacks = list(stacks)
+    if any("Node.js" in s for s in final_stacks):
+        final_stacks.append("Frontend")
+        
+    return ", ".join(sorted(final_stacks)) if final_stacks else "Unknown Stack"
 
 def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query_llm_fn=None, llm_provider=None, api_key=None, context_str="", boilerplate_dir: str = None):
     """Generates the ONBOARDING_DOMAIN.md template using LLM profiling and verified tools."""
@@ -372,6 +377,19 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query
     domain_events = "*   **[USER INPUT REQUIRED]**"
     recommended_skills = []
     recommended_mcps = []
+
+    # Pre-populate with forced tools based on tech stack
+    for tool in flattened_tools:
+        if "force_if_keywords" in tool:
+            for kw in tool["force_if_keywords"]:
+                if kw.lower() in tech_stack.lower():
+                    if tool.get("type") == "mcp":
+                        if not any(m["name"] == tool["name"] for m in recommended_mcps):
+                            recommended_mcps.append(tool)
+                    else:
+                        if not any(s["name"] == tool["name"] for s in recommended_skills):
+                            recommended_skills.append(tool)
+                    break
 
     if query_llm_fn and llm_provider and api_key:
         prompt = f"""
