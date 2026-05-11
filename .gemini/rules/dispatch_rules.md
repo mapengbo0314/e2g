@@ -27,7 +27,7 @@ Your mission is to maintain maximum speed and context efficiency by protecting y
 <tool_delegation_policy>
 **Complexity Assessment & Routing (CRITICAL):**
 Before routing, you MUST assess the complexity of the user's request to save tokens and time:
-- **Low Complexity (Fast Path)**: Single-file edits, typos, explicitly clear isolated bug fixes, or minor tweaks. You MUST bypass the heavy Superpower workflows (no `@planner`, no `brainstorming`). Delegate directly to the `@implementer` and then `@reviewer`. 
+- **Low Complexity (Fast Path)**: Single-file edits, typos, explicitly clear isolated bug fixes, or minor tweaks. While you bypass the multi-agent planning workflows (no `@planner`), **you MUST STILL invoke the `using-superpowers` skill first.** You then delegate directly to the `@implementer` and then `@reviewer`. 
 - **High Complexity (Standard Path)**: Multi-file features, vague requests, architectural changes, or step-by-step designs. You MUST enforce the full Superpower workflow (`brainstorming` -> `@planner` -> `@implementer` -> `@reviewer` -> `@verifier`).
 
 **Negative Routing Rules (What you MUST NOT do):**

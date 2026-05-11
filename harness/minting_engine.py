@@ -272,9 +272,17 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
     }
     active_platform = platform_map.get(platform_choice, platform_choice).lower()
 
+    # Get selected tools from the domain doc
+    domain_content = ""
+    domain_doc_path = os.path.join(project_path, "ONBOARDING_DOMAIN.md")
+    if os.path.exists(domain_doc_path):
+        with open(domain_doc_path, "r") as f:
+            domain_content = f.read()
+    
+    selected_skills, selected_mcps = parse_tool_checklists(domain_content)
+
     import shlex
     escaped_project_path = os.path.abspath(project_path)
-    # Note: We still need to be careful with double quotes in the f-string
     quoted_project_path = shlex.quote(escaped_project_path)
     indxr_abs_path = shutil.which("indxr") or "~/.cargo/bin/indxr"
     
@@ -288,6 +296,30 @@ if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
 fi
 """
 
+    # Prepare tool installation snippets
+    skill_installs = ""
+    mcp_installs = ""
+    
+    if active_platform == "gemini":
+        for s in selected_skills:
+            skill_installs += f"    gemini extensions install {s['url']} || true\n"
+        for m in selected_mcps:
+            cmd = m["command"]
+            if " " in cmd:
+                cmd = f'bash -c {shlex.quote(cmd)}'
+            mcp_installs += f'    gemini mcp add {m["name"]} {cmd} || true\n'
+    elif active_platform == "claude":
+        for s in selected_skills:
+            skill_installs += f'echo "  /plugin install {s["name"]}@{s["url"]}"\n'
+        for m in selected_mcps:
+            cmd = m["command"]
+            if " " in cmd:
+                cmd = f'bash -c {shlex.quote(cmd)}'
+            mcp_installs += f'    claude mcp add {m["name"]} -- {cmd} || true\n'
+    elif active_platform == "cursor":
+        for s in selected_skills:
+            skill_installs += f'echo "  /add-plugin {s["name"]} ({s["url"]})"\n'
+
     scripts_to_generate = {
         "gemini": f"""#!/usr/bin/env bash
 set -e
@@ -296,10 +328,12 @@ echo "=== Setting up Superpowers for Gemini CLI ==="
 if command -v gemini &> /dev/null; then
     gemini extensions install https://github.com/obra/superpowers || true
     gemini extensions install https://github.com/mattpocock/skills || true
+{skill_installs}
     
     echo "Adding indxr to Gemini CLI project MCP configuration..."
     indxr_serve_args_str="serve --watch --wiki-auto-update --all-tools"
     gemini mcp add indxr bash -c "cd {quoted_project_path} && {indxr_abs_path} $indxr_serve_args_str" -e GEMINI_API_KEY=\\$GEMINI_API_KEY -e ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY -e OPENAI_API_KEY=\\$OPENAI_API_KEY || true
+{mcp_installs}
 else
     echo "Warning: gemini command not found."
 fi
@@ -313,12 +347,14 @@ echo "=== Setting up Superpowers for Claude Code ==="
 echo "To install Superpowers and Skills for Claude Code, run these commands inside the Claude Code interface:"
 echo "  /plugin install superpowers@claude-plugins-official"
 echo "  /plugin install skills@mattpocock"
+{skill_installs}
 
 # MCP Configuration for Claude
 if command -v claude &> /dev/null; then
     echo "Adding indxr to Claude Code project MCP configuration..."
     indxr_serve_args_str="serve --watch --wiki-auto-update --all-tools"
     claude mcp add --scope project indxr --env GEMINI_API_KEY=\\$GEMINI_API_KEY --env ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY --env OPENAI_API_KEY=\\$OPENAI_API_KEY -- bash -c "cd {quoted_project_path} && {indxr_abs_path} $indxr_serve_args_str" || true
+{mcp_installs}
 fi
 """,
         "cursor": f"""#!/usr/bin/env bash
@@ -328,6 +364,7 @@ echo "=== Setting up Superpowers for Cursor ==="
 echo "To install Superpowers and Skills for Cursor, run these commands inside the Cursor Agent chat:"
 echo "  /add-plugin superpowers"
 echo "  /add-plugin mattpocock/skills"
+{skill_installs}
 """,
         "codex": f"""#!/usr/bin/env bash
 set -e
@@ -546,7 +583,8 @@ def synthesize_domain_sme_agent(target_dir: str, domain_content: str, harness_fo
 
     # Extract proposed name, fallback to domain-sme
     agent_name = "domain-sme"
-    name_match = re.search(r'Proposed Agent Name:\s*`?@([a-zA-Z0-9_-]+)`?', domain_content)
+    # Robust regex for: **Proposed Agent Name:** `@name` or Proposed Agent Name: @name
+    name_match = re.search(r'Proposed Agent Name:.*?\s*`?@([a-zA-Z0-9_-]+)`?', domain_content, re.IGNORECASE)
     if name_match:
         agent_name = name_match.group(1).lower()
         

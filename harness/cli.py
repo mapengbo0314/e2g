@@ -202,8 +202,6 @@ def main():
         platform_choice = input("Select target platform [1-5]: ").strip()
         if not platform_choice:
             platform_choice = "1"
-            
-        print(f"\nStage 3: Proceeding to mint {len(selected_agents)} agents...")
         
         if platform_choice == "1":
             harness_folder = ".gemini"

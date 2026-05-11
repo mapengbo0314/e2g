@@ -212,7 +212,7 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
         return [{"name": "Architect", "role": "General architecture and design", "zone": "Core"}]
 
 def discover_ddd_context(context_str: str, llm_provider: str, api_key: str, model: str = None) -> dict:
-    """Extracts DDD context using remote skills."""
+    """Extracts DDD context using remote skills and deterministic questions."""
     print("Loading skills for DDD alignment...")
     grill_me_skill = fetch_skill("grill-me", "https://raw.githubusercontent.com/mattpocock/skills/main/skills/productivity/grill-me/SKILL.md")
     grill_with_docs_skill = fetch_skill("grill-with-docs", "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md")
@@ -220,20 +220,24 @@ def discover_ddd_context(context_str: str, llm_provider: str, api_key: str, mode
     prompt_engineer_skill = fetch_skill("prompt-engineer", "https://raw.githubusercontent.com/Jeffallan/claude-skills/main/skills/prompt-engineer/SKILL.md")
 
     prompt = (
-        "You are a strict Domain-Driven Design architect. Analyze the following project context (sourced from indxr MCP) and execute the provided skills.\n\n"
-        "Apply the 'agentic-eval' and 'prompt-engineer' skills to rigorously self-critique and refine your domain definitions and output JSON structure against the provided codebase architecture.\n\n"
+        "You are a strict Domain-Driven Design architect. Analyze the project context and execute the provided skills.\n\n"
+        "AVOID TECHNICAL PEDANTRY: Do not ask about technical naming (e.g., 'spend vs cost') or implementation details (e.g., 'dataframe skeletons') unless they represent a fundamental business misunderstanding.\n\n"
+        "=== DETERMINISTIC DDD FRAMEWORK ===\n"
+        "Focus your analysis and questions on these 5 core areas:\n"
+        "1. UBIQUITOUS LANGUAGE: What is the exact vocabulary business experts use? Are there overloaded terms across contexts?\n"
+        "2. CORE DOMAIN: What is the single core capability that provides primary value/competitive advantage?\n"
+        "3. AGGREGATES & INVARIANTS: What data MUST be updated together in a single transaction to maintain business rules?\n"
+        "4. DOMAIN EVENTS: Who needs to know when a significant action is completed? (Eventual consistency needs)\n"
+        "5. CONTEXT MAPPING: Who dictates the shape of the data contract when interacting with external/other systems?\n\n"
+        "Apply the 'agentic-eval' and 'prompt-engineer' skills to self-critique your domain definitions.\n\n"
         "=== GRILL-WITH-DOCS SKILL ===\n"
         f"{grill_with_docs_skill}\n\n"
         "=== GRILL-ME SKILL ===\n"
         f"{grill_me_skill}\n\n"
-        "=== AGENTIC EVAL ===\n"
-        f"{agentic_eval_skill}\n\n"
-        "=== PROMPT ENGINEER ===\n"
-        f"{prompt_engineer_skill}\n\n"
         "Your task:\n"
-        "1. Draft a context definition (context.md style) based on the codebase.\n"
-        "2. Identify ambiguities or missing domain definitions.\n"
-        "3. Use the 'grill-me' approach to generate 3-5 sharp, critical questions to align the user on these ambiguities.\n\n"
+        "1. Draft a context definition (context.md style) structured by the 5 Deterministic DDD areas.\n"
+        "2. Identify genuine domain ambiguities that cannot be resolved by reading the code.\n"
+        "3. Generate 3-5 sharp questions that force the user to define business boundaries, NOT implementation details.\n\n"
         "Your response MUST be in JSON format with exactly these keys:\n"
         "- 'context_draft': A string containing the drafted domain context.\n"
         "- 'questions': A list of strings representing alignment questions.\n"
@@ -300,18 +304,41 @@ def discover_custom_agent(name: str, specs: str, context_str: str, ddd_context: 
         return {"name": name, "role": specs, "zone": "Core", "system_prompt": f"# {name}\n\n{specs}"}
 
 def detect_tech_stack(project_path: str) -> str:
-    """Fallback heuristic detection if LLM is unavailable."""
-    stacks = []
-    if os.path.exists(os.path.join(project_path, "package.json")):
-        stacks.append("Node.js/JavaScript")
-    if os.path.exists(os.path.join(project_path, "Cargo.toml")):
-        stacks.append("Rust")
-    if os.path.exists(os.path.join(project_path, "requirements.txt")) or os.path.exists(os.path.join(project_path, "pyproject.toml")):
-        stacks.append("Python")
-    if os.path.exists(os.path.join(project_path, "go.mod")):
-        stacks.append("Go")
+    """Heuristic detection of tech stack from project files, searching up to 2 levels deep."""
+    stacks = set()
     
-    return ", ".join(stacks) if stacks else "Unknown Stack"
+    # Files we are looking for
+    markers = {
+        "package.json": "Node.js/JavaScript",
+        "tsconfig.json": "Node.js/TypeScript",
+        "requirements.txt": "Python",
+        "pyproject.toml": "Python",
+        "Pipfile": "Python",
+        "setup.py": "Python",
+        "Cargo.toml": "Rust",
+        "go.mod": "Go",
+        "pom.xml": "JVM (Java/Kotlin)",
+        "build.gradle": "JVM (Java/Kotlin)",
+        "composer.json": "PHP"
+    }
+
+    # Walk directory structure, max 2 levels deep
+    start_depth = project_path.rstrip(os.path.sep).count(os.path.sep)
+    for root, dirs, files in os.walk(project_path):
+        current_depth = root.count(os.path.sep)
+        if current_depth - start_depth >= 2:
+            dirs[:] = [] # Stop recursion
+            continue
+            
+        for file in files:
+            if file in markers:
+                stacks.add(markers[file])
+
+    # If TypeScript is found, prefer it over plain JavaScript
+    if "Node.js/TypeScript" in stacks and "Node.js/JavaScript" in stacks:
+        stacks.remove("Node.js/JavaScript")
+
+    return ", ".join(sorted(list(stacks))) if stacks else "Unknown Stack"
 
 def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query_llm_fn=None, llm_provider=None, api_key=None, context_str="", boilerplate_dir: str = None):
     """Generates the ONBOARDING_DOMAIN.md template using LLM profiling and verified tools."""
@@ -320,46 +347,61 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query
     # 1. Detect Tech Stack
     tech_stack = detect_tech_stack(project_path)
     
-    # 2. Load Tools Registry
+    # 2. Load and Flatten Tools Registry
     tools_registry = {}
+    flattened_tools = []
     if boilerplate_dir:
         registry_path = os.path.join(boilerplate_dir, "onboarding", "tools.json")
         if os.path.exists(registry_path):
             try:
                 with open(registry_path, "r") as f:
                     tools_registry = json.load(f)
+                    # Flatten for LLM consumption
+                    for cat, tools in tools_registry.get("categories", {}).items():
+                        for t in tools:
+                            t["category"] = cat
+                            flattened_tools.append(t)
             except Exception as e:
                 print(f"Warning: Could not load tools registry: {e}")
 
     # 3. Profile SME via LLM
     sme_name = "domain-sme"
+    core_domain_value = "[USER INPUT REQUIRED]"
     invariants = "1. [USER INPUT REQUIRED: Add your own unbreakable rule here]\n"
     glossary = "*   **[Term 1]**: [USER INPUT REQUIRED: Define this term]\n"
+    domain_events = "*   **[USER INPUT REQUIRED]**"
     recommended_skills = []
     recommended_mcps = []
 
     if query_llm_fn and llm_provider and api_key:
         prompt = f"""
-        You are an Architect and Domain Modeler. Based on the following project context, you must define a 'Domain SME' agent to protect the core logic.
+        You are a Senior Architect. Analyze the project context and recommend a 'Domain SME' agent.
+        
+        Detected Tech Stack:
+        {tech_stack}
         
         Project Context:
-        {context_str[:4000]}
+        {context_str[:5000]}
         
-        Available Verified Tools:
-        {json.dumps(tools_registry)}
+        Verified Tool Inventory:
+        {json.dumps(flattened_tools)}
         
         Task:
-        1. Propose a specific name for the Domain SME (e.g., 'billing-guardian', 'auth-sme').
-        2. Propose 3-5 strict Domain Invariants (absolute rules it must enforce).
-        3. Define 3-5 terms for the Ubiquitous Language.
-        4. Select up to 3 relevant skills from the 'Available Verified Tools'. Return EXACTLY the JSON object for the tool.
-        5. Select up to 2 relevant MCPs from the 'Available Verified Tools'. Return EXACTLY the JSON object for the tool.
+        1. Name the SME (e.g. 'marketing-guardian').
+        2. Define the Core Domain Value (what is the competitive advantage?).
+        3. List 4 strict Domain Invariants (rules to protect logic).
+        4. Define 4 Ubiquitous Language terms.
+        5. List 2 key Domain Events (what happens that others need to know about?).
+        6. Select 2-3 most relevant skills from the Inventory based on the Detected Tech Stack.
+        7. Select 1-2 most relevant MCPs from the Inventory based on the Detected Tech Stack.
         
-        Return ONLY valid JSON in this format:
+        Return ONLY valid JSON:
         {{
             "sme_name": "...",
+            "core_domain_value": "...",
             "invariants": ["...", "..."],
             "glossary": {{"term": "definition"}},
+            "domain_events": ["...", "..."],
             "skills": [{{"name": "...", "url": "..."}}],
             "mcps": [{{"name": "...", "command": "...", "type": "mcp"}}]
         }}
@@ -374,22 +416,32 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query
             data = json.loads(cleaned)
             
             if data.get("sme_name"): sme_name = data["sme_name"]
+            core_domain_value = data.get("core_domain_value", "[USER INPUT REQUIRED]")
             if data.get("invariants"):
                 invariants = "\n".join([f"{i+1}. {inv}" for i, inv in enumerate(data["invariants"])])
             if data.get("glossary"):
                 glossary = "\n".join([f"*   **{k}**: {v}" for k, v in data["glossary"].items()])
+            
+            domain_events = "*   **[USER INPUT REQUIRED]**"
+            if data.get("domain_events"):
+                domain_events = "\n".join([f"*   **{e}**" for e in data["domain_events"]])
+                
             if data.get("skills"): recommended_skills = data["skills"]
             if data.get("mcps"): recommended_mcps = data["mcps"]
         except Exception as e:
             print(f"Warning: SME Profiling failed: {e}")
+            core_domain_value = "[USER INPUT REQUIRED]"
+            domain_events = "*   **[USER INPUT REQUIRED]**"
 
-    # 4. Format Tools
+    # 4. Format Tools for Markdown
     skills_md = "- [ ] No skills recommended"
     if recommended_skills:
+        # Format as: - [x] Name (URL)
         skills_md = "\n".join([f"- [x] {s.get('name', 'Unknown')} ({s.get('url', '')})" for s in recommended_skills])
         
     mcps_md = "- [ ] No MCPs recommended"
     if recommended_mcps:
+        # Format as: - [x] Name (Command)
         mcps_md = "\n".join([f"- [x] {m.get('name', 'Unknown')} ({m.get('command', '')})" for m in recommended_mcps])
 
     # 5. Populate Template
@@ -402,13 +454,57 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query
     
     # Fallback if template missing
     if not template_str:
-         template_str = "# Project Onboarding Domain\n\n**Detected Tech Stack:** {{TECH_STACK}}\n\nBased on the codebase scan, I have identified **{{DOMAIN_SUMMARY}}** as a core complex domain. I propose creating a dedicated agent to protect this logic.\n\n## Proposed Domain SME Agent\n\n**Proposed Agent Name:** `@{{SME_NAME}}`\n*(Edit the name above if incorrect. Must be lowercase.)*\n\n**Domain Invariants (The absolute rules this agent must enforce):**\n{{INVARIANTS}}\n\n**Ubiquitous Language (Key terms to define):**\n{{GLOSSARY}}\n\n## Proposed Skills\n*(Delete the line of any skill you do NOT want installed)*\n{{SKILLS_MD}}\n\n## Proposed MCP Tools\n*(Delete the line of any MCP you do NOT want installed)*\n{{MCPS_MD}}\n\n*(When you have finished editing this file, return to the terminal and press ENTER to continue minting)*\n"
+         template_str = """# Project Onboarding Domain
+
+**Detected Tech Stack:** {{TECH_STACK}}
+
+Based on the codebase scan, I have identified **{{DOMAIN_SUMMARY}}** as a core complex domain. I propose creating a dedicated agent to protect this logic.
+
+## Proposed Domain SME Agent
+
+**Proposed Agent Name:** `@{{SME_NAME}}`
+*(Edit the name above if incorrect. Must be lowercase.)*
+
+## Deterministic DDD Alignment
+
+### 1. Ubiquitous Language (Glossary)
+*Key terms defined by business experts:*
+{{GLOSSARY}}
+
+### 2. Core Domain (Value Proposition)
+*The single core capability that provides primary value:*
+*   **{{CORE_DOMAIN_VALUE}}**
+
+### 3. Aggregates & Invariants (Transactional Boundaries)
+*Data that must absolutely always be updated together:*
+{{INVARIANTS}}
+
+### 4. Domain Events & Coordination (Asynchrony)
+*Significant actions that others need to know about:*
+{{DOMAIN_EVENTS}}
+
+### 5. Context Mapping (Contract Ownership)
+*Who dictates the shape of external data contracts:*
+*   **[USER INPUT REQUIRED]**: e.g., "We are a 'Conformist' to the Legacy API, but we use an 'Anti-Corruption Layer' for the CRM."
+
+## Proposed Skills
+*(Delete the line of any skill you do NOT want installed)*
+{{SKILLS_MD}}
+
+## Proposed MCP Tools
+*(Delete the line of any MCP you do NOT want installed)*
+{{MCPS_MD}}
+
+*(When you have finished editing this file, return to the terminal and press ENTER to continue minting)*
+"""
 
     final_content = template_str.replace("{{TECH_STACK}}", tech_stack)
     final_content = final_content.replace("{{DOMAIN_SUMMARY}}", domain_summary)
     final_content = final_content.replace("{{SME_NAME}}", str(sme_name).lower())
+    final_content = final_content.replace("{{CORE_DOMAIN_VALUE}}", core_domain_value)
     final_content = final_content.replace("{{INVARIANTS}}", invariants)
     final_content = final_content.replace("{{GLOSSARY}}", glossary)
+    final_content = final_content.replace("{{DOMAIN_EVENTS}}", domain_events)
     final_content = final_content.replace("{{SKILLS_MD}}", skills_md)
     final_content = final_content.replace("{{MCPS_MD}}", mcps_md)
 
