@@ -14,6 +14,7 @@ def parse_args():
     parser.add_argument("--model", help="Optional specific model to use (e.g., gemini-3.1-pro-preview, claude-3-5-sonnet-20241022)")
     parser.add_argument("--bundle", help="Optional path to an existing .indxr directory or wiki")
     parser.add_argument("--ddd", action="store_true", help="Enable DDD Onboarding sequence")
+    parser.add_argument("--detailed", action="store_true", help="Include all wiki files for deeper context acquisition")
     return parser.parse_args()
 
 def run_ddd_grill(ddd_context: dict) -> dict:
@@ -43,6 +44,11 @@ def main():
     
     api_key_env_var = f"{args.llm.upper()}_API_KEY"
     api_key = os.environ.get(api_key_env_var)
+    
+    # Fallback for Gemini
+    if not api_key and args.llm == "gemini":
+        api_key = os.environ.get("GOOGLE_API_KEY")
+        
     if not api_key:
         print(f"Environment variable {api_key_env_var} not found.")
         api_key = getpass.getpass(prompt=f"Enter your {args.llm} API Key: ")
@@ -125,13 +131,25 @@ def main():
                     )
             except subprocess.CalledProcessError as e:
                 print(f"\nFailed to generate indxr wiki: {e}")
-                print("Context will be severely limited.")
+                print("\033[91mWARNING: Index generation failed. Proceeding without a codebase index will lead to hallucinated workspace context.\033[0m")
+                choice = input("Do you want to continue anyway? (y/N): ").strip().lower()
+                if choice != 'y':
+                    print("Aborting.")
+                    sys.exit(1)
             except FileNotFoundError:
                 print(f"\nError: Neither 'npx' nor 'indxr' command found.")
-                print("Context will be severely limited.")
+                print("\033[91mWARNING: Index generation failed. Proceeding without a codebase index will lead to hallucinated workspace context.\033[0m")
+                choice = input("Do you want to continue anyway? (y/N): ").strip().lower()
+                if choice != 'y':
+                    print("Aborting.")
+                    sys.exit(1)
             except Exception as e:
                 print(f"\nError running indexer: {e}")
-                print("Context will be severely limited.")
+                print("\033[91mWARNING: Index generation failed. Proceeding without a codebase index will lead to hallucinated workspace context.\033[0m")
+                choice = input("Do you want to continue anyway? (y/N): ").strip().lower()
+                if choice != 'y':
+                    print("Aborting.")
+                    sys.exit(1)
         else:
              print("Proceeding without codebase index. Architecture context will be severely limited.")
     # --- End Fast Path ---
@@ -140,7 +158,15 @@ def main():
     repo_url = "https://github.com/mapengbo0314/e2g.git"
     
     with tempfile.TemporaryDirectory() as temp_dir:
-        subprocess.run(["git", "clone", "--depth", "1", repo_url, temp_dir], check=True, capture_output=True)
+        try:
+            subprocess.run(["git", "clone", "--depth", "1", repo_url, temp_dir], check=True, capture_output=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: Failed to clone boilerplate repository: {e.stderr.decode() if e.stderr else str(e)}")
+            sys.exit(1)
+        except FileNotFoundError:
+            print("Error: 'git' command not found. Please install Git.")
+            sys.exit(1)
+            
         boilerplate_dir = os.path.join(temp_dir, "boilerplate-agent")
         
         feature_fetcher_yaml = os.path.join(boilerplate_dir, "agents", "feature-fetcher.md")
@@ -149,7 +175,7 @@ def main():
         from harness.discovery_engine import discover_agents, discover_ddd_context, acquire_mcp_context, generate_onboarding_domain_doc
         
         # Acquire context once
-        context_str = acquire_mcp_context(args.project_path, bundle_path=resolved_bundle_path)
+        context_str = acquire_mcp_context(args.project_path, bundle_path=resolved_bundle_path, detailed=args.detailed)
         if context_str is None:
              context_str = "No codebase wiki found. Architecture unknown."
              print("No usable .indxr/wiki found. Proceeding with empty context.")
@@ -167,44 +193,15 @@ def main():
                 "additional_domain_knowledge": grill_answers.get("__additional_domain_knowledge__", "")
             }
 
-        print("Discovering specialized agents...")
-        recommended_agents = discover_agents(context_str, feature_fetcher_yaml, args.llm, api_key, args.model, ddd_context=final_ddd_context)
-        
-        print(f"Found {len(recommended_agents)} recommendations.")
         selected_agents = []
-        print("\n=== Recommended Agents ===")
-        for idx, agent in enumerate(recommended_agents):
-            print(f"[{idx}] {agent['name']} ({agent['zone']}): {agent['role']}")
-            choice = input(f"Include {agent['name']}? (Y/n): ").strip().lower()
-            if choice in ['', 'y', 'yes']:
-                selected_agents.append(agent)
-                
-        # Custom Agent Creation Loop
-        while True:
-            choice = input("\nWould you like to create an additional custom agent? (y/N): ").strip().lower()
-            if choice not in ['y', 'yes']:
-                break
-                
-            custom_name = input("Enter Agent Name: ").strip()
-            if not custom_name: continue
-            custom_specs = input("Enter Agent Specs/Role: ").strip()
-            if not custom_specs: continue
-            
-            from harness.discovery_engine import discover_custom_agent
-            custom_agent = discover_custom_agent(custom_name, custom_specs, context_str, final_ddd_context, args.llm, api_key, args.model)
-            selected_agents.append(custom_agent)
-            print(f"Agent {custom_name} added.")
-
-        if not selected_agents:
-            print("No agents selected. Aborting.")
-            sys.exit(0)
 
         print("\n=== Platform Selection ===")
         print("1. Gemini CLI")
         print("2. Claude Code")
         print("3. Cursor")
         print("4. Generic / Custom")
-        platform_choice = input("Select target platform [1-4]: ").strip()
+        print("5. Codex")
+        platform_choice = input("Select target platform [1-5]: ").strip()
         if not platform_choice:
             platform_choice = "1"
             
@@ -216,6 +213,8 @@ def main():
             harness_folder = ".claude"
         elif platform_choice == "3":
             harness_folder = ".cursor"
+        elif platform_choice == "5":
+            harness_folder = ".codex"
         else:
             harness_folder = ".agents"
 
@@ -238,7 +237,8 @@ def main():
             query_llm, 
             args.llm, 
             api_key, 
-            context_str
+            context_str,
+            boilerplate_dir
         )
         domain_content = wait_for_user_review_and_read_domain(args.project_path)
 
@@ -251,29 +251,46 @@ def main():
         # Install tools
         install_workspace_tools(args.project_path, harness_folder, skills_to_install, mcps_to_install)
 
-        sme_agent_name = synthesize_domain_sme_agent(args.project_path, domain_content, query_llm, args.llm, api_key)
-        patch_orchestrator_rules(args.project_path, sme_agent_name)
+        # Determine subagent syntax for rule patching
+        target_syntax = "@"
+        if platform_choice == "2": # Claude
+            target_syntax = "Task tool: "
+        elif platform_choice == "5": # Codex
+            target_syntax = "Hand off to "
+
+        sme_agent_name = synthesize_domain_sme_agent(args.project_path, domain_content, harness_folder)
+        patch_orchestrator_rules(args.project_path, sme_agent_name, harness_folder, target_syntax=target_syntax)
 
         print(f"\n{'='*60}")
         print("🚀 ONBOARDING COMPLETE")
         print(f"{'='*60}")
-        print(f"\n1. Workspace Minted: {target_dir}")
-        print(f"2. Domain SME Created: @{sme_agent_name}")
+        
+        counter = 1
+        print(f"\n{counter}. Workspace Minted: {target_dir}")
+        counter += 1
+        
+        if sme_agent_name:
+            print(f"{counter}. Domain SME Created: @{sme_agent_name}")
+            counter += 1
         
         if skills_to_install:
-            print(f"3. Local Skills Installed: {', '.join([s['name'] for s in skills_to_install])}")
+            print(f"{counter}. Local Skills Installed: {', '.join([s['name'] for s in skills_to_install])}")
+            counter += 1
         
         if mcps_to_install:
-            print(f"4. MCP Tools Configured: {', '.join([m['name'] for m in mcps_to_install])}")
+            print(f"{counter}. MCP Tools Configured: {', '.join([m['name'] for m in mcps_to_install])}")
             print("\n[ACTION REQUIRED] MCP Authorization:")
             if platform_choice == "1":
                 print("   - In Gemini CLI, you will be prompted to 'Allow' each tool on first use.")
             elif platform_choice == "2":
                 print("   - In Claude Code, ensure you restart your session to load the new mcp.json.")
             print("   - Review your workspace mcp.json to verify the command paths.")
+            counter += 1
 
-        print(f"\n5. Context: The @{sme_agent_name} is now the gateway for all planning.")
-        print(f"   Dispatch rules in {harness_folder}/rules/dispatch_rules.md have been updated.")
+        if sme_agent_name:
+            print(f"\n{counter}. Context: The @{sme_agent_name} is now the gateway for all planning.")
+            print(f"   Dispatch rules in {harness_folder}/rules/dispatch_rules.md have been updated.")
+            
         print(f"{'='*60}\n")
 
 if __name__ == "__main__":
