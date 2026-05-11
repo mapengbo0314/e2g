@@ -375,21 +375,15 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query
     invariants = "1. [USER INPUT REQUIRED: Add your own unbreakable rule here]\n"
     glossary = "*   **[Term 1]**: [USER INPUT REQUIRED: Define this term]\n"
     domain_events = "*   **[USER INPUT REQUIRED]**"
-    recommended_skills = []
-    recommended_mcps = []
+    
+    def is_forced(tool: dict, stack: str) -> bool:
+        keywords = tool.get("force_if_keywords", [])
+        return any(kw.lower() in stack.lower() for kw in keywords)
 
     # Pre-populate with forced tools based on tech stack
-    for tool in flattened_tools:
-        if "force_if_keywords" in tool:
-            for kw in tool["force_if_keywords"]:
-                if kw.lower() in tech_stack.lower():
-                    if tool.get("type") == "mcp":
-                        if not any(m["name"] == tool["name"] for m in recommended_mcps):
-                            recommended_mcps.append(tool)
-                    else:
-                        if not any(s["name"] == tool["name"] for s in recommended_skills):
-                            recommended_skills.append(tool)
-                    break
+    forced_tools = [t for t in flattened_tools if is_forced(t, tech_stack)]
+    recommended_mcps = [t for t in forced_tools if t.get("type") == "mcp"]
+    recommended_skills = [t for t in forced_tools if t.get("type") != "mcp"]
 
     if query_llm_fn and llm_provider and api_key:
         prompt = f"""
