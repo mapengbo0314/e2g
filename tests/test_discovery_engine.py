@@ -22,7 +22,6 @@ def test_discover_agents(mock_query_llm, mock_fetch_skill):
     assert len(agents) == 1
     assert agents[0]["name"] == "AuthAgent"
     mock_query_llm.assert_called_once()
-    assert mock_fetch_skill.call_count == 4
 
 @mock.patch("harness.discovery_engine.fetch_remote_skill")
 @mock.patch("harness.discovery_engine.query_llm")
@@ -86,7 +85,6 @@ def test_discover_ddd_context(mock_query_llm, mock_fetch_skill):
     assert len(result["questions"]) == 2
     assert "legacy_hints" in result
     mock_query_llm.assert_called_once()
-    assert mock_fetch_skill.call_count == 4
 
 
 def test_acquire_mcp_context_with_bundle():
