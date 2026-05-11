@@ -4,8 +4,8 @@ import time
 import urllib.request
 import os
 
-def acquire_mcp_context(project_path: str, bundle_path: str = None) -> str:
-    """Acquires lightweight project context from the core wiki files to avoid token explosion."""
+def acquire_mcp_context(project_path: str, bundle_path: str = None, detailed: bool = False) -> str:
+    """Acquires project context from the core wiki files. Detailed mode reads everything."""
 
     # Check bundle path first if provided
     if bundle_path:
@@ -27,15 +27,24 @@ def acquire_mcp_context(project_path: str, bundle_path: str = None) -> str:
     context_parts = []
 
     if os.path.exists(wiki_path):
-        if not bundle_path or wiki_path == os.path.join(project_path, ".indxr", "wiki"):
-             print(f"Found existing .indxr/wiki at {wiki_path}. Reading core architecture...")
+        if not bundle_path or wiki_path == os.path.join(project_path, ".indxr/wiki"):
+             print(f"Found existing .indxr/wiki at {wiki_path}. Reading context...")
 
-        # Read ONLY the index and architecture to avoid token explosion
-        for core_file in ["index.md", "architecture.md"]:
-            p = os.path.join(wiki_path, core_file)
-            if os.path.exists(p):
-                with open(p, 'r') as f:
-                    context_parts.append(f"=== {core_file.upper()} ===\n" + f.read())
+        # Read ONLY the index and architecture by default to avoid token explosion
+        # Detailed mode reads everything in the wiki
+        if detailed:
+            for root, _, files in os.walk(wiki_path):
+                for file in files:
+                    if file.endswith(".md"):
+                        p = os.path.join(root, file)
+                        with open(p, 'r') as f:
+                            context_parts.append(f"=== {file.upper()} ===\n" + f.read())
+        else:
+            for core_file in ["index.md", "architecture.md"]:
+                p = os.path.join(wiki_path, core_file)
+                if os.path.exists(p):
+                    with open(p, 'r') as f:
+                        context_parts.append(f"=== {core_file.upper()} ===\n" + f.read())
 
         if context_parts:
             return "\n\n".join(context_parts)
@@ -51,10 +60,33 @@ def fetch_remote_skill(skill_url: str) -> str:
         with urllib.request.urlopen(req, timeout=10) as response:
             return response.read().decode('utf-8')
     except Exception as e:
-        print(f"CRITICAL ERROR: Failed to fetch required skill from {skill_url}")
+        print(f"WARNING: Failed to fetch skill from {skill_url}")
         print(f"Details: {e}")
-        import sys
-        sys.exit(1) # Fail hard as requested
+        return None # Graceful fallback
+
+def fetch_skill(skill_name: str, remote_url: str) -> str:
+    """Fetches a skill definition from remote URL or fallback to local storage."""
+    content = fetch_remote_skill(remote_url)
+    if content:
+        return content
+        
+    print(f"Attempting to load skill {skill_name} from local fallback...")
+    home = os.path.expanduser("~")
+    local_paths = [
+        os.path.join(home, ".agents", "skills", skill_name, "SKILL.md"),
+        os.path.join(home, ".gemini", "extensions", "superpowers", "skills", skill_name, "SKILL.md"),
+        os.path.join(".agents", "skills", skill_name, "SKILL.md")
+    ]
+    
+    for p in local_paths:
+        if os.path.exists(p):
+            try:
+                with open(p, 'r') as f:
+                    return f.read()
+            except Exception:
+                continue
+
+    return None
 
 def query_llm(prompt: str, llm_provider: str, api_key: str, model: str = None) -> str:
     """Dispatches to the real LLM providers."""
@@ -121,11 +153,11 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
     except Exception as e:
         print(f"Warning: Could not load feature-fetcher prompt: {e}")
 
-    print("Fetching remote skills for Agent Discovery...")
-    arch_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture/SKILL.md")
-    grill_docs_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md")
-    agentic_eval_skill = fetch_remote_skill("https://raw.githubusercontent.com/github/awesome-copilot/main/skills/agentic-eval/SKILL.md")
-    prompt_engineer_skill = fetch_remote_skill("https://raw.githubusercontent.com/Jeffallan/claude-skills/main/skills/prompt-engineer/SKILL.md")
+    print("Loading skills for Agent Discovery...")
+    arch_skill = fetch_skill("improve-codebase-architecture", "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/improve-codebase-architecture/SKILL.md")
+    grill_docs_skill = fetch_skill("grill-with-docs", "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md")
+    agentic_eval_skill = fetch_skill("agentic-eval", "https://raw.githubusercontent.com/github/awesome-copilot/main/skills/agentic-eval/SKILL.md")
+    prompt_engineer_skill = fetch_skill("prompt-engineer", "https://raw.githubusercontent.com/Jeffallan/claude-skills/main/skills/prompt-engineer/SKILL.md")
 
     ddd_prompt_section = ""
     if ddd_context:
@@ -181,11 +213,11 @@ def discover_agents(context_str: str, feature_fetcher_yaml_path: str, llm_provid
 
 def discover_ddd_context(context_str: str, llm_provider: str, api_key: str, model: str = None) -> dict:
     """Extracts DDD context using remote skills."""
-    print("Fetching remote skills for DDD alignment...")
-    grill_me_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/productivity/grill-me/SKILL.md")
-    grill_with_docs_skill = fetch_remote_skill("https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md")
-    agentic_eval_skill = fetch_remote_skill("https://raw.githubusercontent.com/github/awesome-copilot/main/skills/agentic-eval/SKILL.md")
-    prompt_engineer_skill = fetch_remote_skill("https://raw.githubusercontent.com/Jeffallan/claude-skills/main/skills/prompt-engineer/SKILL.md")
+    print("Loading skills for DDD alignment...")
+    grill_me_skill = fetch_skill("grill-me", "https://raw.githubusercontent.com/mattpocock/skills/main/skills/productivity/grill-me/SKILL.md")
+    grill_with_docs_skill = fetch_skill("grill-with-docs", "https://raw.githubusercontent.com/mattpocock/skills/main/skills/engineering/grill-with-docs/SKILL.md")
+    agentic_eval_skill = fetch_skill("agentic-eval", "https://raw.githubusercontent.com/github/awesome-copilot/main/skills/agentic-eval/SKILL.md")
+    prompt_engineer_skill = fetch_skill("prompt-engineer", "https://raw.githubusercontent.com/Jeffallan/claude-skills/main/skills/prompt-engineer/SKILL.md")
 
     prompt = (
         "You are a strict Domain-Driven Design architect. Analyze the following project context (sourced from indxr MCP) and execute the provided skills.\n\n"
@@ -209,6 +241,7 @@ def discover_ddd_context(context_str: str, llm_provider: str, api_key: str, mode
         f"PROJECT CONTEXT:\n{context_str}"
     )    
     response_text = query_llm(prompt, llm_provider, api_key, model)
+
     
     try:
         cleaned = response_text.replace("```json", "").replace("```", "").strip()
@@ -266,73 +299,122 @@ def discover_custom_agent(name: str, specs: str, context_str: str, ddd_context: 
         print(f"Error generating custom agent: {e}")
         return {"name": name, "role": specs, "zone": "Core", "system_prompt": f"# {name}\n\n{specs}"}
 
-def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query_llm_fn=None, llm_provider=None, api_key=None, context_str=""):
-    """Generates the ONBOARDING_DOMAIN.md template, now including Tool Scout recommendations."""
+def detect_tech_stack(project_path: str) -> str:
+    """Fallback heuristic detection if LLM is unavailable."""
+    stacks = []
+    if os.path.exists(os.path.join(project_path, "package.json")):
+        stacks.append("Node.js/JavaScript")
+    if os.path.exists(os.path.join(project_path, "Cargo.toml")):
+        stacks.append("Rust")
+    if os.path.exists(os.path.join(project_path, "requirements.txt")) or os.path.exists(os.path.join(project_path, "pyproject.toml")):
+        stacks.append("Python")
+    if os.path.exists(os.path.join(project_path, "go.mod")):
+        stacks.append("Go")
+    
+    return ", ".join(stacks) if stacks else "Unknown Stack"
+
+def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query_llm_fn=None, llm_provider=None, api_key=None, context_str="", boilerplate_dir: str = None):
+    """Generates the ONBOARDING_DOMAIN.md template using LLM profiling and verified tools."""
     doc_path = os.path.join(project_path, "ONBOARDING_DOMAIN.md")
     
-    # Simple heuristic to extract a name from the summary if possible, otherwise generic
-    # In a real scenario, the LLM response parsing would be more robust.
-    domain_name = "Domain"
-    if "Identified Domain:" in domain_summary:
-        domain_name = domain_summary.split("Identified Domain:")[1].strip().split()[0]
-        # Remove punctuation
-        import re
-        domain_name = re.sub(r'[^\w\s]', '', domain_name)
-
-    # Tool Scout LLM Call
-    skills_md = "- [ ] No skills recommended"
-    mcps_md = "- [ ] No MCPs recommended"
+    # 1. Detect Tech Stack
+    tech_stack = detect_tech_stack(project_path)
     
+    # 2. Load Tools Registry
+    tools_registry = {}
+    if boilerplate_dir:
+        registry_path = os.path.join(boilerplate_dir, "onboarding", "tools.json")
+        if os.path.exists(registry_path):
+            try:
+                import json
+                with open(registry_path, "r") as f:
+                    tools_registry = json.load(f)
+            except Exception as e:
+                print(f"Warning: Could not load tools registry: {e}")
+
+    # 3. Profile SME via LLM
+    sme_name = "domain-sme"
+    invariants = "1. [USER INPUT REQUIRED: Add your own unbreakable rule here]\n"
+    glossary = "*   **[Term 1]**: [USER INPUT REQUIRED: Define this term]\n"
+    recommended_skills = []
+    recommended_mcps = []
+
     if query_llm_fn and llm_provider and api_key:
         prompt = f"""
-        You are the 'Tool Scout'. Based on the following project context, recommend up to 3 specific Agent Skills (URLs to raw Markdown files) and up to 2 MCP servers (ephemeral npx or uvx commands).
+        You are an Architect and Domain Modeler. Based on the following project context, you must define a 'Domain SME' agent to protect the core logic.
+        
+        Project Context:
+        {context_str[:4000]}
+        
+        Available Verified Tools:
+        {json.dumps(tools_registry)}
+        
+        Task:
+        1. Propose a specific name for the Domain SME (e.g., 'billing-guardian', 'auth-sme').
+        2. Propose 3-5 strict Domain Invariants (absolute rules it must enforce).
+        3. Define 3-5 terms for the Ubiquitous Language.
+        4. Select up to 3 relevant skills from the 'Available Verified Tools'. Return EXACTLY the JSON object for the tool.
+        5. Select up to 2 relevant MCPs from the 'Available Verified Tools'. Return EXACTLY the JSON object for the tool.
         
         Return ONLY valid JSON in this format:
-        {{"skills": [{{"name": "skill-name", "url": "https://..."}}], "mcps": [{{"name": "mcp-name", "command": "npx -y ..."}}]}}
-        
-        Context:
-        {context_str[:2000]}
+        {{
+            "sme_name": "...",
+            "invariants": ["...", "..."],
+            "glossary": {{"term": "definition"}},
+            "skills": [{{"name": "...", "url": "..."}}],
+            "mcps": [{{"name": "...", "command": "...", "type": "mcp"}}]
+        }}
         """
         try:
             res = query_llm_fn(prompt, llm_provider, api_key)
+            import json
             cleaned = res.replace("```json", "").replace("```", "").strip()
+            start_idx = cleaned.find("{")
+            end_idx = cleaned.rfind("}") + 1
+            if start_idx != -1 and end_idx != 0:
+                cleaned = cleaned[start_idx:end_idx]
             data = json.loads(cleaned)
             
-            if data.get("skills"):
-                skills_md = "\n".join([f"- [x] {s['name']} ({s['url']})" for s in data["skills"]])
-            if data.get("mcps"):
-                mcps_md = "\n".join([f"- [x] {m['name']} ({m['command']})" for m in data["mcps"]])
+            if data.get("sme_name"): sme_name = data["sme_name"]
+            if data.get("invariants"):
+                invariants = "\n".join([f"{i+1}. {inv}" for i, inv in enumerate(data["invariants"])])
+            if data.get("glossary"):
+                glossary = "\n".join([f"*   **{k}**: {v}" for k, v in data["glossary"].items()])
+            if data.get("skills"): recommended_skills = data["skills"]
+            if data.get("mcps"): recommended_mcps = data["mcps"]
         except Exception as e:
-            print(f"Warning: Tool scout failed: {e}")
+            print(f"Warning: SME Profiling failed: {e}")
 
-    template = f"""# Project Onboarding Domain
+    # 4. Format Tools
+    skills_md = "- [ ] No skills recommended"
+    if recommended_skills:
+        skills_md = "\n".join([f"- [x] {s['name']} ({s['url']})" for s in recommended_skills])
+        
+    mcps_md = "- [ ] No MCPs recommended"
+    if recommended_mcps:
+        mcps_md = "\n".join([f"- [x] {m['name']} ({m.get('command', '')})" for m in recommended_mcps])
 
-Based on the codebase scan, I have identified **{domain_summary}** as a core complex domain. I propose creating a dedicated agent to protect this logic.
+    # 5. Populate Template
+    template_str = ""
+    if boilerplate_dir:
+        template_path = os.path.join(boilerplate_dir, "onboarding", "ONBOARDING_DOMAIN.md.template")
+        if os.path.exists(template_path):
+            with open(template_path, "r") as f:
+                 template_str = f.read()
+    
+    # Fallback if template missing
+    if not template_str:
+         template_str = "# Project Onboarding Domain\n\n**Detected Tech Stack:** {{TECH_STACK}}\n\nBased on the codebase scan, I have identified **{{DOMAIN_SUMMARY}}** as a core complex domain. I propose creating a dedicated agent to protect this logic.\n\n## Proposed Domain SME Agent\n\n**Proposed Agent Name:** `@{{SME_NAME}}`\n*(Edit the name above if incorrect. Must be lowercase.)*\n\n**Domain Invariants (The absolute rules this agent must enforce):**\n{{INVARIANTS}}\n\n**Ubiquitous Language (Key terms to define):**\n{{GLOSSARY}}\n\n## Proposed Skills\n*(Delete the line of any skill you do NOT want installed)*\n{{SKILLS_MD}}\n\n## Proposed MCP Tools\n*(Delete the line of any MCP you do NOT want installed)*\n{{MCPS_MD}}\n\n*(When you have finished editing this file, return to the terminal and press ENTER to continue minting)*\n"
 
-## Proposed Domain SME Agent
+    final_content = template_str.replace("{{TECH_STACK}}", tech_stack)
+    final_content = final_content.replace("{{DOMAIN_SUMMARY}}", domain_summary)
+    final_content = final_content.replace("{{SME_NAME}}", sme_name.lower())
+    final_content = final_content.replace("{{INVARIANTS}}", invariants)
+    final_content = final_content.replace("{{GLOSSARY}}", glossary)
+    final_content = final_content.replace("{{SKILLS_MD}}", skills_md)
+    final_content = final_content.replace("{{MCPS_MD}}", mcps_md)
 
-**Proposed Agent Name:** `@{(domain_name + '-sme').lower()}`
-*(Edit the name above if incorrect. Must be lowercase.)*
-
-**Domain Invariants (The absolute rules this agent must enforce):**
-1. [Generated by LLM: e.g., "All transactions require a user_id"]
-2. [USER INPUT REQUIRED: Add your own unbreakable rule here]
-
-**Ubiquitous Language (Key terms to define):**
-*   **[Term 1]**: [LLM guessed definition]
-*   **[Term 2]**: [USER INPUT REQUIRED: Define this term]
-
-## Proposed Skills
-*(Delete the line of any skill you do NOT want installed)*
-{skills_md}
-
-## Proposed MCP Tools
-*(Delete the line of any MCP you do NOT want installed)*
-{mcps_md}
-
-*(When you have finished editing this file, return to the terminal and press ENTER to continue minting)*
-"""
     with open(doc_path, "w") as f:
-        f.write(template)
+        f.write(final_content)
     print(f"\n[HARNESS] Generated ONBOARDING_DOMAIN.md at {doc_path}")
 
