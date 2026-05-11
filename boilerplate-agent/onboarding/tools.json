@@ -1,0 +1,38 @@
+{
+  "categories": {
+    "frontend": [
+      {
+        "name": "nextjs",
+        "url": "https://raw.githubusercontent.com/PatrickJS/awesome-cline-prompts/main/prompts/nextjs.md",
+        "keywords": ["react", "nextjs", "next.js", "frontend"]
+      },
+      {
+         "name": "playwright",
+         "command": "npx -y @modelcontextprotocol/server-playwright",
+         "type": "mcp",
+         "keywords": ["react", "nextjs", "frontend", "vue", "svelte"]
+      }
+    ],
+    "backend": [
+      {
+        "name": "fastapi",
+        "url": "https://raw.githubusercontent.com/PatrickJS/awesome-cline-prompts/main/prompts/fastapi.md",
+        "keywords": ["fastapi", "python backend"]
+      },
+      {
+        "name": "fetch",
+        "command": "npx -y @modelcontextprotocol/server-fetch",
+        "type": "mcp",
+        "keywords": ["api", "rest", "graphql"]
+      }
+    ],
+    "database": [
+      {
+        "name": "postgres",
+        "command": "npx -y @modelcontextprotocol/server-postgres postgresql://postgres:postgres@localhost:5432/postgres",
+        "type": "mcp",
+        "keywords": ["postgresql", "postgres", "sql"]
+      }
+    ]
+  }
+}
