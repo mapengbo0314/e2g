@@ -444,8 +444,14 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query
             if data.get("domain_events"):
                 domain_events = "\n".join([f"*   **{e}**" for e in data["domain_events"]])
                 
-            if data.get("skills"): recommended_skills = data["skills"]
-            if data.get("mcps"): recommended_mcps = data["mcps"]
+            if data.get("skills"): 
+                for skill in data["skills"]:
+                    if not any(s["name"] == skill["name"] for s in recommended_skills):
+                        recommended_skills.append(skill)
+            if data.get("mcps"): 
+                for mcp in data["mcps"]:
+                    if not any(m["name"] == mcp["name"] for m in recommended_mcps):
+                        recommended_mcps.append(mcp)
         except Exception as e:
             print(f"Warning: SME Profiling failed: {e}")
             core_domain_value = "[USER INPUT REQUIRED]"

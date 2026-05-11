@@ -154,3 +154,53 @@ def test_generate_onboarding_domain_doc_with_tools(mock_query_llm, tmp_path):
         assert "- [x] pytest (http://test)" in content
         assert "## Proposed MCP Tools" in content
         assert "- [x] sql (npx -y sql-mcp)" in content
+
+@mock.patch('harness.discovery_engine.query_llm')
+def test_generate_onboarding_domain_doc_forced_injection(mock_query_llm, tmp_path):
+    project_path = str(tmp_path)
+    
+    # Create a package.json to trigger 'Frontend' tech stack detection
+    with open(os.path.join(project_path, "package.json"), "w") as f:
+        f.write("{}")
+
+    # Create a dummy boilerplate_dir with tools.json that forces playwright
+    boilerplate_dir = os.path.join(project_path, "boilerplate")
+    os.makedirs(os.path.join(boilerplate_dir, "onboarding"))
+    with open(os.path.join(boilerplate_dir, "onboarding", "tools.json"), "w") as f:
+        json_data = {
+            "categories": {
+                "testing": [
+                    {
+                        "name": "playwright",
+                        "command": "npx -y @playwright/mcp-server",
+                        "type": "mcp",
+                        "force_if_keywords": ["frontend"]
+                    }
+                ]
+            }
+        }
+        import json
+        json.dump(json_data, f)
+        
+    mock_llm_response = "Identified Domain: Financial Ledger"
+    
+    # Mock the tool scout response to NOT include playwright
+    mock_query_llm.return_value = '{"skills": [], "mcps": [{"name": "sql", "command": "npx -y sql-mcp", "type": "mcp"}]}'
+    
+    generate_onboarding_domain_doc(
+        project_path, 
+        mock_llm_response, 
+        query_llm_fn=mock_query_llm, 
+        llm_provider="provider", 
+        api_key="key", 
+        context_str="some context",
+        boilerplate_dir=boilerplate_dir
+    )
+    
+    doc_path = os.path.join(project_path, "ONBOARDING_DOMAIN.md")
+    assert os.path.exists(doc_path)
+    
+    with open(doc_path, 'r') as f:
+        content = f.read()
+        assert "- [x] playwright" in content
+        assert "- [x] sql" in content
