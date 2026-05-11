@@ -10,6 +10,14 @@
          "name": "playwright",
          "command": "npx -y @modelcontextprotocol/server-playwright",
          "type": "mcp",
+         "force_if_keywords": ["frontend"],
+         "keywords": ["react", "nextjs", "frontend", "vue", "svelte"]
+      },
+      {
+         "name": "playwright-interactive",
+         "url": "https://github.com/openai/skills/blob/main/skills/.curated/playwright-interactive/SKILL.md",
+         "type": "skill",
+         "force_if_keywords": ["frontend"],
          "keywords": ["react", "nextjs", "frontend", "vue", "svelte"]
       }
     ],
