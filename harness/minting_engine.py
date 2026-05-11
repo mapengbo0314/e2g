@@ -17,9 +17,9 @@ def parse_tool_checklists(domain_content: str) -> tuple[list[dict], list[dict]]:
     skills_match = re.search(r'## Proposed Skills\n.*?(?=##|$)', domain_content, re.DOTALL)
     if skills_match:
         for line in skills_match.group(0).split('\n'):
-            if line.strip().startswith('- [x]'):
+            if line.strip().lower().startswith('- [x]'):
                 # match: - [x] name (url)
-                m = re.match(r'- \[x\]\s+([^\(]+)\s*\((.*?)\)', line.strip())
+                m = re.match(r'- \[[xX]\]\s+([^\(]+?)\s*\((.*?)\)', line.strip())
                 if m:
                     skills.append({"name": m.group(1).strip(), "url": m.group(2).strip()})
                     
@@ -27,15 +27,15 @@ def parse_tool_checklists(domain_content: str) -> tuple[list[dict], list[dict]]:
     mcps_match = re.search(r'## Proposed MCP Tools\n.*?(?=##|$)', domain_content, re.DOTALL)
     if mcps_match:
         for line in mcps_match.group(0).split('\n'):
-            if line.strip().startswith('- [x]'):
-                 m = re.match(r'- \[x\]\s+([^\(]+)\s*\((.*?)\)', line.strip())
+            if line.strip().lower().startswith('- [x]'):
+                 m = re.match(r'- \[[xX]\]\s+([^\(]+?)\s*\((.*?)\)', line.strip())
                  if m:
                      mcps.append({"name": m.group(1).strip(), "command": m.group(2).strip()})
                      
     return skills, mcps
 
 def wait_for_user_review_and_read_domain(project_path: str) -> str:
-    """Pauses execution waiting for the user, then reads the domain doc."""
+    """Pauses execution waiting for the user, then reads the domain doc with validation."""
     doc_path = os.path.join(project_path, "ONBOARDING_DOMAIN.md")
     
     if not os.path.exists(doc_path):
@@ -47,14 +47,23 @@ def wait_for_user_review_and_read_domain(project_path: str) -> str:
     print("Fill in the domain invariants and ubiquitous language.")
     print(f"{'='*60}\n")
     
-    input("Press ENTER when you have saved your changes to ONBOARDING_DOMAIN.md...")
-    
-    try:
-        with open(doc_path, 'r') as f:
-            return f.read()
-    except Exception as e:
-        print(f"Error reading {doc_path}: {e}")
-        return ""
+    while True:
+        input("Press ENTER when you have saved your changes to ONBOARDING_DOMAIN.md...")
+        
+        try:
+            with open(doc_path, 'r') as f:
+                content = f.read()
+                if "[USER INPUT REQUIRED]" in content:
+                    print("\033[91mWARNING: You still have '[USER INPUT REQUIRED]' placeholders in your document.\033[0m")
+                    choice = input("Are you sure you want to proceed? (y/N): ").strip().lower()
+                    if choice in ['y', 'yes']:
+                        return content
+                    else:
+                        continue
+                return content
+        except Exception as e:
+            print(f"Error reading {doc_path}: {e}")
+            return ""
 
 def process_includes(content: str, current_file_path: str, target_root: Path, tool_replacements: dict, target_dir_name: str, visited: set = None) -> str:
     """Recursively resolves @path includes at the start of lines, applying placeholders."""
@@ -121,7 +130,7 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
         shutil.copytree(boilerplate_dir, target_path, ignore=ignore_patterns, dirs_exist_ok=True)
         
         # Tool mapping for specific platforms
-        platform_map_normalized = {"1": "gemini", "2": "claude", "3": "cursor", "4": "agents"}
+        platform_map_normalized = {"1": "gemini", "2": "claude", "3": "cursor", "4": "agents", "5": "codex"}
         current_platform = platform_map_normalized.get(platform_choice, platform_choice).lower()
         
         tool_replacements = {}
@@ -133,7 +142,17 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
                 "- write_file": "- Write",
                 "- run_shell_command": "- Bash",
                 "- glob": "- Glob",
+                "read_file": "Read",
+                "grep_search": "Grep",
+                "replace": "Edit",
+                "write_file": "Write",
+                "run_shell_command": "Bash",
+                "glob": "Glob",
                 "{{SUBAGENT_SYNTAX}}": "Task tool: "
+            }
+        elif current_platform == "codex":
+            tool_replacements = {
+                "{{SUBAGENT_SYNTAX}}": "Hand off to "
             }
         else:
             tool_replacements = {
@@ -248,11 +267,15 @@ def mint_workspace(target_dir: str, selected_agents: list[dict], project_path: s
         "1": "gemini",
         "2": "claude",
         "3": "cursor",
-        "4": "agents"
+        "4": "agents",
+        "5": "codex"
     }
     active_platform = platform_map.get(platform_choice, platform_choice).lower()
 
-    escaped_project_path = os.path.abspath(project_path).replace("'", "'\\''")
+    import shlex
+    escaped_project_path = os.path.abspath(project_path)
+    # Note: We still need to be careful with double quotes in the f-string
+    quoted_project_path = shlex.quote(escaped_project_path)
     indxr_abs_path = shutil.which("indxr") or "~/.cargo/bin/indxr"
     
     key_check_snippet = """
@@ -276,7 +299,7 @@ if command -v gemini &> /dev/null; then
     
     echo "Adding indxr to Gemini CLI project MCP configuration..."
     indxr_serve_args_str="serve --watch --wiki-auto-update --all-tools"
-    gemini mcp add indxr bash -c "cd '{escaped_project_path}' && {indxr_abs_path} $indxr_serve_args_str" -e GEMINI_API_KEY=\\$GEMINI_API_KEY -e ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY -e OPENAI_API_KEY=\\$OPENAI_API_KEY || true
+    gemini mcp add indxr bash -c "cd {quoted_project_path} && {indxr_abs_path} $indxr_serve_args_str" -e GEMINI_API_KEY=\\$GEMINI_API_KEY -e ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY -e OPENAI_API_KEY=\\$OPENAI_API_KEY || true
 else
     echo "Warning: gemini command not found."
 fi
@@ -295,7 +318,7 @@ echo "  /plugin install skills@mattpocock"
 if command -v claude &> /dev/null; then
     echo "Adding indxr to Claude Code project MCP configuration..."
     indxr_serve_args_str="serve --watch --wiki-auto-update --all-tools"
-    claude mcp add --scope project indxr --env GEMINI_API_KEY=\\$GEMINI_API_KEY --env ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY --env OPENAI_API_KEY=\\$OPENAI_API_KEY -- bash -c "cd '{escaped_project_path}' && {indxr_abs_path} $indxr_serve_args_str" || true
+    claude mcp add --scope project indxr --env GEMINI_API_KEY=\\$GEMINI_API_KEY --env ANTHROPIC_API_KEY=\\$ANTHROPIC_API_KEY --env OPENAI_API_KEY=\\$OPENAI_API_KEY -- bash -c "cd {quoted_project_path} && {indxr_abs_path} $indxr_serve_args_str" || true
 fi
 """,
         "cursor": f"""#!/usr/bin/env bash
@@ -305,6 +328,12 @@ echo "=== Setting up Superpowers for Cursor ==="
 echo "To install Superpowers and Skills for Cursor, run these commands inside the Cursor Agent chat:"
 echo "  /add-plugin superpowers"
 echo "  /add-plugin mattpocock/skills"
+""",
+        "codex": f"""#!/usr/bin/env bash
+set -e
+{key_check_snippet}
+echo "=== Setting up Superpowers for Codex ==="
+echo "Please add indxr MCP to your Codex configuration."
 """
     }
 
@@ -320,7 +349,7 @@ echo "  /add-plugin mattpocock/skills"
         os.chmod(script_path, 0o755)
     
     # Generate Platform Rules Pointers IN THE ROOT DIRECTORY
-    harness_prefix = f".{active_platform}" if active_platform in ["gemini", "claude", "cursor"] else target_dir_name
+    harness_prefix = f".{active_platform}" if active_platform in ["gemini", "claude", "cursor", "codex"] else target_dir_name
     pointer_content = f"""# Agentic Harness
     
 Please read `{harness_prefix}/AGENTS.md` for core repository instructions and routing rules.
@@ -332,6 +361,7 @@ The Orchestrator agent and core rules are located in `{harness_prefix}/orchestra
         "gemini": ["GEMINI.md"],
         "claude": ["CLAUDE.md"],
         "cursor": [".cursorrules"],
+        "codex": ["CODEX.md"],
         "agents": []
     }
     
@@ -386,38 +416,95 @@ The Orchestrator agent and core rules are located in `{harness_prefix}/orchestra
         return re.sub(r'-+', '-', s3).strip('-')
 
     # Generate Specialized Agents
-    for agent in selected_agents:
-        safe_name = to_slug(agent["name"])
+    if active_platform == "codex":
+        agents_md_content = "# Codex Agents Manifest\n\n"
+        for agent in selected_agents:
+            safe_name = to_slug(agent["name"])
+            
+            zone = agent.get("zone", "Core").lower()
+            if zone in ["infra", "logic"]:
+                sandbox_mode = "workspace-write"
+            else:
+                sandbox_mode = "read-only"
+                
+            model_val = model_choice if model_choice else "claude-3-5-sonnet-20241022"
+            
+            yaml_block = f"```yaml\ndescription: \"{agent['role']}\"\nmodel: \"{model_val}\"\nsandbox_mode: \"{sandbox_mode}\"\nmcp_servers: [\"indxr\"]\n```"
+            
+            system_prompt = agent.get("system_prompt", f"# {agent['name']}\n\n{agent['role']}")
+            
+            # Append DDD logic
+            ddd_section = ""
+            if ddd_context:
+                ddd_section = f"""
+## Domain-Driven Design (DDD) Context
+This project uses Domain-Driven Design principles.
+At the beginning of any new session or task involving domain logic, you MUST use the `read_file` tool to load `{target_path.name}/ddd/context.md`.
+
+You MUST refer to the following DDD documentation:
+- `context.md`: Defines the core domain terms and their meanings.
+- `translation_map.json`: Maps domain concepts to implementation details.
+
+Ensure your implementation aligns with these definitions.
+"""
+            
+            agents_md_content += f"## {safe_name}\n{yaml_block}\n\n{system_prompt}\n{ddd_section}\n\n"
+            
+        agents_file_path = target_path / "AGENTS.md"
         
-        agent_dir_path = target_path / "agents"
-        agent_dir_path.mkdir(parents=True, exist_ok=True)
-        agent_file_path = agent_dir_path / f"{safe_name}.md" 
+        # Apply placeholders and includes
+        agents_md_content = agents_md_content.replace("{{HARNESS_DIR}}", target_dir_name)
+        agents_md_content = process_includes(agents_md_content, str(agents_file_path), target_path, tool_replacements, target_dir_name)
         
-        # Select base tools based on platform
-        if active_platform == "claude":
-            tools_list = """  - Read
+        with open(agents_file_path, 'w') as f:
+            f.write(agents_md_content)
+    else:
+        for agent in selected_agents:
+            safe_name = to_slug(agent["name"])
+            
+            agent_dir_path = target_path / "agents"
+            agent_dir_path.mkdir(parents=True, exist_ok=True)
+            agent_file_path = agent_dir_path / f"{safe_name}.md" 
+            
+            # Select base tools based on platform
+            if active_platform == "claude":
+                tools_list = """  - Read
   - Grep
   - Edit
-  - Bash"""
-        else:
-            tools_list = """  - read_file
+  - Bash
+  - Glob
+  - mcp_indxr_find
+  - mcp_indxr_summarize
+  - mcp_indxr_explain_symbol
+  - mcp_indxr_get_public_api
+  - mcp_indxr_get_file_summary
+  - mcp_indxr_read_source"""
+            else:
+                tools_list = """  - read_file
   - grep_search
   - replace
-  - run_shell_command"""
-        
-        frontmatter = f"""---
+  - run_shell_command
+  - glob
+  - mcp_indxr_find
+  - mcp_indxr_summarize
+  - mcp_indxr_explain_symbol
+  - mcp_indxr_get_public_api
+  - mcp_indxr_get_file_summary
+  - mcp_indxr_read_source"""
+            
+            frontmatter = f"""---
 name: {safe_name}
 description: {agent["role"]}
 tools:
 {tools_list}
 ---
 """
-        system_prompt = agent.get("system_prompt", f"# {agent['name']}\n\n{agent['role']}")
-        
-        # Append DDD logic
-        ddd_section = ""
-        if ddd_context:
-            ddd_section = f"""
+            system_prompt = agent.get("system_prompt", f"# {agent['name']}\n\n{agent['role']}")
+            
+            # Append DDD logic
+            ddd_section = ""
+            if ddd_context:
+                ddd_section = f"""
 ## Domain-Driven Design (DDD) Context
 This project uses Domain-Driven Design principles.
 At the beginning of any new session or task involving domain logic, you MUST use the `read_file` tool to load `{target_path.name}/ddd/context.md`.
@@ -429,22 +516,22 @@ You MUST refer to the following DDD documentation:
 Ensure your implementation aligns with these definitions.
 """
 
-        # Determine the correct include syntax based on platform
-        include_pointer = ""
-        if active_platform in ["gemini", "claude"]:
-            include_pointer = "@../rules/core_mandates.md\n\n"
-        else:
-            # Fallback for cursor/agents where include syntax might not be natively supported
-            include_pointer = "<!-- Core Mandates should be read from ../rules/core_mandates.md -->\n\n"
+            # Determine the correct include syntax based on platform
+            include_pointer = ""
+            if active_platform in ["gemini", "claude"]:
+                include_pointer = "@../rules/core_mandates.md\n\n"
+            else:
+                # Fallback for cursor/agents where include syntax might not be natively supported
+                include_pointer = "<!-- Core Mandates should be read from ../rules/core_mandates.md -->\n\n"
 
-        final_content = frontmatter + include_pointer + system_prompt + "\n" + ddd_section
-        
-        # Final post-processing for placeholders and includes
-        final_content = final_content.replace("{{HARNESS_DIR}}", target_dir_name)
-        final_content = process_includes(final_content, str(agent_file_path), target_path, tool_replacements, target_dir_name)
-        
-        with open(agent_file_path, 'w') as f:
-            f.write(final_content)
+            final_content = frontmatter + include_pointer + system_prompt + "\n" + ddd_section
+            
+            # Final post-processing for placeholders and includes
+            final_content = final_content.replace("{{HARNESS_DIR}}", target_dir_name)
+            final_content = process_includes(final_content, str(agent_file_path), target_path, tool_replacements, target_dir_name)
+            
+            with open(agent_file_path, 'w') as f:
+                f.write(final_content)
             
     print(f"Successfully minted workspace at {target_dir}")
     print("\nNext Steps:")
@@ -452,8 +539,8 @@ Ensure your implementation aligns with these definitions.
     print("2. ./scripts/setup_harness.sh (Install prerequisites)")
     print("3. Activate your environment and Launch AI")
 
-def synthesize_domain_sme_agent(target_dir: str, domain_content: str, query_llm_fn, llm_provider: str, api_key: str):
-    """Uses the LLM to synthesize the domain SME agent based on the filled doc."""
+def synthesize_domain_sme_agent(target_dir: str, domain_content: str, harness_folder_name: str):
+    """Generates the domain SME agent deterministically based on the filled doc."""
     if not domain_content:
         return None
 
@@ -462,60 +549,69 @@ def synthesize_domain_sme_agent(target_dir: str, domain_content: str, query_llm_
     name_match = re.search(r'Proposed Agent Name:\s*`?@([a-zA-Z0-9_-]+)`?', domain_content)
     if name_match:
         agent_name = name_match.group(1).lower()
-
-    prompt = f"""
-    You are an expert systems architect. Based on the following ONBOARDING_DOMAIN.md content, 
-    generate a strict Markdown file defining a specialized Domain SME agent.
-    
-    The agent name MUST be: {agent_name}
-    
-    The file MUST follow this exact format:
-    ---
-    name: {agent_name}
-    description: Subject Matter Expert and Guardian. Consult this agent before modifying core logic.
-    type: architect_variant
-    ---
-    # Role: Domain Subject Matter Expert
-    You are the definitive authority on the business logic, ubiquitous language, and architectural constraints.
-    
-    # Core Mandates
-    1. **Security & System Integrity:** Never log, print, or commit secrets.
-    2. **Context Efficiency:** Your context window is isolated.
-    3. **No Chitchat:** Focus exclusively on intent and technical rationale.
-    
-    # Domain-Specific Invariants (The MOAT)
-    <invariants>
-    [Extract the invariants from the provided content]
-    </invariants>
-    
-    # Ubiquitous Language (Glossary)
-    <glossary>
-    [Extract the glossary from the provided content]
-    </glossary>
-    
-    # Operational Instructions
-    1. **Audit:** Review proposed plans against your <invariants>. 
-    2. **Correct:** Identify any misuse of terms.
-    3. **Reject:** Reject plans that violate domain rules. Provide architectural corrections, NOT implementation code.
-    
-    DO NOT output markdown code blocks (```markdown). Output the raw file content.
-    
-    CONTENT:
-    {domain_content}
-    """
-    
-    try:
-        agent_markdown = query_llm_fn(prompt, llm_provider, api_key)
         
-        # Clean up if LLM wrapped in code block
-        if agent_markdown.startswith("```markdown"):
-            agent_markdown = agent_markdown[len("```markdown"):].strip()
-        if agent_markdown.startswith("```"):
-            agent_markdown = agent_markdown[3:].strip()
-        if agent_markdown.endswith("```"):
-            agent_markdown = agent_markdown[:-3].strip()
+    # Extract sections using split
+    invariants = "None provided."
+    glossary = "None provided."
+    
+    # Robust split-based extraction
+    try:
+        if "Domain Invariants" in domain_content:
+            parts = domain_content.split("Domain Invariants")
+            after_invariants = parts[1]
+            # Handle potential instruction text in parentheses or bold colons
+            after_invariants = re.sub(r'\(.*?\)', '', after_invariants)
+            after_invariants = after_invariants.replace("**:**", "").replace(":", "").strip()
             
-        agents_dir = os.path.join(target_dir, ".gemini", "agents")
+            if "Ubiquitous Language" in after_invariants:
+                inv_parts = after_invariants.split("Ubiquitous Language")
+                invariants = inv_parts[0].strip()
+                
+                after_glossary = inv_parts[1]
+                after_glossary = re.sub(r'\(.*?\)', '', after_glossary)
+                after_glossary = after_glossary.replace("**:**", "").replace(":", "").strip()
+                
+                if "## Proposed Skills" in after_glossary:
+                    glo_parts = after_glossary.split("## Proposed Skills")
+                    glossary = glo_parts[0].strip()
+                else:
+                    glossary = after_glossary.strip()
+            else:
+                invariants = after_invariants.strip()
+    except Exception as e:
+        print(f"Warning: Failed to parse domain doc sections: {e}")
+
+    agent_markdown = f"""---
+name: {agent_name}
+description: Subject Matter Expert and Guardian. Consult this agent before modifying core logic.
+type: architect_variant
+---
+# Role: Domain Subject Matter Expert
+You are the definitive authority on the business logic, ubiquitous language, and architectural constraints.
+
+# Core Mandates
+1. **Security & System Integrity:** Never log, print, or commit secrets.
+2. **Context Efficiency:** Your context window is isolated.
+3. **No Chitchat:** Focus exclusively on intent and technical rationale.
+
+# Domain-Specific Invariants (The MOAT)
+<invariants>
+{invariants}
+</invariants>
+
+# Ubiquitous Language (Glossary)
+<glossary>
+{glossary}
+</glossary>
+
+# Operational Instructions
+1. **Audit:** Review proposed plans against your <invariants>. 
+2. **Correct:** Identify any misuse of terms.
+3. **Reject:** Reject plans that violate domain rules. Provide architectural corrections, NOT implementation code.
+"""
+
+    try:
+        agents_dir = os.path.join(target_dir, harness_folder_name, "agents")
         os.makedirs(agents_dir, exist_ok=True)
         
         file_path = os.path.join(agents_dir, f"{agent_name}.md")
@@ -529,31 +625,36 @@ def synthesize_domain_sme_agent(target_dir: str, domain_content: str, query_llm_
         print(f"Error synthesizing domain agent: {e}")
         return None
 
-def patch_orchestrator_rules(target_dir: str, agent_name: str):
+def patch_orchestrator_rules(target_dir: str, agent_name: str, harness_folder_name: str, target_syntax: str = "@"):
     """Injects the new Domain SME into the Orchestrator's dispatch rules."""
     if not agent_name:
         return
-        
-    rules_path = os.path.join(target_dir, ".gemini", "rules", "dispatch_rules.md")
+
+    rules_path = os.path.join(target_dir, harness_folder_name, "rules", "dispatch_rules.md")
     if not os.path.exists(rules_path):
          # If rules don't exist yet, try orchestrator.md directly
-         rules_path = os.path.join(target_dir, ".gemini", "orchestrator.md")
+         rules_path = os.path.join(target_dir, harness_folder_name, "orchestrator.md")
          if not os.path.exists(rules_path):
              print("Warning: Could not find rules to patch Domain SME.")
              return
-
     with open(rules_path, "r") as f:
         content = f.read()
         
     # Construct the patch
+    planner_ref = f"{target_syntax}planner"
+    sme_ref = f"{target_syntax}{agent_name}"
+    
     sme_rule = f"""
-- **Domain SME Gateway**: If a task touches core logic or invariants, you MUST first dispatch the `@{agent_name}` to generate a "Domain Constraints Brief" before allowing the `@planner` to create the implementation plan.
+- **Domain SME Gateway**: If a task touches core logic or invariants, you MUST first dispatch the `{sme_ref}` to generate a "Domain Constraints Brief" before allowing the `{planner_ref}` to create the implementation plan.
 """
     
     # Try to insert after the Hierarchy section or at the top of Tool Delegation
     if "</orchestration_hierarchy>" in content:
         parts = content.split("</orchestration_hierarchy>")
         new_content = parts[0] + "\n" + sme_rule + "\n</orchestration_hierarchy>" + parts[1]
+    elif "### DOMAIN DRIVEN DESIGN (DDD):" in content:
+        parts = content.split("### DOMAIN DRIVEN DESIGN (DDD):")
+        new_content = parts[0] + "### Domain SME Gateway\n" + sme_rule + "\n\n### DOMAIN DRIVEN DESIGN (DDD):" + parts[1]
     else:
         # Fallback append to bottom
         new_content = content + "\n\n### Domain SME Gateway\n" + sme_rule
@@ -561,7 +662,7 @@ def patch_orchestrator_rules(target_dir: str, agent_name: str):
     with open(rules_path, "w") as f:
         f.write(new_content)
         
-    print(f"[HARNESS] Patched Orchestrator rules with @{agent_name}")
+    print(f"[HARNESS] Patched Orchestrator rules with {sme_ref}")
 
 def install_workspace_tools(target_dir: str, harness_folder_name: str, skills: list[dict], mcps: list[dict]):
     """Downloads remote skills and configures MCPs locally for the workspace."""
@@ -612,12 +713,13 @@ def install_workspace_tools(target_dir: str, harness_folder_name: str, skills: l
                  
         for mcp in mcps:
             print(f"[HARNESS] Configuring MCP: {mcp['name']}...")
-            # Wrap ephemeral command in bash -c to ensure it executes correctly in the target env
-            mcp_data["mcpServers"][mcp['name']] = {
-                "command": "bash",
-                "args": ["-c", mcp['command']]
-            }
-            
-        with open(mcp_json_path, "w") as f:
-             json.dump(mcp_data, f, indent=2)
+            import shlex
+            parts = shlex.split(mcp['command'])
+            if parts:
+                mcp_data["mcpServers"][mcp['name']] = {
+                    "command": parts[0],
+                    "args": parts[1:]
+                }
+
+        with open(mcp_json_path, "w") as f:             json.dump(mcp_data, f, indent=2)
 
