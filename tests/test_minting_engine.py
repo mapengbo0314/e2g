@@ -17,21 +17,25 @@ def test_parse_tool_checklists():
 ## Proposed Skills
 - [x] pytest (http://pytest)
 - [ ] ignore_me (http://ignore)
-- [x] debug (http://debug)
+- [X] uppercase (http://uppercase)
+- [x]    spaced   (http://spaced)
 
 ## Proposed MCP Tools
 - [x] sql (npx -y sql)
 - [ ] bad (npx bad)
+- [X]  uppercase-mcp   (npx uppercase)
     """
 
     skills, mcps = parse_tool_checklists(content)
 
-    assert len(skills) == 2
+    assert len(skills) == 3
     assert skills[0] == {"name": "pytest", "url": "http://pytest"}
-    assert skills[1] == {"name": "debug", "url": "http://debug"}
+    assert skills[1] == {"name": "uppercase", "url": "http://uppercase"}
+    assert skills[2] == {"name": "spaced", "url": "http://spaced"}
 
-    assert len(mcps) == 1
+    assert len(mcps) == 2
     assert mcps[0] == {"name": "sql", "command": "npx -y sql"}
+    assert mcps[1] == {"name": "uppercase-mcp", "command": "npx uppercase"}
 
 def test_patch_orchestrator_rules(tmp_path):
     target_dir = str(tmp_path)
@@ -42,7 +46,7 @@ def test_patch_orchestrator_rules(tmp_path):
     with open(rules_path, "w") as f:
         f.write("# Rules\nSome generic rules.\n<orchestration_hierarchy>\nRules here\n</orchestration_hierarchy>")
         
-    patch_orchestrator_rules(target_dir, "test-sme")
+    patch_orchestrator_rules(target_dir, "test-sme", ".gemini")
     
     with open(rules_path, "r") as f:
         content = f.read()
@@ -105,22 +109,27 @@ def test_wait_for_user_review_and_read_domain(mock_input, tmp_path):
     assert mock_input.called
     assert content == "TEST CONTENT"
 
-@patch('harness.discovery_engine.query_llm') 
-def test_synthesize_domain_sme_agent(mock_query_llm, tmp_path):
+def test_synthesize_domain_sme_agent(tmp_path):
     target_dir = str(tmp_path)
-    domain_content = "Proposed Agent Name: @test-sme\nInvariants: None"
-    
-    # Mock LLM to return valid agent markdown
-    mock_query_llm.return_value = "---\nname: test-sme\ndescription: SME\n---\n# Role\nSME"
-    
+    # New format has newlines after headers
+    domain_content = """# Project Onboarding Domain
+**Domain Invariants (The absolute rules this agent must enforce):**
+Rule 1
+
+**Ubiquitous Language (Key terms to define):**
+Term 1
+"""
+
     from harness.minting_engine import synthesize_domain_sme_agent
-    
-    synthesize_domain_sme_agent(target_dir, domain_content, mock_query_llm, "provider", "key")
-    
-    agent_file = os.path.join(target_dir, ".gemini", "agents", "test-sme.md")
+    synthesize_domain_sme_agent(target_dir, domain_content, ".gemini")
+
+    agent_file = os.path.join(target_dir, ".gemini", "agents", "domain-sme.md")
     assert os.path.exists(agent_file)
     with open(agent_file, 'r') as f:
-        assert "name: test-sme" in f.read()
+        content = f.read()
+        assert "name: domain-sme" in content
+        assert "Rule 1" in content
+        assert "Term 1" in content
 
 @patch('urllib.request.urlopen')
 def test_install_workspace_tools(mock_urlopen, tmp_path):
@@ -158,5 +167,5 @@ def test_install_workspace_tools(mock_urlopen, tmp_path):
     with open(os.path.join(target_dir, ".gemini", "mcp.json"), "r") as f:
         m_data = json.load(f)
         assert "test-mcp" in m_data["mcpServers"]
-        assert m_data["mcpServers"]["test-mcp"]["command"] == "bash"
-        assert "npx mock" in m_data["mcpServers"]["test-mcp"]["args"][1]
+        assert m_data["mcpServers"]["test-mcp"]["command"] == "npx"
+        assert "mock" in m_data["mcpServers"]["test-mcp"]["args"]
