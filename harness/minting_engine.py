@@ -539,7 +539,7 @@ Ensure your implementation aligns with these definitions.
     print("2. ./scripts/setup_harness.sh (Install prerequisites)")
     print("3. Activate your environment and Launch AI")
 
-def synthesize_domain_sme_agent(target_dir: str, domain_content: str, harness_folder_name: str):
+def synthesize_domain_sme_agent(target_dir: str, domain_content: str, harness_folder_name: str, platform_choice: str = "1"):
     """Generates the domain SME agent deterministically based on the filled doc."""
     if not domain_content:
         return None
@@ -550,43 +550,33 @@ def synthesize_domain_sme_agent(target_dir: str, domain_content: str, harness_fo
     if name_match:
         agent_name = name_match.group(1).lower()
         
-    # Extract sections using split
+    # Extract sections using regex
     invariants = "None provided."
     glossary = "None provided."
     
-    # Robust split-based extraction
     try:
-        if "Domain Invariants" in domain_content:
-            parts = domain_content.split("Domain Invariants")
-            after_invariants = parts[1]
-            # Handle potential instruction text in parentheses or bold colons
-            after_invariants = re.sub(r'\(.*?\)', '', after_invariants)
-            after_invariants = after_invariants.replace("**:**", "").replace(":", "").strip()
+        # Domain Invariants
+        inv_pattern = re.compile(r'Domain Invariants.*?\n(.*?)(?=Ubiquitous Language|## Proposed Skills|## Proposed MCP Tools|$)', re.DOTALL | re.IGNORECASE)
+        inv_match = inv_pattern.search(domain_content)
+        if inv_match:
+            raw_inv = inv_match.group(1).strip()
+            # Clean up potential instruction text in parentheses or bold colons
+            raw_inv = re.sub(r'\(.*?\)', '', raw_inv)
+            invariants = raw_inv.replace("**:**", "").replace(":", "").strip()
+
+        # Ubiquitous Language
+        glo_pattern = re.compile(r'Ubiquitous Language.*?\n(.*?)(?=## Proposed Skills|## Proposed MCP Tools|$)', re.DOTALL | re.IGNORECASE)
+        glo_match = glo_pattern.search(domain_content)
+        if glo_match:
+            raw_glo = glo_match.group(1).strip()
+            # Clean up potential instruction text in parentheses or bold colons
+            raw_glo = re.sub(r'\(.*?\)', '', raw_glo)
+            glossary = raw_glo.replace("**:**", "").replace(":", "").strip()
             
-            if "Ubiquitous Language" in after_invariants:
-                inv_parts = after_invariants.split("Ubiquitous Language")
-                invariants = inv_parts[0].strip()
-                
-                after_glossary = inv_parts[1]
-                after_glossary = re.sub(r'\(.*?\)', '', after_glossary)
-                after_glossary = after_glossary.replace("**:**", "").replace(":", "").strip()
-                
-                if "## Proposed Skills" in after_glossary:
-                    glo_parts = after_glossary.split("## Proposed Skills")
-                    glossary = glo_parts[0].strip()
-                else:
-                    glossary = after_glossary.strip()
-            else:
-                invariants = after_invariants.strip()
     except Exception as e:
         print(f"Warning: Failed to parse domain doc sections: {e}")
 
-    agent_markdown = f"""---
-name: {agent_name}
-description: Subject Matter Expert and Guardian. Consult this agent before modifying core logic.
-type: architect_variant
----
-# Role: Domain Subject Matter Expert
+    agent_markdown = f"""# Role: Domain Subject Matter Expert
 You are the definitive authority on the business logic, ubiquitous language, and architectural constraints.
 
 # Core Mandates
@@ -610,20 +600,62 @@ You are the definitive authority on the business logic, ubiquitous language, and
 3. **Reject:** Reject plans that violate domain rules. Provide architectural corrections, NOT implementation code.
 """
 
-    try:
-        agents_dir = os.path.join(target_dir, harness_folder_name, "agents")
-        os.makedirs(agents_dir, exist_ok=True)
-        
-        file_path = os.path.join(agents_dir, f"{agent_name}.md")
-        with open(file_path, "w") as f:
-            f.write(agent_markdown.strip() + "\n")
+    if platform_choice == "5":
+        try:
+            agents_file_path = os.path.join(target_dir, harness_folder_name, "AGENTS.md")
+            if os.path.exists(agents_file_path):
+                with open(agents_file_path, "r") as f:
+                    existing_content = f.read()
+            else:
+                existing_content = "# Codex Agents Manifest\n\n"
             
-        print(f"[HARNESS] Synthesized {agent_name} at {file_path}")
-        return agent_name
-        
-    except Exception as e:
-        print(f"Error synthesizing domain agent: {e}")
-        return None
+            yaml_block = """```yaml
+description: "Subject Matter Expert and Guardian. Consult this agent before modifying core logic."
+model: "claude-3-5-sonnet-20241022"
+sandbox_mode: "read-only"
+mcp_servers: ["indxr"]
+```"""
+            
+            sme_section = f"""
+## {agent_name}
+{yaml_block}
+
+{agent_markdown}
+"""
+            new_content = existing_content.rstrip() + "\n\n" + sme_section.strip() + "\n"
+            # Apply placeholders as Codex AGENTS.md might need them (consistent with mint_workspace)
+            new_content = new_content.replace("{{HARNESS_DIR}}", harness_folder_name)
+            
+            with open(agents_file_path, "w") as f:
+                f.write(new_content)
+            
+            print(f"[HARNESS] Appended {agent_name} to {agents_file_path}")
+            return agent_name
+        except Exception as e:
+            print(f"Error appending to AGENTS.md for Codex: {e}")
+            return None
+    else:
+        full_agent_markdown = f"""---
+name: {agent_name}
+description: Subject Matter Expert and Guardian. Consult this agent before modifying core logic.
+type: architect_variant
+---
+{agent_markdown}
+"""
+        try:
+            agents_dir = os.path.join(target_dir, harness_folder_name, "agents")
+            os.makedirs(agents_dir, exist_ok=True)
+            
+            file_path = os.path.join(agents_dir, f"{agent_name}.md")
+            with open(file_path, "w") as f:
+                f.write(full_agent_markdown.strip() + "\n")
+                
+            print(f"[HARNESS] Synthesized {agent_name} at {file_path}")
+            return agent_name
+            
+        except Exception as e:
+            print(f"Error synthesizing domain agent: {e}")
+            return None
 
 def patch_orchestrator_rules(target_dir: str, agent_name: str, harness_folder_name: str, target_syntax: str = "@"):
     """Injects the new Domain SME into the Orchestrator's dispatch rules."""

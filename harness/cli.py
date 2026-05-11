@@ -256,7 +256,7 @@ def main():
         elif platform_choice == "5": # Codex
             target_syntax = "Hand off to "
 
-        sme_agent_name = synthesize_domain_sme_agent(args.project_path, domain_content, harness_folder)
+        sme_agent_name = synthesize_domain_sme_agent(args.project_path, domain_content, harness_folder, platform_choice=platform_choice)
         patch_orchestrator_rules(args.project_path, sme_agent_name, harness_folder, target_syntax=target_syntax)
 
         print(f"\n{'='*60}")
