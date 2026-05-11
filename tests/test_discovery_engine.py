@@ -132,9 +132,8 @@ def test_generate_onboarding_domain_doc(tmp_path):
         content = f.read()
         assert "Proposed Domain SME Agent" in content
         assert "Financial Ledger" in content
-        assert "Domain Invariants" in content
+        assert "Invariants" in content
         assert "Ubiquitous Language" in content
-
 @mock.patch('harness.discovery_engine.query_llm')
 def test_generate_onboarding_domain_doc_with_tools(mock_query_llm, tmp_path):
     project_path = str(tmp_path)

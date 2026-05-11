@@ -9,8 +9,8 @@
     "improve-codebase-architecture": {
       "path": "improve-codebase-architecture/SKILL.md"
     },
-    "context-intake": {
-      "path": "context-intake/SKILL.md"
+    "ddd-alignment": {
+      "path": "ddd-alignment/SKILL.md"
     }
   }
 }
