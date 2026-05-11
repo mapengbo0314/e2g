@@ -90,19 +90,19 @@ def main():
         if choice in ['', 'y', 'yes']:
             print("Generating indxr wiki...")
             
-            # Prepare environment variables with the collected API key
+            # Prepare environment variables for indxr
             env = os.environ.copy()
             if args.llm == "anthropic":
                 env["ANTHROPIC_API_KEY"] = api_key
             elif args.llm == "openai":
                 env["OPENAI_API_KEY"] = api_key
             elif args.llm == "gemini":
-                 # Currently indxr wiki generate requires ANTHROPIC or OPENAI, but we pass what we have.
-                 # If indxr adds Gemini support, this will be needed.
-                 env["GEMINI_API_KEY"] = api_key
-                 # Fallback warning if Gemini is selected for harness but indexer needs Anthropic
+                 # Pass GOOGLE_API_KEY to the indexer as it might support it now.
+                 env["GOOGLE_API_KEY"] = api_key
+                 # Clarify the warning: indexer performs best with Anthropic or OpenAI
                  if not env.get("ANTHROPIC_API_KEY") and not env.get("OPENAI_API_KEY"):
-                      print("Warning: 'indxr wiki generate' currently requires ANTHROPIC_API_KEY or OPENAI_API_KEY.")
+                      print("Notice: 'indxr' performs best with ANTHROPIC_API_KEY or OPENAI_API_KEY for wiki generation.")
+                      print("Attempting with GOOGLE_API_KEY...")
             
             # Execute indxr in the project directory
             os.makedirs(args.project_path, exist_ok=True)
@@ -168,8 +168,6 @@ def main():
             sys.exit(1)
             
         boilerplate_dir = os.path.join(temp_dir, "boilerplate-agent")
-        
-        feature_fetcher_yaml = os.path.join(boilerplate_dir, "agents", "feature-fetcher.md")
         
         print("Stage 2: Dynamic Context Acquisition")
         from harness.discovery_engine import discover_agents, discover_ddd_context, acquire_mcp_context, generate_onboarding_domain_doc
