@@ -33,6 +33,19 @@
         "type": "mcp",
         "keywords": ["postgresql", "postgres", "sql"]
       }
+    ],
+    "universal": [
+      {
+        "name": "git-mcp",
+        "command": "npx -y @modelcontextprotocol/server-git",
+        "type": "mcp",
+        "keywords": ["git", "version control"]
+      },
+      {
+        "name": "pytest-patterns",
+        "url": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/pytest-patterns/SKILL.md",
+        "keywords": ["python", "testing", "pytest"]
+      }
     ]
   }
 }
