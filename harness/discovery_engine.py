@@ -326,7 +326,6 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query
         registry_path = os.path.join(boilerplate_dir, "onboarding", "tools.json")
         if os.path.exists(registry_path):
             try:
-                import json
                 with open(registry_path, "r") as f:
                     tools_registry = json.load(f)
             except Exception as e:
@@ -367,7 +366,6 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query
         """
         try:
             res = query_llm_fn(prompt, llm_provider, api_key)
-            import json
             cleaned = res.replace("```json", "").replace("```", "").strip()
             start_idx = cleaned.find("{")
             end_idx = cleaned.rfind("}") + 1
@@ -388,11 +386,11 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query
     # 4. Format Tools
     skills_md = "- [ ] No skills recommended"
     if recommended_skills:
-        skills_md = "\n".join([f"- [x] {s['name']} ({s['url']})" for s in recommended_skills])
+        skills_md = "\n".join([f"- [x] {s.get('name', 'Unknown')} ({s.get('url', '')})" for s in recommended_skills])
         
     mcps_md = "- [ ] No MCPs recommended"
     if recommended_mcps:
-        mcps_md = "\n".join([f"- [x] {m['name']} ({m.get('command', '')})" for m in recommended_mcps])
+        mcps_md = "\n".join([f"- [x] {m.get('name', 'Unknown')} ({m.get('command', '')})" for m in recommended_mcps])
 
     # 5. Populate Template
     template_str = ""
@@ -408,7 +406,7 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query
 
     final_content = template_str.replace("{{TECH_STACK}}", tech_stack)
     final_content = final_content.replace("{{DOMAIN_SUMMARY}}", domain_summary)
-    final_content = final_content.replace("{{SME_NAME}}", sme_name.lower())
+    final_content = final_content.replace("{{SME_NAME}}", str(sme_name).lower())
     final_content = final_content.replace("{{INVARIANTS}}", invariants)
     final_content = final_content.replace("{{GLOSSARY}}", glossary)
     final_content = final_content.replace("{{SKILLS_MD}}", skills_md)
