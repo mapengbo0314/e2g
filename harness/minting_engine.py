@@ -640,7 +640,6 @@ mcp_servers: ["indxr"]
         full_agent_markdown = f"""---
 name: {agent_name}
 description: Subject Matter Expert and Guardian. Consult this agent before modifying core logic.
-type: architect_variant
 ---
 {agent_markdown}
 """
