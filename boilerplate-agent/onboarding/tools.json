@@ -3,7 +3,7 @@
     "frontend": [
       {
         "name": "nextjs",
-        "url": "https://raw.githubusercontent.com/PatrickJS/awesome-cline-prompts/main/prompts/nextjs.md",
+        "url": "https://raw.githubusercontent.com/PatrickJS/awesome-cursorrules/main/rules/cursorrules-cursor-ai-nextjs-14-tailwind-seo-setup/.cursorrules",
         "keywords": ["react", "nextjs", "next.js", "frontend"]
       },
       {
@@ -15,7 +15,7 @@
       },
       {
          "name": "playwright-interactive",
-         "url": "https://github.com/openai/skills/blob/main/skills/.curated/playwright-interactive/SKILL.md",
+         "url": "https://raw.githubusercontent.com/openai/skills/main/skills/.curated/playwright-interactive/SKILL.md",
          "type": "skill",
          "force_if_keywords": ["frontend"],
          "keywords": ["react", "nextjs", "frontend", "vue", "svelte"]
@@ -24,7 +24,7 @@
     "backend": [
       {
         "name": "fastapi",
-        "url": "https://raw.githubusercontent.com/PatrickJS/awesome-cline-prompts/main/prompts/fastapi.md",
+        "url": "https://raw.githubusercontent.com/PatrickJS/awesome-cursorrules/main/rules/python-fastapi-cursorrules-prompt-file/.cursorrules",
         "keywords": ["fastapi", "python backend"]
       },
       {
@@ -48,11 +48,6 @@
         "command": "npx -y @modelcontextprotocol/server-git",
         "type": "mcp",
         "keywords": ["git", "version control"]
-      },
-      {
-        "name": "pytest-patterns",
-        "url": "https://raw.githubusercontent.com/mattpocock/skills/main/skills/pytest-patterns/SKILL.md",
-        "keywords": ["python", "testing", "pytest"]
       }
     ]
   }

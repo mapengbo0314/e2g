@@ -455,7 +455,7 @@ def generate_onboarding_domain_doc(project_path: str, domain_summary: str, query
     skills_md = "- [ ] No skills recommended"
     if recommended_skills:
         # Format as: - [x] Name (URL)
-        skills_md = "\n".join([f"- [x] {s.get('name', 'Unknown')} ({s.get('url', '')})" for s in recommended_skills])
+        skills_md = "\n".join([f"- [x] {s.get('name', 'Unknown')} ({s.get('url', '')}) <!-- type:{s.get('type', 'skill')} -->" for s in recommended_skills])
         
     mcps_md = "- [ ] No MCPs recommended"
     if recommended_mcps:

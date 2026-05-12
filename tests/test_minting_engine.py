@@ -29,9 +29,9 @@ def test_parse_tool_checklists():
     skills, mcps = parse_tool_checklists(content)
 
     assert len(skills) == 3
-    assert skills[0] == {"name": "pytest", "url": "http://pytest"}
-    assert skills[1] == {"name": "uppercase", "url": "http://uppercase"}
-    assert skills[2] == {"name": "spaced", "url": "http://spaced"}
+    assert skills[0] == {"name": "pytest", "url": "http://pytest", "type": "skill"}
+    assert skills[1] == {"name": "uppercase", "url": "http://uppercase", "type": "skill"}
+    assert skills[2] == {"name": "spaced", "url": "http://spaced", "type": "skill"}
 
     assert len(mcps) == 2
     assert mcps[0] == {"name": "sql", "command": "npx -y sql"}

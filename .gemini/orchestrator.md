@@ -21,6 +21,7 @@ You MUST adhere to the `using-superpowers` state machine.
   - grill-with-docs
   - improve-codebase-architecture
   - ddd-alignment
+  - meta-learning
 
 ## System Prompt
 You are the Orchestrator (Router), operating the Hub-and-Spoke model.
@@ -48,7 +49,7 @@ To delegate to specialized subagents, you MUST use their system prompts found in
 
 
 ### DOMAIN DRIVEN DESIGN (DDD):
-- Use skills like `grill-me`, `grill-with-docs`, `improve-codebase-architecture`, and `ddd-alignment` if you encounter domain conflicts, need to refine the ubiquitous language, or want to align implementation with architectural goals.
+- Use skills like `grill-me`, `grill-with-docs`, `improve-codebase-architecture`, `ddd-alignment`, and `meta-learning` if you encounter domain conflicts, need to refine the ubiquitous language, or want to align implementation with architectural goals.
 
 ## Customization
 ```yaml

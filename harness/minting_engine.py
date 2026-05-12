@@ -18,10 +18,11 @@ def parse_tool_checklists(domain_content: str) -> tuple[list[dict], list[dict]]:
     if skills_match:
         for line in skills_match.group(0).split('\n'):
             if line.strip().lower().startswith('- [x]'):
-                # match: - [x] name (url)
-                m = re.match(r'- \[[xX]\]\s+([^\(]+?)\s*\((.*?)\)', line.strip())
+                # match: - [x] name (url) [optional type comment]
+                m = re.match(r'- \[[xX]\]\s+([^\(]+?)\s*\((.*?)\)(?:\s*<!--\s*type:(.*?)\s*-->)?', line.strip())
                 if m:
-                    skills.append({"name": m.group(1).strip(), "url": m.group(2).strip()})
+                    skill_type = m.group(3).strip() if m.group(3) else "skill"
+                    skills.append({"name": m.group(1).strip(), "url": m.group(2).strip(), "type": skill_type})
                     
     # Find MCPs block
     mcps_match = re.search(r'## Proposed MCP Tools\n.*?(?=##|$)', domain_content, re.DOTALL)
@@ -302,7 +303,9 @@ fi
     
     if active_platform == "gemini":
         for s in selected_skills:
-            skill_installs += f"    gemini extensions install {s['url']} || true\n"
+            # Only install as a Gemini extension if it's explicitly marked as an extension
+            if s.get('type') == 'extension':
+                skill_installs += f"    gemini extensions install {s['url']} || true\n"
         for m in selected_mcps:
             cmd = m["command"]
             if " " in cmd:
@@ -310,7 +313,8 @@ fi
             mcp_installs += f'    gemini mcp add {m["name"]} {cmd} || true\n'
     elif active_platform == "claude":
         for s in selected_skills:
-            skill_installs += f'echo "  /plugin install {s["name"]}@{s["url"]}"\n'
+            if s.get('type') == 'extension':
+                 skill_installs += f'echo "  /plugin install {s["name"]}@{s["url"]} --project"\n'
         for m in selected_mcps:
             cmd = m["command"]
             if " " in cmd:
@@ -344,9 +348,9 @@ echo "To activate it, run Gemini from the project root and use '/mcp reload'."
 set -e
 {key_check_snippet}
 echo "=== Setting up Superpowers for Claude Code ==="
-echo "To install Superpowers and Skills for Claude Code, run these commands inside the Claude Code interface:"
-echo "  /plugin install superpowers@claude-plugins-official"
-echo "  /plugin install skills@mattpocock"
+echo "To install Superpowers and Skills for Claude Code workspace-wide, run these commands inside the Claude Code interface:"
+echo "  /plugin install superpowers@claude-plugins-official --project"
+echo "  /plugin install skills@mattpocock --project"
 {skill_installs}
 
 # MCP Configuration for Claude
@@ -392,6 +396,18 @@ echo "Please add indxr MCP to your Codex configuration."
 Please read `{harness_prefix}/AGENTS.md` for core repository instructions and routing rules.
 The Orchestrator agent and core rules are located in `{harness_prefix}/orchestrator.md`.
 """
+
+    if active_platform in ["cursor", "codex"]:
+        pointer_content += "\n## Available Agent Skills\n"
+        pointer_content += "To activate a skill, you MUST use your file reading tool to read its instructions into your context before beginning work.\n\n"
+        
+        has_sp = any(s.get('name') == 'using-superpowers' for s in selected_skills)
+        if not has_sp:
+            pointer_content += f"- **using-superpowers**: `{harness_prefix}/skills/using-superpowers/SKILL.md`\n"
+            
+        for s in selected_skills:
+            if s.get('type') != 'extension':
+                pointer_content += f"- **{s['name']}**: `{harness_prefix}/skills/{s['name']}/SKILL.md`\n"
 
     # Map the platform to its specific pointer files
     pointer_files_map = {
@@ -572,9 +588,8 @@ Ensure your implementation aligns with these definitions.
             
     print(f"Successfully minted workspace at {target_dir}")
     print("\nNext Steps:")
-    print(f"1. cd {target_dir}")
-    print("2. ./scripts/setup_harness.sh (Install prerequisites)")
-    print("3. Activate your environment and Launch AI")
+    print(f"1. ./scripts/setup_harness.sh (Run from your project root, do NOT cd into {target_dir})")
+    print("2. Activate your environment and Launch AI")
 
 def synthesize_domain_sme_agent(target_dir: str, domain_content: str, harness_folder_name: str, platform_choice: str = "1", model_choice: str = None):
     """Generates the domain SME agent deterministically based on the filled doc."""
@@ -742,7 +757,7 @@ def install_workspace_tools(target_dir: str, harness_folder_name: str, skills: l
     # Defensive copy and normalize
     skills_to_install = list(skills) if skills else []
     
-    # Guarantee superpowers is installed
+    # Guarantee superpowers is installed locally for all platforms
     has_superpowers = any(s.get('name') == 'using-superpowers' for s in skills_to_install)
     if not has_superpowers:
         skills_to_install.append({
@@ -762,6 +777,10 @@ def install_workspace_tools(target_dir: str, harness_folder_name: str, skills: l
                 pass
 
         for skill in skills_to_install:
+            if skill.get('type') == 'extension':
+                print(f"[HARNESS] Skipping download for extension: {skill['name']}")
+                continue
+                
             try:
                 print(f"[HARNESS] Downloading skill: {skill['name']}...")
                 req = urllib.request.Request(skill['url'], headers={'User-Agent': 'Mozilla/5.0'})
@@ -777,12 +796,25 @@ def install_workspace_tools(target_dir: str, harness_folder_name: str, skills: l
                 # Update skills.json with LOCAL path relative to workspace
                 skills_data["skills"][skill['name']] = {"path": f"skills/{skill['name']}/SKILL.md"}
             except Exception as e:
-                print(f"Failed to install skill {skill['name']}: {e}")
+                # Local fallback check
+                print(f"Network fetch failed for {skill['name']}: {e}. Checking local boilerplate fallback...")
+                import shutil
+                # We need to reach the boilerplate directory. We can guess it's roughly 2 dirs up from harness_dir
+                # Alternatively, we just look in the root `boilerplate-agent`
+                root_dir = os.path.dirname(os.path.dirname(harness_dir)) if harness_folder_name.startswith('.') else os.path.dirname(harness_dir)
+                local_skill_path = os.path.join(root_dir, "boilerplate-agent", "skills", skill['name'], "SKILL.md")
+                if os.path.exists(local_skill_path):
+                    skill_dir = os.path.join(harness_dir, "skills", skill['name'])
+                    os.makedirs(skill_dir, exist_ok=True)
+                    skill_file = os.path.join(skill_dir, "SKILL.md")
+                    shutil.copyfile(local_skill_path, skill_file)
+                    print(f"[HARNESS] Successfully copied local fallback for skill: {skill['name']}")
+                    skills_data["skills"][skill['name']] = {"path": f"skills/{skill['name']}/SKILL.md"}
+                else:
+                    print(f"Failed to install skill {skill['name']} (no local fallback found at {local_skill_path})")
                 
         with open(skills_json_path, "w") as f:
              json.dump(skills_data, f, indent=2)
-
-    # Configure MCPs
     if mcps:
         mcp_json_path = os.path.join(harness_dir, "mcp.json")
         mcp_data = {"mcpServers": {}}
@@ -803,5 +835,5 @@ def install_workspace_tools(target_dir: str, harness_folder_name: str, skills: l
                     "args": parts[1:]
                 }
 
-        with open(mcp_json_path, "w") as f:             json.dump(mcp_data, f, indent=2)
-
+        with open(mcp_json_path, "w") as f:
+             json.dump(mcp_data, f, indent=2)
