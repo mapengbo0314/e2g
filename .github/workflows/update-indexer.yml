@@ -29,10 +29,9 @@ jobs:
           # Fetch full depth so we can push
           fetch-depth: 0
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      - name: Setup Rust and Install indxr
+        run: |
+          cargo install indxr --features wiki
 
       - name: Run Indexer Update Script
         env:

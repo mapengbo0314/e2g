@@ -13,9 +13,8 @@ if [ -z "$GEMINI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENAI_API_
     exit 1
 fi
 
-# Run the update (assuming 'update' is the command to refresh an existing wiki)
-# Using npx --yes -p indxr indxr to ensure it works in clean CI environments
-npx --yes -p indxr indxr wiki update
+# Run the update
+indxr wiki update
 
 echo "=== Checking for index changes ==="
 
