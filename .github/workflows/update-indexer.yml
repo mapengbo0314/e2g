@@ -29,15 +29,24 @@ jobs:
           # Fetch full depth so we can push
           fetch-depth: 0
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Setup Rust and Install indxr
         run: |
           cargo install indxr --features wiki
 
+      - name: Install Gemini CLI
+        run: |
+          npm install -g @google/gemini-cli
+
       - name: Run Indexer Update Script
         env:
-          # Assuming the user stores their key in a secret named GEMINI_API_KEY
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # Provide fallbacks if they use other providers
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # Tell indxr to pipe completion requests through the gemini cli in headless mode
+          INDXR_LLM_COMMAND: "gemini -p"
         run: ./scripts/update_index.sh
