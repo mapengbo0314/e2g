@@ -1,6 +1,6 @@
 version: 1
-generated_at_ref: f1af3b2fa46c98c92658d870947ac03b9020de8a
-generated_at: 2026-05-08T19:40:40Z
+generated_at_ref: b341f91c9dedfba9ea77683443093879cad39600
+generated_at: 2026-05-12T23:04:50Z
 pages:
 - id: architecture
   page_type: architecture
@@ -109,12 +109,6 @@ pages:
   - tests/test_cli_preflight.py
   - tests/test_context_acquisition.py
   - tests/test_discovery_engine.py
-- id: entity-agent-config
-  page_type: entity
-  file: entities/entity-agent-config.md
-  source_files:
-  - _agents/agents/config-schema.md
-  - _agents/GEMINI.md
 - id: index
   page_type: index
   file: index.md

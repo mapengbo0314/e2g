@@ -10,17 +10,17 @@ source_files:
 - _agents/rules/phases/phase_4_implementation.md
 - boilerplate-agent/rules/orchestrator.md
 - boilerplate-agent/rules/unified_superpower_workflow.md
-generated_at_ref: f1af3b2fa46c98c92658d870947ac03b9020de8a
-generated_at: 2026-05-08T19:40:40Z
+generated_at_ref: b341f91c9dedfba9ea77683443093879cad39600
+generated_at: 2026-05-12T23:04:50Z
 links_to: []
-covers:
-- heading:Orchestrator Rules
-- heading:Primary Workflows (The Superpower Workflow)
-- 'heading:Phase 1: The Design Discussion (No Code Yet)'
-- 'heading:Phase 2: Writing the Design Doc'
-- 'heading:Phase 3: The "Goldfish" Review Protocol'
-- 'heading:Phase 4: Implementation & Mean Review'
-- heading:The Universal Agentic Harness Protocol
+covers: []
+contradictions:
+- description: Wiki stated Phase 1 is 'Design Discussion' and Phase 2 is 'Design Documentation', but code/dispatch rules now define them as 'Discovery & Design Challenge' and 'Planning & Design Doc'.
+  source: boilerplate-agent/rules/dispatch_rules.md
+  detected_at: 2026-05-12T23:04:50Z
+- description: Wiki described a 6-state machine in 'unified_superpower_workflow.md', but that file has been removed in favor of a phase-based system in 'dispatch_rules.md'.
+  source: boilerplate-agent/rules/dispatch_rules.md
+  detected_at: 2026-05-12T23:04:50Z
 ---
 
 # E2G Harness: Workflow Orchestration System
@@ -29,98 +29,60 @@ The E2G harness implements a sophisticated multi-phase workflow orchestration sy
 
 ## Core Orchestration Pattern
 
-The orchestration follows a **phased goldfish protocol** that treats each phase as an independent unit requiring fresh context loading. This design prevents context drift and ensures consistent quality across long-running workflows.
+The orchestration follows a **Hub-and-Spoke model** managed by a Senior Project Manager (Orchestrator). The system has transitioned from distributed configurations in `_agents/` to a centralized structure within the `.gemini/` directory.
 
-The master orchestrator (`_agents/rules/orchestrator.md`) defines the primary workflow structure, while individual phase specifications (`_agents/rules/phases/`) provide detailed execution rules. The boilerplate agent system (`boilerplate-agent/`) implements a parallel **Universal Agentic Harness Protocol** with its own state machine.
+The master orchestrator (`.gemini/orchestrator.md`) defines the primary workflow, utilizing the **Indexer MCP Integration** to maintain codebase awareness without context bloat. Individual phase execution is guided by `dispatch_rules.md`.
+
+### Key Orchestration Mandates
+- **Zero Work Rule**: The Orchestrator is forbidden from modifying code directly; it must delegate to specialized subagents.
+- **Artifact-Driven Communication**: Detailed plans and reports are stored in `artifacts/` to keep session histories lean.
+- **Wiki-First Indexing**: Reliance on the `indxr` MCP server for verified structural context.
 
 ## Phase Structure and Flow
 
-### Phase 1: Design Discussion (`phase_1_design_discussion.md`)
-- **Objective**: Feature exploration without implementation
-- **Key Constraint**: Absolute prohibition on code generation
-- **Process**: Context loading → Feature description → Adversarial challenge → Technical proposal
-- **Output**: Validated feature requirements and high-level approach
+The workflow has been streamlined into distinct lifecycle phases managed via `dispatch_rules.md`.
 
-### Phase 2: Design Documentation (`phase_2_design_doc.md`)
-- **Objective**: Create comprehensive technical specification
-- **Structure**: Five mandatory sections (Business Problem, Technical Plan, Alternatives, Implementation, Sphinch Marks)
-- **Quality Gate**: Sphinch Marks (SM-1 through SM-N) provide readiness assertions
-- **Output**: Implementation-ready design document serving as source of truth
+### Phase 1: Discovery & Design Challenge (No Code)
+- **Objective**: Feature exploration and adversarial validation without implementation.
+- **Key Constraint**: Absolute prohibition on code generation.
+- **Process**: Context loading → Feature description → Adversarial challenge → Technical proposal.
+- **Output**: Validated requirements and a high-level architectural approach.
 
-### Phase 3: Goldfish Protocol (`phase_3_goldfish_protocol.md`)
-- **Objective**: Validation through fresh perspective simulation
-- **Core Mechanism**: Agent must demonstrate understanding as if seeing the project for the first time
-- **Validation Steps**: Comprehension test → Sphinch Mark verification → Implementation readiness assessment
-- **Fallback**: Legacy open-ended critic review if goldfish protocol insufficient
+### Phase 2: Planning & Design Doc (The Source of Truth)
+- **Objective**: Create a comprehensive technical specification.
+- **Structure**: Mandatory sections including Business Problem, Technical Plan, and Alternatives.
+- **Quality Gate**: **Sphinch Marks** provide readiness assertions before implementation begins.
+- **Output**: `implementation_plan.md` and `task.md` artifacts.
 
-### Phase 4: Implementation (`phase_4_implementation.md`)
-- **Objective**: Code generation with adversarial review
-- **Process**: Coding with guardrails → "Mean" adversarial code review
-- **Quality Control**: Aggressive criticism to identify defects before human review
+### Execution & Verification
+Following the design phases, the system moves through:
+- **TDD Implementation**: Subagents (e.g., `@implementer`) write production code strictly using Test-Driven Development.
+- **Adversarial Review**: The `@reviewer` and `@adversary` agents perform "mean" reviews to identify defects.
+- **QA & Verification**: The `@verifier` agent performs final robustness checks.
 
-## State Machine Architecture (Boilerplate Agent)
-
-The boilerplate agent implements a complementary **Universal Agentic Harness Protocol** (`unified_superpower_workflow.md`) with six discrete states:
-
-- **State 0**: Bootstrap & Factory Minting - Initial setup and capability discovery
-- **State 1**: Feature Refinement - Requirements clarification and scope definition  
-- **State 2**: Planning - Architecture design and implementation strategy
-- **State 3**: Execution & Testing - Code generation with continuous validation
-- **State 4**: Adversarial Verification - Aggressive quality assurance
-- **State 5**: Wrap-up & Review - Final validation and documentation
-
-### Domain-Driven Design Integration
-
-The boilerplate agent workflow now includes a **Domain-Driven Design (DDD) mandate** that provides specialized context analysis and domain modeling capabilities. This enhancement enables agents to better understand project structure, domain boundaries, and architectural patterns before engaging in implementation work.
-
-## Agent Architecture Evolution
-
-### Centralized Agent Management
-
-The system has migrated from distributed agent configurations to centralized management:
-
-- **Main Harness**: Agents consolidated in `_agents/agents/` as markdown specifications (replacing JSON-based configs)
-- **Boilerplate System**: Agents standardized in `boilerplate-agent/agents/` with consistent markdown format
-- **Discovery Engine**: Enhanced with DDD context analysis, custom agent discovery, and remote skill fetching
-- **Minting Engine**: Extended with model choice options, bundle overrides, and DDD context integration
+## Agent Architecture and Minting
 
 ### Specialized Agent Roles
+The ecosystem has evolved into a standardized set of markdown specifications:
+- **Core Workflow**: Architect, Planner, Implementer, Reviewer, Verifier.
+- **Specialized**: Security Auditor, Performance Profiler, Linter Agent, Refactorer.
+- **Dynamic SMEs**: The system can now synthesize **Domain SME Agents** specifically tailored to the project's tech stack and domain concepts.
 
-The agent ecosystem includes specialized roles:
-- **Core Workflow Agents**: Architect, Implementer, Reviewer, Verifier
-- **Specialized Agents**: Security Auditor, Performance Profiler, Linter Agent, Refactorer
-- **Discovery Agents**: Feature Fetcher for dynamic capability identification
-- **Documentation Agents**: Design Doc Drafter for technical specification generation
-
-## Enhanced Discovery and Context Management
-
-### DDD Context Analysis
-The discovery engine now includes domain-driven design analysis capabilities that extract and model domain concepts, boundaries, and relationships from project contexts. This provides agents with richer architectural understanding before task execution.
-
-### Remote Skill Integration
-The system supports fetching remote skills dynamically, enabling agents to acquire new capabilities from external repositories during workflow execution.
-
-### Custom Agent Discovery
-Agents can be discovered and configured dynamically based on project-specific requirements, moving beyond static predefined roles to adaptive capability matching.
+### Discovery & Minting Engines
+The harness includes advanced automation for workspace setup:
+- **Tech Stack Detection**: Automatically identifies project technologies to inform agent configuration.
+- **Dynamic SME Synthesis**: `synthesize_domain_sme_agent` creates specialized agents based on domain analysis.
+- **Dynamic Dispatch Injection**: The `minting_engine` automatically injects newly discovered DDD agents into the workspace's `dispatch_rules.md` during generation.
+- **Remote Skill Fetching**: Capabilities can be acquired dynamically from external repositories.
 
 ## Design Principles
 
-**Phase Isolation**: Each phase operates independently with explicit context loading to prevent information decay across long sessions.
+**Phase Isolation**: Each phase operates with explicit context loading to prevent information decay.
 
-**Adversarial Validation**: Multiple phases incorporate adversarial review (Phase 1 challenge, Phase 3 goldfish test, Phase 4 mean review) to stress-test decisions before human involvement.
+**Adversarial Validation**: Multiple phases incorporate adversarial review to stress-test decisions before code is written.
 
-**Sphinch Mark System**: Quantified readiness assertions replace subjective quality gates, providing concrete validation criteria for phase transitions.
+**Sphinch Mark System**: Quantified readiness assertions replace subjective quality gates.
 
-**Superpower Integration**: The state machine explicitly invokes superpower skills at appropriate phases, ensuring agents leverage their full capability spectrum.
+**Domain-Aware Processing**: Domain-Driven Design (DDD) analysis provides architectural intelligence that informs agent decision-making throughout the workflow.
 
-**Domain-Aware Processing**: DDD context analysis provides architectural intelligence that informs agent decision-making throughout the workflow.
-
-## Orchestration Invariants
-
-1. **No Phase Skipping**: Each phase must complete successfully before progression
-2. **Context Refresh**: Agents must reload context at phase boundaries to simulate fresh perspective
-3. **Validation Gates**: Sphinch Marks and adversarial reviews must pass before implementation
-4. **Documentation Primacy**: Phase 2 design document serves as authoritative specification for all subsequent phases
-5. **DDD Context Grounding**: Domain analysis must inform architectural decisions across all phases
-
-The dual orchestration systems (main harness + boilerplate agent) provide redundancy and specialization - the main system handles general workflows while the boilerplate agent optimizes for rapid prototyping, skill demonstration, and domain-driven development scenarios.
+**Tool Orchestration**: Automated installation of workspace tools, skills, and MCP configurations during the minting process.
