@@ -12,73 +12,63 @@ source_files:
 - _agents/skills/repo_migration_planner/scripts/detect_drift.py
 - boilerplate-agent/skills/harness-workflow/SKILL.md
 - boilerplate-agent/skills/harness-workflow/verify_tdd_gate.sh
-generated_at_ref: f1af3b2fa46c98c92658d870947ac03b9020de8a
-generated_at: 2026-05-08T19:40:40Z
+generated_at_ref: b341f91c9dedfba9ea77683443093879cad39600
+generated_at: 2026-05-12T23:04:50Z
 links_to:
 - mod-agents
 - mod-harness-core
-- topic-workflow-orchestration
-- mod-testing
-covers:
-- key:skills
-- key:name
-- key:eval_targets
-- 'heading:Skill: ADK Document Structurer'
-- heading:Test Notes
-- 'heading:Skill: Repo Migration Planner'
-- heading:Expected Modifications
-- fn:detect_drift
+covers: []
 contradictions:
-- description: Wiki stated harness-workflow skill exists with 5-phase execution model and TDD gates, but this skill has been removed from the codebase
-  source: boilerplate-agent/skills/harness-workflow/SKILL.md
-  detected_at: 2026-05-08T19:40:40Z
+- description: Wiki stated the registry is at _agents/skills.json, but that directory was removed and replaced by boilerplate-agent/skills.json
+  source: boilerplate-agent/skills.json
+  detected_at: 2026-05-12T23:04:50Z
+- description: Wiki listed adk_document_structurer and repo_migration_planner as examples, but these were deleted from the codebase.
+  source: _agents/skills/
+  detected_at: 2026-05-12T23:04:50Z
 ---
 
 The Skills System is the core competency framework that defines reusable agent capabilities across the harness. Skills are modular, testable units that encapsulate domain-specific knowledge and workflows, organized in a hierarchical directory structure with standardized documentation and evaluation patterns.
 
 ## Architecture
 
-Skills follow a standardized structure with three required components:
-- `SKILL.md`: Defines purpose, use cases, and behavioral contracts
-- `EVAL.yaml`: Specifies evaluation targets and success criteria  
-- Supporting files: Scripts, references, and test materials
+Skills follow a standardized structure centered around:
+- `SKILL.md`: Defines purpose, use cases, and behavioral contracts.
+- **Supporting files**: Checklists, templates (e.g., `ADR-FORMAT.md`), and configuration.
 
-The system maintains a registry at `_agents/skills.json` that indexes available skills, enabling dynamic discovery and composition by the [[mod-agents]] system.
+The system maintains a registry at `boilerplate-agent/skills.json` (formerly `_agents/skills.json`) that indexes available skills, enabling dynamic discovery and composition by the [[mod-agents]] system. A `skills-lock.json` file is used to manage and lock skill versions.
 
 ## Skill Categories
 
-### Domain Skills
-**adk_document_structurer** focuses on technical documentation parsing and structuring, particularly for ADK-style specifications. Evaluation targets include structural accuracy and completeness metrics.
+### Domain & Workflow Skills
+The harness now prioritizes architectural and alignment-focused skills:
 
-**repo_migration_planner** handles repository transformation workflows, with drift detection capabilities via `detect_drift.py`. The skill maintains expected modification patterns in `references/expected_modifications.md` for validation.
+- **ddd-alignment**: Ensures implementations stay consistent with Domain-Driven Design principles.
+- **grill-me / grill-with-docs**: Interview-based skills for stress-testing plans against domain models and existing documentation.
+- **improve-codebase-architecture**: Identifies refactoring and deepening opportunities within the codebase.
+- **meta-learning**: Facilitates deep understanding of new, complex subjects.
+- **fastapi / nextjs**: Technical stack-specific skills for standardizing implementation patterns.
 
 ### Skill Evolution
-
-The skill system has evolved from its original architecture where system skills like **harness-workflow** provided core 5-phase execution models with TDD gates. The system has shifted toward a more flexible, agent-driven approach where skills are dynamically discovered and composed through the enhanced discovery engine.
+The system has fully transitioned from fixed, phase-gated models (like the legacy `harness-workflow`) to a highly dynamic, discovery-driven architecture. Skills are no longer just local files but can be fetched and installed on-demand based on the project's detected technology stack and DDD context.
 
 ## Integration Patterns
 
-Skills integrate with the harness through several mechanisms:
+Skills integrate with the harness through several updated mechanisms:
 
-1. **Dynamic Discovery**: The [[mod-harness-core]] discovery engine can now fetch remote skills via `fetch_remote_skill()`, enabling distributed skill repositories and dynamic capability expansion
-
-2. **Agent Composition**: The [[mod-agents]] system dynamically loads skills based on agent configurations, allowing per-agent skill specialization
-
-3. **Workflow Orchestration**: The [[topic-workflow-orchestration]] system uses skills as execution units within phase-based workflows
-
-4. **Evaluation Framework**: Skills expose evaluation targets that integrate with the testing infrastructure in [[mod-testing]]
-
-5. **Domain-Driven Design (DDD) Integration**: Skills now support DDD contexts through the discovery engine's `discover_ddd_context()` function, enabling contextual skill selection and composition
+1.  **Dynamic Discovery & Fetching**: The [[mod-harness-core]] discovery engine utilizes `fetch_skill(skill_name, remote_url)` to retrieve capabilities from remote sources, allowing for a distributed ecosystem of skills.
+2.  **Automated Installation**: During workspace generation, the `minting_engine.py` uses `install_workspace_tools()` to inject selected skills and MCP configurations directly into the target environment.
+3.  **DDD Context Awareness**: Skills are selected and configured via `discover_ddd_context()`, ensuring the agent's capabilities are relevant to the specific business domain.
+4.  **Agent Composition**: The [[mod-agents]] system dynamically loads skills based on agent configurations (managed in `.gemini/agents/`), allowing per-agent skill specialization.
 
 ## Enhanced Discovery Capabilities
 
-The skills system now supports:
-- **Remote Skill Fetching**: Skills can be loaded from external sources via URL
-- **DDD Context Awareness**: Skills can be selected and configured based on domain-driven design contexts
-- **Custom Agent Generation**: Skills can be dynamically composed into custom agents through `discover_custom_agent()`
+The skills system supports:
+- **Remote Skill Fetching**: Skills can be loaded from external sources via URL.
+- **DDD Context Awareness**: Skills are selected and configured based on domain-driven design contexts.
+- **Custom Agent Generation**: Skills are dynamically composed into custom agents through `discover_custom_agent()`.
 
 ## Design Invariants
 
-Skills maintain strict separation between specification (`SKILL.md`) and evaluation (`EVAL.yaml`), enabling independent evolution of capability definitions and success criteria. The standardized structure allows the harness to treat skills as black boxes while maintaining discoverability and composability.
+Skills maintain strict specification in `SKILL.md`. The standardized structure allows the harness to treat skills as black boxes while maintaining discoverability and composability.
 
 The system assumes skills are stateless and idempotent - they operate on input data and produce deterministic outputs without side effects beyond their defined scope. This enables safe parallel execution and reproducible results across multiple harness runs.

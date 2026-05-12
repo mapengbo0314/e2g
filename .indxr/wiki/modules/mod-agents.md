@@ -20,80 +20,78 @@ source_files:
 - _agents/agents/reviewer/config.yaml
 - _agents/agents/verifier/agent.json
 - _agents/agents/verifier/config.yaml
-generated_at_ref: f1af3b2fa46c98c92658d870947ac03b9020de8a
-generated_at: 2026-05-08T19:40:40Z
+generated_at_ref: b341f91c9dedfba9ea77683443093879cad39600
+generated_at: 2026-05-12T23:04:50Z
 links_to:
-- entity-agent-config
 - mod-harness-core
 - topic-workflow-orchestration
-covers:
-- heading:Agent Config Schema
-- key:defaultAgent
-- key:agents
-- fn:reload_agents
+covers: []
 contradictions:
-- description: Wiki previously described a two-layer JSON/YAML configuration structure (agent.json + config.yaml) but the system has migrated to single Markdown files
-  source: _agents/agents/config-schema.md
-  detected_at: 2026-05-08T19:40:40Z
-- description: Wiki stated configurations follow a specific YAML schema but agents are now defined in Markdown format
-  source: _agents/agents/*.md files
-  detected_at: 2026-05-08T19:40:40Z
+- description: Wiki stated agent configurations are stored in _agents/agents/, but the directory has been removed and they are now in .gemini/agents/.
+  source: 'Structural Diff: Removed _agents/'
+  detected_at: 2026-05-12T23:04:50Z
+- description: Wiki referenced reload_agents() in _agents/reload_agents.py, but this file has been removed.
+  source: 'Structural Diff: Removed _agents/reload_agents.py'
+  detected_at: 2026-05-12T23:04:50Z
+- description: Wiki referenced _agents/agents.json for registry structure, but this file has been removed.
+  source: 'Structural Diff: Removed _agents/agents.json'
+  detected_at: 2026-05-12T23:04:50Z
 ---
 
 # Agent Configuration System
 
-The agent configuration system provides a centralized mechanism for defining specialized AI agents with distinct roles, capabilities, and behavioral configurations. This system enables workflow orchestration by allowing the harness to dynamically select and configure agents based on task requirements.
+The agent configuration system provides a centralized mechanism for defining specialized AI agents with distinct roles, capabilities, and behavioral configurations. This system enables workflow orchestration by allowing the harness to dynamically select, configure, and synthesize agents based on task requirements.
 
 ## Configuration Architecture
 
-**MAJOR ARCHITECTURAL CHANGE**: The system has migrated from a two-layer JSON/YAML configuration structure to a Markdown-based agent definition format. This represents a fundamental shift in how agents are configured and managed.
+**MAJOR ARCHITECTURAL CHANGE**: The system has transitioned from a centralized `_agents/` directory to a project-local configuration stored within the `.gemini/` directory of the workspace. This shift supports the "Minting" lifecycle, where agents are tailored to the specific domain of the codebase during setup.
 
-### New Agent Definition Format
+### Agent Definition Format
 
-Agent configurations are now stored as standalone Markdown files in `_agents/agents/`, replacing the previous `agent.json` + `config.yaml` pattern. Each agent is defined in a single `.md` file (e.g., `planner.md`, `architect.md`) that contains structured agent specifications in a human-readable format.
+Agent configurations are stored as standalone Markdown files in `.gemini/agents/`. Each agent is defined in a single `.md` file (e.g., `planner.md`, `architect.md`) containing:
+- **Metadata**: Name, Description, Type, Version.
+- **Skills**: A list of associated superpower skills.
+- **System Prompt**: The persona and behavioral instructions.
 
-### Registry Structure
+### Discovery and Synthesis (DDD Alignment)
 
-The `_agents/agents.json` file continues to specify `"defaultAgent": "planner"`, establishing the planner as the primary orchestration entry point, but now references the new Markdown-based agent definitions.
+The system now features a dynamic **Domain-Driven Design (DDD) Discovery** phase. 
+- **Custom Agent Discovery**: `harness/discovery_engine.py` can discover or propose custom agents based on the project's tech stack and domain summary.
+- **SME Synthesis**: `harness/minting_engine.py` can synthesize a "Domain SME" (Subject Matter Expert) agent (`synthesize_domain_sme_agent`) specifically for the project, which is then minted into the workspace.
 
-## Agent Registry and Reload System
+## Agent Registry and Orchestration
 
-The `reload_agents()` function in `_agents/reload_agents.py` has been updated to handle the new Markdown-based configuration format. This build-time configuration compilation process transforms the source agent definitions into the runtime format expected by the harness, maintaining the ability to apply configuration changes without system restart.
+The previous `reload_agents.py` and `agents.json` registry have been replaced by the **Orchestrator** model. 
 
-The function now processes Markdown agent definitions instead of JSON/YAML configurations, enabling more flexible and maintainable agent specifications while preserving the separation between development-time configuration and runtime agent instantiation.
+- **Entrypoint**: The primary orchestration entry point is defined in `.gemini/orchestrator.md`.
+- **Dynamic Routing**: During the minting process, `minting_engine.py` patches the workspace's `dispatch_rules.md` to inject routing rules for newly discovered DDD agents. This allows the Orchestrator to delegate tasks to these specialized agents automatically.
 
 ## Specialized Agent Roles
 
-The system maintains the same specialized agent roles, now defined in Markdown format:
+The system utilizes a variety of specialized roles, defined in Markdown format within the workspace:
 
-- **Planner**: Primary orchestration agent for task decomposition and workflow coordination
-- **Architect**: Deep codebase analysis and system-wide dependency mapping
-- **Implementer**: TDD execution and production code changes
-- **Reviewer**: Code quality assessment and standards enforcement
-- **Verifier**: Final QA, edge-case testing, and robustness verification
-- **Adversary**: Hyper-skeptical validation agent for critical path verification
-- **Designdoc-drafter**: Documentation and specification generation (new addition)
-
-This role specialization continues to prevent capability dilution and ensures each agent's prompt engineering is optimized for its specific function in the development pipeline.
-
-## Configuration Schema Structure
-
-The new configuration schema is documented in [[entity-agent-config]] and follows a Markdown-based structure that replaces the previous YAML format:
-
-- Agent metadata and behavioral settings are embedded within structured Markdown
-- Prompt customizations are integrated directly into the agent definition
-- Role-specific behavior tuning is handled through the Markdown specification format
-
-The schema documentation in `_agents/agents/config-schema.md` explains the rationale: "Why it looks like this" - indicating the new format was designed for improved maintainability and human readability compared to the previous JSON/YAML approach.
+- **Planner**: Primary orchestration agent for task decomposition and workflow coordination.
+- **Architect**: Deep codebase analysis and system-wide dependency mapping.
+- **Implementer**: TDD execution and production code changes.
+- **Reviewer**: Code quality assessment and standards enforcement.
+- **Verifier**: Final QA, edge-case testing, and robustness verification.
+- **Adversary**: Hyper-skeptical validation agent for critical path verification.
+- **Refactorer**: Specialized in structural refactoring and technical debt reduction.
+- **Linter-agent**: Specialized in fixing lint, type errors, and formatting.
+- **Security-auditor**: Performs security audits and vulnerability scanning.
+- **Performance-profiler**: Identifies performance bottlenecks.
 
 ## Integration with Core Harness
 
-The configuration system continues to integrate with [[mod-harness-core]] through the agent factory pattern, with configurations lazy-loaded during agent instantiation. The migration to Markdown-based definitions maintains the reduced memory footprint and configuration hot-reloading capabilities while improving the developer experience for agent configuration management.
+The configuration system integrates with [[mod-harness-core]] through the `minting_engine`. The migration to workspace-local `.gemini/` definitions ensures that agent behavior is portable and grounded in the project's specific context.
 
 ## Boilerplate Integration
 
-A new boilerplate agent system has been introduced in `boilerplate-agent/`, providing template configurations and standardized agent definitions that can be used as starting points for custom agent development. This includes comprehensive agent templates and supporting infrastructure.
+The `boilerplate-agent/` directory provides the source templates for all standard agents and rules.
+- **Template Agents**: Located in `boilerplate-agent/agents/`.
+- **Tool Checklists**: `boilerplate-agent/onboarding/tools.json` provides a registry of installable tools and skills that can be added to the workspace during minting.
+- **Skills System**: A rich set of skills (e.g., `ddd-alignment`, `grill-me`, `improve-codebase-architecture`) is bundled in `boilerplate-agent/skills/` and mapped via `boilerplate-agent/skills.json`.
 
 ## Cross-Agent Communication Protocol
 
-Agent configurations continue to include communication protocols that enable the [[topic-workflow-orchestration]] system to coordinate multi-agent workflows. The new Markdown format preserves the ability to specify how agents handle handoffs, context preservation, and result validation when participating in multi-step processes.
+Agent configurations include communication protocols that enable the [[topic-workflow-orchestration]] system. The Orchestrator uses the `@agent` syntax defined in `.gemini/rules/dispatch_rules.md` to handle handoffs, context preservation via artifacts in `workspace/artifacts/`, and result validation.
