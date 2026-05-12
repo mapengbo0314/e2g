@@ -327,6 +327,7 @@ fi
     scripts_to_generate = {
         "gemini": f"""#!/usr/bin/env bash
 set -e
+cd {quoted_project_path}
 {key_check_snippet}
 echo "=== Setting up Superpowers for Gemini CLI ==="
 if command -v gemini &> /dev/null; then
@@ -346,6 +347,7 @@ echo "To activate it, run Gemini from the project root and use '/mcp reload'."
 """,
         "claude": f"""#!/usr/bin/env bash
 set -e
+cd {quoted_project_path}
 {key_check_snippet}
 echo "=== Setting up Superpowers for Claude Code ==="
 echo "To install Superpowers and Skills for Claude Code workspace-wide, run these commands inside the Claude Code interface:"
@@ -363,6 +365,7 @@ fi
 """,
         "cursor": f"""#!/usr/bin/env bash
 set -e
+cd {quoted_project_path}
 {key_check_snippet}
 echo "=== Setting up Superpowers for Cursor ==="
 echo "To install Superpowers and Skills for Cursor, run these commands inside the Cursor Agent chat:"
@@ -372,6 +375,7 @@ echo "  /add-plugin mattpocock/skills"
 """,
         "codex": f"""#!/usr/bin/env bash
 set -e
+cd {quoted_project_path}
 {key_check_snippet}
 echo "=== Setting up Superpowers for Codex ==="
 echo "Please add indxr MCP to your Codex configuration."
@@ -588,7 +592,7 @@ Ensure your implementation aligns with these definitions.
             
     print(f"Successfully minted workspace at {target_dir}")
     print("\nNext Steps:")
-    print(f"1. ./scripts/setup_harness.sh (Run from your project root, do NOT cd into {target_dir})")
+    print(f"1. ./{target_dir_name}/scripts/setup_harness.sh (Run from your project root, do NOT cd into {target_dir})")
     print("2. Activate your environment and Launch AI")
 
 def synthesize_domain_sme_agent(target_dir: str, domain_content: str, harness_folder_name: str, platform_choice: str = "1", model_choice: str = None):

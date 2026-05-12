@@ -5,6 +5,7 @@ import os
 import tempfile
 import subprocess
 import shutil
+from pathlib import Path
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Initialize a new Harness agent workspace.")
@@ -213,6 +214,15 @@ def main():
             harness_folder = ".codex"
         else:
             harness_folder = ".agents"
+
+        # Normalize project_path to avoid nesting if the user points directly to the harness folder
+        # We check against ALL common harness folder names to be safe
+        possible_harness_folders = [".gemini", ".claude", ".cursor", ".codex", ".agents"]
+        abs_project_path = os.path.abspath(args.project_path)
+        path_parts = Path(abs_project_path).parts
+        if path_parts and path_parts[-1] in possible_harness_folders:
+            print(f"Notice: You pointed to a harness folder '{path_parts[-1]}'. Backtracking to project root: {os.path.dirname(abs_project_path)}")
+            args.project_path = os.path.dirname(abs_project_path)
 
         target_dir = os.path.join(args.project_path, harness_folder)
         
