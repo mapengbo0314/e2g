@@ -14,8 +14,9 @@ if [ -z "$GEMINI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENAI_API_
 fi
 
 # Run the update
-echo "Executing indxr with INDXR_LLM_COMMAND='gemini -p \"\"'"
-export INDXR_LLM_COMMAND="gemini -p \"\""
+echo "Executing indxr with INDXR_LLM_COMMAND='gemini --skip-trust -p \"\"'"
+export GEMINI_CLI_TRUST_WORKSPACE=true
+export INDXR_LLM_COMMAND="gemini --skip-trust -p \"\""
 indxr wiki update
 
 echo "=== Checking for index changes ==="
