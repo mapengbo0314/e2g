@@ -1,5 +1,8 @@
 {
   "skills": {
+    "diagnose": {
+      "path": "diagnose/SKILL.md"
+    },
     "grill-me": {
       "path": "grill-me/SKILL.md"
     },

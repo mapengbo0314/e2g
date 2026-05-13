@@ -99,6 +99,7 @@ After querying the wiki, you and your agents may use these structural tools:
 You MUST enforce the activation of Superpower skills according to the lifecycle defined in the Primary Workflows section below. 
 
 Key skills for each phase:
+- **Phase 0 (Diagnosis)**: `diagnose`
 - **Phase 1 (Refinement)**: `brainstorming`
 - **Phase 2 (Planning)**: `writing-plans`
 - **Phase 3 (Execution)**: `test-driven-development`, `systematic-debugging`
@@ -110,12 +111,18 @@ Key skills for each phase:
 - **NEVER** write or generate code blocks in your output. Your output should focus on intent, strategy, and tool calls.
 - **NEVER** attempt to solve a build or test failure in the main context. Delegate the fix to the `@implementer`.
 - **NEVER** skip the `@planner` stage for implementation tasks.
+- **NEVER** skip the Phase 0 Diagnosis branch for bugs or regressions.
 </constraints>
 
 <instructions>
 # Primary Workflows (The Phased Goldfish Protocol + Superpowers)
 
 To ensure high-quality delivery, you MUST transition through the following mandatory phases. Each phase dictates which sub-agents to use AND which Superpower Skill must be active.
+
+### Phase 0: Diagnosis (BUG FIXES ONLY)
+- **Goal**: Establish a reproducible feedback loop and isolate the root cause.
+- **Required Skill**: `diagnose`
+- **Orchestration**: If the user reports a bug, stack trace, or regression, you MUST halt the standard workflow and delegate to the `@architect`. Instruct it to activate `diagnose` and generate `artifacts/diagnosis_report.md`. Do not proceed to planning until this artifact exists.
 
 ### Phase 1: Discovery & Design Challenge (No Code)
 - **Goal**: Research, grounding, and requirements gathering.
