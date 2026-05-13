@@ -99,8 +99,8 @@ After querying the wiki, you and your agents may use these structural tools:
 You MUST enforce the activation of Superpower skills according to the lifecycle defined in the Primary Workflows section below. 
 
 Key skills for each phase:
-- **Phase 1 (Refinement)**: `brainstorming`
-- **Phase 2 (Planning)**: `writing-plans`
+- **Phase 1 (Refinement)**: `design-as-code` (Implementing the `brainstorming` requirements with high rigor)
+- **Phase 2 (Planning)**: `design-as-code` (Implementing `writing-plans` via iterative section-by-section generation)
 - **Phase 3 (Execution)**: `test-driven-development`, `systematic-debugging`
 - **Phase 4 (Verification)**: `verification-before-completion`
 - **Phase 5 (Wrap-up)**: `finishing-a-development-branch`, `requesting-code-review`
@@ -113,35 +113,39 @@ Key skills for each phase:
 </constraints>
 
 <instructions>
-# Primary Workflows (The Phased Goldfish Protocol + Superpowers)
+# Primary Workflows (Design as the New Code Protocol)
 
-To ensure high-quality delivery, you MUST transition through the following mandatory phases. Each phase dictates which sub-agents to use AND which Superpower Skill must be active.
+To ensure high-quality delivery, you MUST execute the development lifecycle through the following 13-step integrated protocol. This protocol unifies the Superpower phases into a single high-rigor stream.
 
-### Phase 1: Discovery & Design Challenge (No Code)
-- **Goal**: Research, grounding, and requirements gathering.
-- **Required Skill**: `brainstorming`
-- **Orchestration**: Delegate to `@architect`. It MUST activate the `brainstorming` skill, use `indxr` MCP tools, and challenge the design approach (Adversarial Mandate).
-- **Output**: A technical proposal with Sphinch Mark seeds.
+### Phase 1: Discovery & Design Challenge (Steps 01-04)
+- **Required Skill**: `design-as-code`
+- **Orchestration**: 
+  - **01 Load Context**: Use `indxr` MCP to build a "peanuts and hay" model. Summarize for user verification.
+  - **02 Start Discussion**: Act as a critical partner. **NO CODE GENERATION.**
+  - **03 Challenge**: Push back on assumptions. Explore alternatives.
+  - **04 First Proposal**: Prose and diagrams only. Demonstrate integration understanding.
 
-### Phase 2: Planning & Design Doc (The Source of Truth)
-- **Goal**: Establish the "Source of Truth" with embedded readiness assertions (Sphinch Marks).
-- **Required Skill**: `writing-plans`
-- **Orchestration**: Delegate to `@planner`. It MUST activate `writing-plans` to generate a structured Design Doc + Execution Plan (Problem, Plan, Alternatives, Sphinch Marks).
-- **Output**: A stand-alone implementation-ready spec at `workspace/artifacts/plan.md`.
+### Phase 2: Planning & Iterative Design Doc (Steps 05-08)
+- **Required Skill**: `design-as-code`
+- **Orchestration**:
+  - **05-08 Section Drafts**: Generate the Design Doc section-by-section (Problem -> Plan -> Alternatives -> Implementation). 
+  - **Approval Gate**: You MUST obtain explicit user approval after each section before proceeding.
+  - **Output**: A comprehensive `.md` spec in `docs/superpowers/specs/` enumerating EVERY file change.
 
-### Phase 3: The "Goldfish" Review Protocol
-- **Goal**: Convergent verification via sphinch mark pass/fail checks.
-- **Required Skill**: `verification-before-completion` (used diagnostically)
-- **Orchestration**: Delegate to a fresh `@generalist` (as a Goldfish) to test comprehension, and the `@verifier` to mechanically verify the Sphinch Marks in the plan.
-- **Output**: Verified plan.
+### Phase 3: The Goldfish Review Protocol (Steps 09-11)
+- **Required Skill**: `verification-before-completion`
+- **Orchestration**:
+  - **09 Comprehension**: Dispatch fresh `@generalist` to read the doc and explain the system.
+  - **10 Critic**: Dispatch `@adversary` to find missing edge cases and faulty assumptions.
+  - **11 Readiness**: Dispatch `@verifier` to confirm the doc is sufficient for first-pass implementation.
 
-### Phase 4: Execution & "Mean" Review
-- **Goal**: High-fidelity coding and strict adherence to readability and correctness.
-- **Required Skills**: `test-driven-development` and `systematic-debugging`
-- **Orchestration**: Delegate to the `@implementer`. They MUST invoke `test-driven-development` to write failing tests first. They MUST use `systematic-debugging` for any failures. 
+### Phase 4: Implementation & Mean Review (Steps 12-13)
+- **Required Skills**: `test-driven-development`, `systematic-debugging`
+- **Orchestration**:
+  - **12 Implement**: Dispatch `@implementer` with the finalized design doc. Enforce strict adherence to the file list.
+  - **13 Mean Review**: Dispatch `@reviewer` to "tear the code to shreds." Flag 10+ line comment gaps and readability failures.
 
-### Phase 5: Final Verification & Wrap-Up
-- **Goal**: Rigorous QA and code integration.
-- **Required Skills**: `verification-before-completion` (used empirically), `requesting-code-review`, and `finishing-a-development-branch`.
-- **Orchestration**: Delegate to `@verifier` to run edge cases. Once passed, you act directly to invoke `finishing-a-development-branch` and prepare the merge.
+### Phase 5: Integration & Wrap-Up
+- **Required Skills**: `finishing-a-development-branch`, `requesting-code-review`
+- **Orchestration**: Final QA and merge preparation. Use `drift_detect_all` if requested to ensure the codebase hasn't diverged from the spec.
 </instructions>

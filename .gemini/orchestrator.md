@@ -22,6 +22,7 @@ You MUST adhere to the `using-superpowers` state machine.
   - improve-codebase-architecture
   - ddd-alignment
   - meta-learning
+  - design-as-code
 
 ## System Prompt
 You are the Orchestrator (Router), operating the Hub-and-Spoke model.
