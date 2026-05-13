@@ -4,7 +4,7 @@ When onboarding a new repository, follow these steps to ensure the `indxr` codeb
 
 ## Step 1: Create the Helper Script
 
-Create a script at `scripts/update_index.sh` to handle the execution and commit logic:
+Create a script at `scripts/update_index.sh` to handle the execution and commit logic. This script is designed to handle Gemini (via CLI) or Anthropic/OpenAI (native).
 
 ```bash
 #!/usr/bin/env bash
@@ -15,15 +15,21 @@ cd "$(dirname "$0")/.."
 
 echo "=== Running indxr wiki update ==="
 
-# Fallback to checking keys if needed
+# Check for LLM API keys
 if [ -z "$GEMINI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
     echo "Error: No LLM API key found in environment."
-    echo "Please ensure GEMINI_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY is set."
     exit 1
 fi
 
+# Configuration for Gemini (requires INDXR_LLM_COMMAND bypass)
+if [ -n "$GEMINI_API_KEY" ]; then
+    echo "Using Gemini CLI as the LLM backend..."
+    export GEMINI_CLI_TRUST_WORKSPACE=true
+    export INDXR_LLM_COMMAND="gemini --skip-trust -p \"\""
+fi
+
 # Run the update
-npx --yes indxr wiki update
+indxr wiki update
 
 echo "=== Checking for index changes ==="
 
@@ -55,7 +61,7 @@ chmod +x scripts/update_index.sh
 
 ## Step 2: Add the GitHub Action
 
-Create the workflow file at `.github/workflows/update-indexer.yml`:
+Create the workflow file at `.github/workflows/update-indexer.yml`.
 
 ```yaml
 name: Update Codebase Index
@@ -85,25 +91,35 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
-      - name: Setup Node.js
+      - name: Setup Rust and Install indxr
+        run: |
+          cargo install indxr --features wiki
+
+      - name: Setup Node.js (for Gemini CLI)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
+      - name: Install Gemini CLI (Only needed for Gemini)
+        run: |
+          npm install -g @google/gemini-cli
+
       - name: Run Indexer Update Script
         env:
+          # Inject whichever keys are configured in your repository secrets
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # Fallbacks:
-          # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: ./scripts/update_index.sh
 ```
 
 ## Step 3: Configure GitHub Secrets
 
 1. Go to **Settings > Secrets and variables > Actions** in the GitHub repository.
-2. Add a new repository secret.
-3. Name it `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` depending on your preferred provider).
-4. Paste your LLM API key as the value.
+2. Add your provider's key as a secret:
+   - **Gemini:** `GEMINI_API_KEY`
+   - **Claude:** `ANTHROPIC_API_KEY`
+   - **OpenAI:** `OPENAI_API_KEY`
 
-Once these three steps are complete, any future PRs will automatically run `indxr wiki update` and commit the documentation changes back to the PR branch.
+## Why Gemini requires more setup
+`indxr` is a Rust binary that natively understands `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`. To use Gemini, we use the `@google/gemini-cli` as a "shim" by setting the `INDXR_LLM_COMMAND`. The script handles this automatically if it detects a `GEMINI_API_KEY`.
