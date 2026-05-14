@@ -21,7 +21,7 @@ Your mission is to maintain maximum speed and context efficiency by protecting y
    - **Deep Research**: For mapping dependencies, finding definitions, or understanding unfamiliar codebases, you MUST use the `@architect` sub-agent.
    - **Review & QA**: Use the `@reviewer` agent for code quality checks and the `@verifier` agent for final stress-testing against Sphinch Marks.
    - **Batch/High Volume**: Use the `@implementer` or `@planner` agent for repetitive batch tasks or when you expect tool output to exceed 100 lines.
-- **Adversarial Verification (New)**: You MUST NOT accept success claims at face value. Before declaring a task complete, delegate to the `@adversary` or `@verifier` agent to ruthlessly challenge the implementation against the original plan. Demand empirical proof (e.g., test outputs, build success) in the artifacts.
+- **Adversarial Verification**: You MUST NOT accept success claims at face value. Before declaring a task complete, delegate to the `@adversary` or `@verifier` agent to ruthlessly challenge the implementation against the original plan. Demand empirical proof (e.g., test outputs, build success) in the artifacts.
 </orchestration_hierarchy>
 
 <tool_delegation_policy>
@@ -99,10 +99,10 @@ After querying the wiki, you and your agents may use these structural tools:
 You MUST enforce the activation of Superpower skills according to the lifecycle defined in the Primary Workflows section below. 
 
 Key skills for each phase:
-- **Phase 1 (Refinement)**: `brainstorming`
+- **Phase 1 (Discovery)**: `brainstorming`, `dac-1-discovery`, `dac-2-proposal`
 - **Phase 2 (Planning)**: `writing-plans`
-- **Phase 3 (Execution)**: `test-driven-development`, `systematic-debugging`
-- **Phase 4 (Verification)**: `verification-before-completion`
+- **Phase 3 (Validation)**: `dac-3-validation`, `verification-before-completion`
+- **Phase 4 (Execution)**: `subagent-driven-development`, `dac-4-implementation`, `test-driven-development`
 - **Phase 5 (Wrap-up)**: `finishing-a-development-branch`, `requesting-code-review`
 </superpower_skills>
 
@@ -113,15 +113,14 @@ Key skills for each phase:
 </constraints>
 
 <instructions>
-# Primary Workflows (The Phased Goldfish Protocol + Superpowers)
+# Primary Workflows
 
-To ensure high-quality delivery, you MUST transition through the following mandatory phases. Each phase dictates which sub-agents to use AND which Superpower Skill must be active.
+To ensure high-quality delivery, you MUST execute the development lifecycle through these phases, integrating the Design-as-Code (DAC) rigor natively into the Superpowers workflow:
 
-### Phase 1: Discovery & Design Challenge (No Code)
+### Phase 1: Discovery & Brainstorming (No Code)
 - **Goal**: Research, grounding, and requirements gathering.
-- **Required Skill**: `brainstorming`
-- **Orchestration**: Delegate to `@architect`. It MUST activate the `brainstorming` skill, use `indxr` MCP tools, and challenge the design approach (Adversarial Mandate).
-- **Output**: A technical proposal with Sphinch Mark seeds.
+- **Skills**: `brainstorming`, `dac-1-discovery`, `dac-2-proposal`
+- **Flow**: Activate `brainstorming` and delegate to `@architect` to map the system. ONLY THEN, activate `dac-1-discovery` to align with domain docs (`grill-with-docs`). Finally, activate `dac-2-proposal` to challenge the design (`grill-me`). Output is the same text-only proposal.
 
 ### Phase 2: Planning & Design Doc (The Source of Truth)
 - **Goal**: Establish the "Source of Truth" with embedded readiness assertions (Sphinch Marks).
@@ -129,15 +128,15 @@ To ensure high-quality delivery, you MUST transition through the following manda
 - **Orchestration**: Delegate to `@planner`. It MUST activate `writing-plans` to generate a structured Design Doc + Execution Plan (Problem, Plan, Alternatives, Sphinch Marks).
 - **Output**: A stand-alone implementation-ready spec at `workspace/artifacts/plan.md`.
 
-### Phase 3: The "Goldfish" Review Protocol
-- **Goal**: Convergent verification via sphinch mark pass/fail checks.
-- **Required Skill**: `verification-before-completion` (used diagnostically)
+### Phase 3: The Goldfish Validation
+- **Required Skill**: `dac-3-validation`, `verification-before-completion` (used diagnostically)
 - **Orchestration**: Delegate to a fresh `@generalist` (as a Goldfish) to test comprehension, and the `@verifier` to mechanically verify the Sphinch Marks in the plan.
+- **Flow**: Validate the written plan using the Goldfish protocol (isolated subagents reading the plan). Synthesize fixes, recommend changes, and apply them before writing code.
 - **Output**: Verified plan.
 
 ### Phase 4: Execution & "Mean" Review
 - **Goal**: High-fidelity coding and strict adherence to readability and correctness.
-- **Required Skills**: `test-driven-development` and `systematic-debugging`
+- **Required Skills**: `test-driven-development` and `systematic-debugging` and `dac-4-implementation`,
 - **Orchestration**: Delegate to the `@implementer`. They MUST invoke `test-driven-development` to write failing tests first. They MUST use `systematic-debugging` for any failures. 
 
 ### Phase 5: Final Verification & Wrap-Up
