@@ -115,9 +115,9 @@ Key skills for each phase:
 </constraints>
 
 <instructions>
-# Primary Workflows (The Phased Goldfish Protocol + Superpowers)
+# Primary Workflows (Design as the New Code Protocol)
 
-To ensure high-quality delivery, you MUST transition through the following mandatory phases. Each phase dictates which sub-agents to use AND which Superpower Skill must be active.
+To ensure high-quality delivery, you MUST execute the development lifecycle through the following 13-step integrated protocol. This protocol unifies the Superpower phases into a single high-rigor stream.
 
 ### Phase 0: Diagnosis (BUG FIXES ONLY)
 - **Goal**: Establish a reproducible feedback loop and isolate the root cause.
@@ -130,22 +130,25 @@ To ensure high-quality delivery, you MUST transition through the following manda
 - **Orchestration**: Delegate to `@architect`. It MUST activate the `brainstorming` skill, use `indxr` MCP tools, and challenge the design approach (Adversarial Mandate).
 - **Output**: A technical proposal with Sphinch Mark seeds.
 
-### Phase 2: Planning & Design Doc (The Source of Truth)
-- **Goal**: Establish the "Source of Truth" with embedded readiness assertions (Sphinch Marks).
-- **Required Skill**: `writing-plans`
-- **Orchestration**: Delegate to `@planner`. It MUST activate `writing-plans` to generate a structured Design Doc + Execution Plan (Problem, Plan, Alternatives, Sphinch Marks).
-- **Output**: A stand-alone implementation-ready spec at `workspace/artifacts/plan.md`.
+### Phase 2: Planning & Iterative Design Doc (Steps 05-08)
+- **Required Skill**: `design-as-code`
+- **Orchestration**:
+  - **05-08 Section Drafts**: Generate the Design Doc section-by-section (Problem -> Plan -> Alternatives -> Implementation). 
+  - **Approval Gate**: You MUST obtain explicit user approval after each section before proceeding.
+  - **Output**: A comprehensive `.md` spec in `docs/superpowers/specs/` enumerating EVERY file change.
 
-### Phase 3: The "Goldfish" Review Protocol
-- **Goal**: Convergent verification via sphinch mark pass/fail checks.
-- **Required Skill**: `verification-before-completion` (used diagnostically)
-- **Orchestration**: Delegate to a fresh `@generalist` (as a Goldfish) to test comprehension, and the `@verifier` to mechanically verify the Sphinch Marks in the plan.
-- **Output**: Verified plan.
+### Phase 3: The Goldfish Review Protocol (Steps 09-11)
+- **Required Skill**: `verification-before-completion`
+- **Orchestration**:
+  - **09 Comprehension**: Dispatch fresh `@generalist` to read the doc and explain the system.
+  - **10 Critic**: Dispatch `@adversary` to find missing edge cases and faulty assumptions.
+  - **11 Readiness**: Dispatch `@verifier` to confirm the doc is sufficient for first-pass implementation.
 
-### Phase 4: Execution & "Mean" Review
-- **Goal**: High-fidelity coding and strict adherence to readability and correctness.
-- **Required Skills**: `test-driven-development` and `systematic-debugging`
-- **Orchestration**: Delegate to the `@implementer`. They MUST invoke `test-driven-development` to write failing tests first. They MUST use `systematic-debugging` for any failures. 
+### Phase 4: Implementation & Mean Review (Steps 12-13)
+- **Required Skills**: `test-driven-development`, `systematic-debugging`
+- **Orchestration**:
+  - **12 Implement**: Dispatch `@implementer` with the finalized design doc. Enforce strict adherence to the file list.
+  - **13 Mean Review**: Dispatch `@reviewer` to "tear the code to shreds." Flag 10+ line comment gaps and readability failures.
 
 ### Phase 5: Final Verification & Wrap-Up
 - **Goal**: Rigorous QA and code integration.

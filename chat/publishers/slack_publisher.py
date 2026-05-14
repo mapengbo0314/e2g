@@ -21,7 +21,7 @@ def publish_to_slack(bot_token: str, channel_id: str, report_data: dict) -> bool
     }
     
     try:
-        resp = requests.post("https://slack.com/api/chat.postMessage", headers=headers, json=payload)
+        resp = requests.post("https://slack.com/api/chat.postMessage", headers=headers, json=payload, timeout=10)
         data = resp.json()
         if resp.status_code == 200 and data.get("ok"):
             return True
