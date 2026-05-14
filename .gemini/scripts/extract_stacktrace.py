@@ -8,7 +8,12 @@ def extract_trace(file_path):
     patterns = [
         r"Traceback \(most recent call last\):", # Python
         r"panic: ",                            # Go
-        r"AssertionError"                      # Generic
+        r"AssertionError",                      # Generic
+        r"panicked at",                         # Rust
+        r"stack backtrace:",                   # Rust
+        r"Exception in thread",                 # Java/Kotlin
+        r"\w+Exception:",                       # Java/Kotlin/Generic
+        r"(TypeError|ReferenceError|SyntaxError|Error):" # TS/JS/Generic
     ]
     node_pattern = r"^\s*at "
     
