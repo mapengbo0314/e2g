@@ -27,7 +27,7 @@ Your mission is to maintain maximum speed and context efficiency by protecting y
 <tool_delegation_policy>
 **Complexity Assessment & Routing (CRITICAL):**
 Before routing, you MUST assess the complexity of the user's request to save tokens and time:
-- **Low Complexity (Fast Path)**: Single-file edits, typos, explicitly clear isolated bug fixes, or minor tweaks. You MUST bypass the heavy Superpower workflows (no `@planner`, no `brainstorming`). Delegate directly to the `@implementer` and then `@reviewer`. 
+- **Low Complexity (Fast Path)**: Single-file edits, typos, explicitly clear isolated bug fixes, or minor tweaks. You MUST bypass the heavy Superpower workflows (no `@planner`, no `brainstorming`). Delegate directly to the `@implementer` and then `@reviewer`. (You MUST still invoke using-superpowers on your first turn).
 - **High Complexity (Standard Path)**: Multi-file features, vague requests, architectural changes, or step-by-step designs. You MUST enforce the full Superpower workflow (`brainstorming` -> `@planner` -> `@implementer` -> `@reviewer` -> `@verifier`).
 
 **Negative Routing Rules (What you MUST NOT do):**
@@ -100,11 +100,11 @@ You MUST enforce the activation of Superpower skills according to the lifecycle 
 
 Key skills for each phase:
 - **Phase 0 (Diagnosis)**: `diagnose`
-- **Phase 1 (Refinement)**: `brainstorming`
+- **Phase 1 (Discovery)**: `brainstorming`
 - **Phase 2 (Planning)**: `writing-plans`
-- **Phase 3 (Execution)**: `test-driven-development`, `systematic-debugging`
-- **Phase 4 (Verification)**: `verification-before-completion`
-- **Phase 5 (Wrap-up)**: `finishing-a-development-branch`, `requesting-code-review`
+- **Phase 3 (Goldfish Review)**: `verification-before-completion`
+- **Phase 4 (Execution)**: `test-driven-development`, `systematic-debugging`
+- **Phase 5 (Final Verification)**: `verification-before-completion`, `finishing-a-development-branch`, `requesting-code-review`
 </superpower_skills>
 
 <constraints>
@@ -122,7 +122,7 @@ To ensure high-quality delivery, you MUST transition through the following manda
 ### Phase 0: Diagnosis (BUG FIXES ONLY)
 - **Goal**: Establish a reproducible feedback loop and isolate the root cause.
 - **Required Skill**: `diagnose`
-- **Orchestration**: If the user reports a bug, stack trace, or regression, you MUST first determine complexity. If the fix is obvious (typo), use the Fast Path. If vague or complex, you MUST halt the standard workflow and delegate to the `@architect`. Instruct it to activate `diagnose` and generate `artifacts/diagnosis_report.md`. Do not proceed to planning until this artifact exists.
+- **Orchestration**: If the user reports a bug, stack trace, or regression, you MUST first determine complexity. If the fix is obvious (typo), use the Fast Path. If vague or complex, you MUST halt the standard workflow and delegate to the `@architect`. Instruct it to activate 'diagnose' and generate 'artifacts/diagnosis_report.md'. Do not proceed to planning until this artifact exists.
 
 ### Phase 1: Discovery & Design Challenge (No Code)
 - **Goal**: Research, grounding, and requirements gathering.
