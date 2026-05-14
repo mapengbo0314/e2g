@@ -29,58 +29,57 @@ def publish_to_slack(bot_token: str, channel_id: str, report_data: dict) -> bool
     
     if "github" in stats:
         gh = stats["github"]
+        gh_text = (
+            "🛠️ *Engineering Metrics (GitHub)*\n"
+            f"• *PRs Submitted:* {gh.get('prs_submitted', 0)}\n"
+            f"• *Lines Added:* {gh.get('lines_added', 0)}\n"
+            f"• *Lines Deleted:* {gh.get('lines_deleted', 0)}\n"
+            f"• *Bugs Closed:* {gh.get('bugs_closed', 0)}\n"
+            f"• *Releases:* {gh.get('releases_done', 0)}"
+        )
         blocks.append({
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "*Engineering Metrics (GitHub)*"
-            },
-            "fields": [
-                {"type": "mrkdwn", "text": f"*PRs Submitted:*\n{gh.get('prs_submitted', 0)}"},
-                {"type": "mrkdwn", "text": f"*Lines Added:*\n{gh.get('lines_added', 0)}"},
-                {"type": "mrkdwn", "text": f"*Lines Deleted:*\n{gh.get('lines_deleted', 0)}"},
-                {"type": "mrkdwn", "text": f"*Bugs Closed:*\n{gh.get('bugs_closed', 0)}"},
-                {"type": "mrkdwn", "text": f"*Releases:*\n{gh.get('releases_done', 0)}"}
-            ]
+                "text": gh_text
+            }
         })
         
     # Aggregate AI stats if multiple providers exist
     ai_keys = ["openai", "anthropic", "gemini"]
-    ai_blocks = []
+    ai_lines = []
     for ai_key in ai_keys:
         if ai_key in stats:
             ai = stats[ai_key]
-            ai_blocks.extend([
-                {"type": "mrkdwn", "text": f"*{ai_key.title()} Tokens:*\n{ai.get('tokens_consumed', 0)}"},
-                {"type": "mrkdwn", "text": f"*{ai_key.title()} Cost:*\n${ai.get('cost', 0.0)}"}
-            ])
+            ai_lines.append(f"• *{ai_key.title()}*: model `{ai.get('model', 'unknown')}` | In: {ai.get('tokens_in', 0)} | Out: {ai.get('tokens_out', 0)} | Cost: ${ai.get('cost', 0.0):.4f}")
             
-    if ai_blocks:
+    if ai_lines:
+        ai_text = "🤖 *AI Usage Metrics*\n" + "\n".join(ai_lines)
         blocks.append({
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "*AI Usage Metrics*"
-            },
-            "fields": ai_blocks[:10] # Slack limit is 10 fields per section
+                "text": ai_text
+            }
         })
         
     # Aggregate Cloud stats
     cloud_keys = ["aws", "gcp"]
-    cloud_blocks = []
+    cloud_lines = []
     for cloud_key in cloud_keys:
         if cloud_key in stats:
             cloud = stats[cloud_key]
-            cloud_blocks.append({"type": "mrkdwn", "text": f"*{cloud_key.upper()} Cost:*\n${cloud.get('cost', 0.0)}"})
+            cost_val = cloud.get('cost', 0.0)
+            cloud_lines.append(f"• *{cloud_key.upper()}:* ${cost_val:.2f}" if isinstance(cost_val, (int, float)) else f"• *{cloud_key.upper()}:* ${cost_val}")
             
-    if cloud_blocks:
+    if cloud_lines:
+        cloud_text = "☁️ *Infrastructure Costs*\n" + "\n".join(cloud_lines)
         blocks.append({
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "*Infrastructure Costs*"
-            },
-            "fields": cloud_blocks
+                "text": cloud_text
+            }
         })
         
     if "warnings" in report_data:

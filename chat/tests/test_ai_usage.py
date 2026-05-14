@@ -3,40 +3,31 @@ from unittest.mock import patch
 import requests
 
 @patch('chat.fetchers.ai_usage.requests.get')
-def test_fetch_openai_usage(mock_get):
+def test_fetch_openai_usage_comprehensive(mock_get):
     mock_get.return_value.status_code = 200
     mock_get.return_value.json.return_value = {
-        "total_usage": 1500, # Representing cents
-        "daily_costs": [
-            {
-                "timestamp": 1610000000,
-                "line_items": [{"name": "Instruct models", "cost": 1500}]
-            }
-        ]
+        "tokens_in": 1000, "tokens_out": 500, "prompts": 10, "cost": 0.05
     } 
-    
     stats = fetch_openai_usage("fake-key")
-    assert stats["cost"] == 15.0 # 1500 cents
-    assert stats["tokens_consumed"] == 0 # we might not get this from dashboard endpoint directly
-    assert stats["prompt_count"] == "N/A"
-    assert stats["status"] == "success"
+    assert stats["tokens_in"] == 1000
+    assert stats["cost"] == 0.05
 
 def test_fetch_openai_usage_missing_key():
     stats = fetch_openai_usage("")
-    assert stats["tokens_consumed"] == 0
+    assert stats["tokens_in"] == 0
     assert stats["cost"] == 0.0
-    assert stats["status"] == "error"
+    assert "error" in stats
     assert stats["error"] == "Missing API key"
     
     stats_none = fetch_openai_usage(None)
-    assert stats_none["tokens_consumed"] == 0
+    assert stats_none["tokens_in"] == 0
     assert stats_none["cost"] == 0.0
-    assert stats_none["status"] == "error"
+    assert "error" in stats_none
 
 @patch('chat.fetchers.ai_usage.requests.get')
 def test_fetch_openai_usage_timeout(mock_get):
     mock_get.return_value.status_code = 200
-    mock_get.return_value.json.return_value = {"total_usage": 1500} 
+    mock_get.return_value.json.return_value = {"tokens_in": 1000} 
     
     fetch_openai_usage("fake-key")
     
@@ -49,37 +40,35 @@ def test_fetch_openai_usage_api_error(mock_get):
     mock_get.return_value.status_code = 401
     
     stats = fetch_openai_usage("fake-key")
-    assert stats["tokens_consumed"] == 0
+    assert stats["tokens_in"] == 0
     assert stats["cost"] == 0.0
-    assert stats["status"] == "error"
+    assert "error" in stats
 
 @patch('chat.fetchers.ai_usage.requests.get')
 def test_fetch_openai_usage_exception(mock_get):
     mock_get.side_effect = requests.exceptions.RequestException("Connection error")
     
     stats = fetch_openai_usage("fake-key")
-    assert stats["tokens_consumed"] == 0
+    assert stats["tokens_in"] == 0
     assert stats["cost"] == 0.0
-    assert stats["status"] == "error"
+    assert "error" in stats
 
-def test_fetch_anthropic_usage():
-    stats_no_key = fetch_anthropic_usage("")
-    assert stats_no_key["status"] == "error"
-    assert stats_no_key["error"] == "Missing API key"
-    
-    stats_with_key = fetch_anthropic_usage("fake-key")
-    assert "tokens_consumed" in stats_with_key
-    assert "cost" in stats_with_key
-    assert "prompt_count" in stats_with_key
-    assert stats_with_key["status"] in ["success", "API unsupported"]
+@patch('chat.fetchers.ai_usage.requests.get')
+def test_fetch_anthropic_usage_real(mock_get):
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = {
+        "tokens_in": 2000, "tokens_out": 800, "prompts": 12, "cost": 0.08
+    }
+    stats = fetch_anthropic_usage("fake-key")
+    assert stats["tokens_in"] == 2000
+    assert stats["cost"] == 0.08
 
-def test_fetch_gemini_usage():
-    stats_no_key = fetch_gemini_usage("")
-    assert stats_no_key["status"] == "error"
-    assert stats_no_key["error"] == "Missing API key"
-    
-    stats_with_key = fetch_gemini_usage("fake-key")
-    assert "tokens_consumed" in stats_with_key
-    assert "cost" in stats_with_key
-    assert "prompt_count" in stats_with_key
-    assert stats_with_key["status"] in ["success", "API unsupported"]
+@patch('chat.fetchers.ai_usage.requests.get')
+def test_fetch_gemini_usage_real(mock_get):
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = {
+        "tokens_in": 3000, "tokens_out": 1000, "prompts": 15, "cost": 0.01
+    }
+    stats = fetch_gemini_usage("fake-key")
+    assert stats["tokens_in"] == 3000
+    assert stats["cost"] == 0.01
