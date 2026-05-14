@@ -293,6 +293,12 @@ def main():
             print("   - Review your workspace mcp.json to verify the command paths.")
             counter += 1
 
+        print(f"\n{counter}. [ACTION REQUIRED] Context Automation:")
+        print("   - The indxr GitHub Action (.github/workflows/update-indexer.yml) has been generated.")
+        print("   - To enable automated context updates on PRs, configure the following GitHub Secrets:")
+        print("     - GEMINI_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY")
+        counter += 1
+
         if sme_agent_name:
             print(f"\n{counter}. Context: The @{sme_agent_name} is now the gateway for all planning.")
             print(f"   Dispatch rules in {harness_folder}/rules/dispatch_rules.md have been updated.")
