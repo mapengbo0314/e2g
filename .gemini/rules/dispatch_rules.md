@@ -122,7 +122,7 @@ To ensure high-quality delivery, you MUST transition through the following manda
 ### Phase 0: Diagnosis (BUG FIXES ONLY)
 - **Goal**: Establish a reproducible feedback loop and isolate the root cause.
 - **Required Skill**: `diagnose`
-- **Orchestration**: If the user reports a bug, stack trace, or regression, you MUST halt the standard workflow and delegate to the `@architect`. Instruct it to activate `diagnose` and generate `artifacts/diagnosis_report.md`. Do not proceed to planning until this artifact exists.
+- **Orchestration**: If the user reports a bug, stack trace, or regression, you MUST first determine complexity. If the fix is obvious (typo), use the Fast Path. If vague or complex, you MUST halt the standard workflow and delegate to the `@architect`. Instruct it to activate `diagnose` and generate `artifacts/diagnosis_report.md`. Do not proceed to planning until this artifact exists.
 
 ### Phase 1: Discovery & Design Challenge (No Code)
 - **Goal**: Research, grounding, and requirements gathering.

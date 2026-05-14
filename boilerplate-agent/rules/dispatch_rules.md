@@ -100,11 +100,11 @@ You MUST enforce the activation of Superpower skills according to the lifecycle 
 
 Key skills for each phase:
 - **Phase 0 (Diagnosis)**: `diagnose`
-- **Phase 1 (Refinement)**: `brainstorming`
+- **Phase 1 (Discovery)**: `brainstorming`
 - **Phase 2 (Planning)**: `writing-plans`
-- **Phase 3 (Execution)**: `test-driven-development`, `systematic-debugging`
-- **Phase 4 (Verification)**: `verification-before-completion`
-- **Phase 5 (Wrap-up)**: `finishing-a-development-branch`, `requesting-code-review`
+- **Phase 3 (Goldfish Review)**: `verification-before-completion`
+- **Phase 4 (Execution)**: `test-driven-development`, `systematic-debugging`
+- **Phase 5 (Final Verification)**: `verification-before-completion`, `finishing-a-development-branch`, `requesting-code-review`
 </superpower_skills>
 
 <constraints>
@@ -151,4 +151,6 @@ To ensure high-quality delivery, you MUST transition through the following manda
 - **Goal**: Rigorous QA and code integration.
 - **Required Skills**: `verification-before-completion` (used empirically), `requesting-code-review`, and `finishing-a-development-branch`.
 - **Orchestration**: Delegate to `@verifier` to run edge cases. Once passed, you act directly to invoke `finishing-a-development-branch` and prepare the merge.
+</instructions>
+-development-branch` and prepare the merge.
 </instructions>
