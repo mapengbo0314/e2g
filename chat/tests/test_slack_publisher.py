@@ -8,9 +8,28 @@ def test_publish_to_slack_success(mock_post):
     mock_post.return_value.status_code = 200
     mock_post.return_value.json.return_value = {"ok": True}
     
-    result = publish_to_slack("token", "C123", {"report": "data"})
+    report_data = {
+        "project_id": "TEST-123",
+        "github": {"prs": 5, "lines": 100, "bugs": 1},
+        "ai": {"tokens": 500, "cost": 0.05},
+        "cloud": {"cost": 10.0},
+        "warnings": ["API rate limit near"]
+    }
+    
+    result = publish_to_slack("token", "C123", report_data)
     assert result is True
     mock_post.assert_called_once()
+    
+    # Verify blocks payload
+    call_kwargs = mock_post.call_args.kwargs
+    assert "json" in call_kwargs
+    payload = call_kwargs["json"]
+    assert "blocks" in payload
+    
+    blocks = payload["blocks"]
+    assert len(blocks) == 5
+    assert blocks[0]["type"] == "header"
+    assert "TEST-123" in blocks[0]["text"]["text"]
 
 def test_publish_to_slack_missing_credentials():
     # Empty credentials
