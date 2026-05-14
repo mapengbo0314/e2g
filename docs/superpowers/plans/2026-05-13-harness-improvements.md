@@ -154,7 +154,7 @@ Before routing, you MUST assess the user's request to save tokens and time:
    - **Question:** "Should I route this as a quick, localized fix, or run a deep architectural diagnosis?"
    - **Options:** `["Quick Fix (Fast Path)", "Deep Diagnosis (Standard Path)"]`
    - **Fallback:** If `ask_user` is unavailable or the user tells you to decide, default to the **Fast Path** (`@implementer`).
-- **High Complexity (Standard Path)**: Multi-file features, architectural changes, or step-by-step designs. Enforce the full Superpower workflow (`brainstorming` -> `@planner` -> `@implementer` -> `@reviewer` -> `@verifier`).
+- **High Complexity (Standard Path)**: Multi-file features, architectural changes, deep diagnosis, or step-by-step designs. Enforce the full Superpower workflow. If the task is a bug diagnosis, you MUST route to the `@architect` and explicitly instruct them to activate the `diagnose` skill. For features, follow (`brainstorming` -> `@planner` -> `@implementer` -> `@reviewer` -> `@verifier`).
 - **Escalation Loop**: If the `@implementer` fails to resolve a bug on the Fast Path, you must catch the failure and immediately escalate to the **Standard Path** (`@architect` -> `@planner`). When escalating to the `@architect`, you MUST instruct them to activate the `diagnose` skill before proceeding.
 ```
 
