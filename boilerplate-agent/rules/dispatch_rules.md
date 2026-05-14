@@ -145,7 +145,9 @@ To ensure high-quality delivery, you MUST transition through the following manda
 ### Phase 4: Execution & "Mean" Review
 - **Goal**: High-fidelity coding and strict adherence to readability and correctness.
 - **Required Skills**: `test-driven-development` and `systematic-debugging`
-- **Orchestration**: Delegate to the `@implementer`. They MUST invoke `test-driven-development` to write failing tests first. They MUST use `systematic-debugging` for any failures. 
+- **Orchestration**: 
+  - **Hard Gate**: Before implementation, you MUST run `run_shell_command(command="python scripts/gatekeeper.py --phase 4")`. This verifies the presence of `artifacts/implementation_plan.md` and `artifacts/tdd_failing_test.log`.
+  - **Action**: Delegate to the `@implementer`. They MUST invoke `test-driven-development` to write failing tests first. They MUST use `systematic-debugging` for any failures. 
 
 ### Phase 5: Final Verification & Wrap-Up
 - **Goal**: Rigorous QA and code integration.
