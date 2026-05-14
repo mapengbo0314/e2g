@@ -15,6 +15,6 @@ def publish_to_teams(webhook_url: str, report_data: dict) -> bool:
         else:
             logging.error(f"Teams webhook error: {resp.status_code} - {resp.text}")
             return False
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         logging.error(f"Failed to post to Teams: {e}")
         return False
