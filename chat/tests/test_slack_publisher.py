@@ -9,10 +9,12 @@ def test_publish_to_slack_success(mock_post):
     mock_post.return_value.json.return_value = {"ok": True}
     
     report_data = {
-        "project_id": "TEST-123",
-        "github": {"prs": 5, "lines": 100, "bugs": 1},
-        "ai": {"tokens": 500, "cost": 0.05},
-        "cloud": {"cost": 10.0},
+        "project": "TEST-123",
+        "stats": {
+            "github": {"prs_submitted": 5, "lines_added": 100, "lines_deleted": 10, "bugs_closed": 1, "releases_done": 0},
+            "openai": {"tokens_consumed": 500, "cost": 0.05},
+            "aws": {"cost": 10.0}
+        },
         "warnings": ["API rate limit near"]
     }
     
