@@ -3,9 +3,10 @@ import json
 from dotenv import load_dotenv
 
 def load_config():
-    test_mode = os.environ.get("TEST_MODE", "").lower() == "true"
-    if test_mode:
-        load_dotenv()
+    # Attempt to load from chat/.env if it exists
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
         
     projects_json_str = os.environ.get("PROJECTS_JSON")
     if projects_json_str:
