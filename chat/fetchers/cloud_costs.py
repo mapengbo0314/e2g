@@ -27,12 +27,14 @@ def fetch_aws_cost(aws_access_key_id: Optional[str], aws_secret_access_key: Opti
                 'Start': start_date,
                 'End': end_date
             },
-            Granularity='MONTHLY',
+            Granularity='DAILY',
             Metrics=['UnblendedCost']
         )
         
-        cost_str = response['ResultsByTime'][0]['Total']['UnblendedCost']['Amount']
-        cost = float(cost_str)
+        cost = 0.0
+        for result in response.get('ResultsByTime', []):
+            cost_str = result['Total']['UnblendedCost']['Amount']
+            cost += float(cost_str)
         
         return {
             "cost": cost,

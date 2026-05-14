@@ -11,7 +11,14 @@ def test_fetch_aws_cost_success():
                 {
                     "Total": {
                         "UnblendedCost": {
-                            "Amount": "12.50"
+                            "Amount": "10.00"
+                        }
+                    }
+                },
+                {
+                    "Total": {
+                        "UnblendedCost": {
+                            "Amount": "2.50"
                         }
                     }
                 }

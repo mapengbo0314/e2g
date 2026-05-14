@@ -61,6 +61,10 @@ def run_report():
                 report_data["stats"]["anthropic"] = global_anthropic_stats
             if global_gemini_stats:
                 report_data["stats"]["gemini"] = global_gemini_stats
+            if global_aws_stats:
+                report_data["stats"]["aws"] = global_aws_stats
+            if global_gcp_stats:
+                report_data["stats"]["gcp"] = global_gcp_stats
                 
             warnings = {}
             for stat_key, stat_val in list(report_data["stats"].items()):
