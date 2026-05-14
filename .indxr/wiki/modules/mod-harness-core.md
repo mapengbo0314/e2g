@@ -80,3 +80,4 @@ The redesigned data flow emphasizes context efficiency and user-driven refinemen
 7. **Workspace Minting** (`mint_workspace`) → Final assembly, template cloning, and configuration injection (including dynamic dispatch rule updates).
 
 **Removed Components**: The `indexer_wrapper.py` and `indexing/main.py` modules have been eliminated, reflecting the shift away from heavy indexing toward lightweight, wiki-based context acquisition and interactive profiling. This reduces external dependencies and simplifies the operational model.
+

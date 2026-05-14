@@ -24,8 +24,8 @@ source_files:
 - boilerplate-agent/scripts/clone_harness.py
 - boilerplate-agent/scripts/clone_harness.sh
 - boilerplate-agent/scripts/setup_harness.sh
-generated_at_ref: b341f91c9dedfba9ea77683443093879cad39600
-generated_at: 2026-05-12T23:04:50Z
+generated_at_ref: b29a3ffd2cf37a1a0c14e3c142224bee9fdd325d
+generated_at: 2026-05-14T04:26:21Z
 links_to:
 - mod-harness-core
 covers:
@@ -37,9 +37,9 @@ covers:
 - key:skills
 - key:related_agents
 contradictions:
-- description: Wiki listed codesigner and designdoc-drafter as active agents, but they have been removed from the boilerplate agents directory.
-  source: boilerplate-agent/agents/codesigner.md
-  detected_at: 2026-05-12T23:04:50Z
+- description: 'Wiki stated architecture is organized into three distinct lifecycle phases, but dispatch_rules.md now defines four phases starting with Phase 0: Diagnosis.'
+  source: boilerplate-agent/rules/dispatch_rules.md
+  detected_at: 2026-05-14T04:26:21Z
 ---
 
 # Boilerplate Agent System
@@ -48,8 +48,9 @@ The Boilerplate Agent System provides a reference implementation of a hierarchic
 
 ## Architecture
 
-The system follows a dynamic, Domain-Driven Design (DDD) approach organized into three distinct lifecycle phases:
+The system follows a dynamic, Domain-Driven Design (DDD) approach organized into four distinct lifecycle phases:
 
+0.  **Phase 0: Diagnosis (BUG FIXES ONLY)**: Initial triage and root-cause analysis for reported defects before entering the planning stage.
 1.  **Phase 1: Discovery & DDD Alignment**: Automatic analysis of project domains and technical stacks to establish the ubiquitous language and architectural boundaries.
 2.  **Phase 2: Minting & Setup**: Dynamic creation of specialized agents and workspace configuration, including tool installation and rule injection.
 3.  **Phase 3: Final User State**: The operational environment where the `orchestrator` manages execution via delegated sub-agents.
@@ -89,10 +90,11 @@ Agents are defined as Markdown documents, emphasizing clear mandates and operati
 
 ### Rule-Based Configuration
 - **Core Mandates**: Fundamental rules including a **Wiki-First Indexer Integration** that prioritizes the codebase index for context (`boilerplate-agent/rules/core_mandates.md`).
-- **Dispatch Rules**: Routing logic that enforces the transition between Brainstorming, Planning, TDD, and Implementation (`boilerplate-agent/rules/dispatch_rules.md`).
+- **Dispatch Rules**: Routing logic that enforces the transition between Diagnosis, Brainstorming, Planning, TDD, and Implementation (`boilerplate-agent/rules/dispatch_rules.md`).
 
 ### Skills Integration
-The system utilizes a modular skills configuration (`boilerplate-agent/skills.json`) and supports dynamic skill fetching. Key skills include:
+The system utilizes a modular skills configuration (`boilerplate-agent/skills.json`) and supports dynamic skill fetching. Skills are now consolidated within the `boilerplate-agent/skills/` directory. Key skills include:
+- **diagnose**: Specialized skill for bug triage and stacktrace extraction (utilizing `extract_stacktrace.py`).
 - **grill-me**: Interactive validation of plans and designs.
 - **grill-with-docs**: Documentation-aware analysis and ADR enforcement.
 - **improve-codebase-architecture**: Proactive identification of refactoring opportunities.

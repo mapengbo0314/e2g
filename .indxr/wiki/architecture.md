@@ -108,3 +108,4 @@ The system follows a streamlined data flow from raw codebase to fully functional
 3. **Dynamic Routing**: The Minting Engine now actively modifies `dispatch_rules.md` to inject project-specific agents.
 4. **Indexing Decoupling**: The harness no longer includes its own indexing engine, instead consuming index data via MCP or `acquire_mcp_context()`.
 5. **Flattened Structure**: Removal of `core/` and `discovery/` subdirectories in the agent configuration hierarchy.
+

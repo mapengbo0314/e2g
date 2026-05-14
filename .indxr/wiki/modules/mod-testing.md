@@ -108,3 +108,4 @@ The test infrastructure validates critical handoff points between harness compon
 - **Remote Skills → Local Integration** - Incorporation of external skills into agent workflows.
 
 These tests serve as integration contracts, ensuring that changes to [[mod-harness-core]] components don't break the lifecycle phases described in [[architecture]].
+

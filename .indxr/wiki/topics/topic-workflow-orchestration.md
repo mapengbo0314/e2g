@@ -86,3 +86,4 @@ The harness includes advanced automation for workspace setup:
 **Domain-Aware Processing**: Domain-Driven Design (DDD) analysis provides architectural intelligence that informs agent decision-making throughout the workflow.
 
 **Tool Orchestration**: Automated installation of workspace tools, skills, and MCP configurations during the minting process.
+
