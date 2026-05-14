@@ -34,3 +34,12 @@ The code will be housed in a new `chat/` directory within the root repository.
 *   **Isolated Failures:** If a specific fetcher fails, it logs the error but does not crash the script.
 *   **Report Annotation:** The final report includes an "Errors/Warnings" section if data sources fail.
 *   **Critical Failures:** Failure to load the Configuration Store or Secret Store halts execution.
+
+## 5. Testing & Verification
+To verify the bot functions correctly before enterprise deployment, we will build a local test harness.
+*   **Local Overrides:** `config.py` will support a `TEST_MODE` flag. When enabled, it will bypass DynamoDB/Secrets Manager and load configuration/secrets directly from a local `.env` file.
+*   **Sample Run:** To test, you will need to provide:
+    *   A Slack Bot Token installed in your workspace.
+    *   The Channel ID of your sample Slack channel.
+    *   (Optional) A sample API key (e.g., GitHub Personal Access Token) to test real data fetching.
+*   The function will execute locally, pulling sample data (or mocked data if keys are omitted) and publishing a real message to the sample Slack channel to verify formatting and connectivity.
