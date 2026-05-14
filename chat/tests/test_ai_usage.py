@@ -21,6 +21,17 @@ def test_fetch_openai_usage_missing_key():
     assert stats_none["error"] == "Missing API key"
 
 @patch('chat.fetchers.ai_usage.requests.get')
+def test_fetch_openai_usage_timeout(mock_get):
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = {"total_usage": 1500} 
+    
+    fetch_openai_usage("fake-key")
+    
+    # Assert timeout is provided
+    kwargs = mock_get.call_args.kwargs
+    assert kwargs.get("timeout") == 10
+
+@patch('chat.fetchers.ai_usage.requests.get')
 def test_fetch_openai_usage_api_error(mock_get):
     mock_get.return_value.status_code = 401
     

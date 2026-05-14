@@ -2,8 +2,9 @@
 import requests
 import logging
 from datetime import datetime, timedelta
+from typing import Optional
 
-def fetch_openai_usage(api_key: str) -> dict:
+def fetch_openai_usage(api_key: Optional[str]) -> dict:
     if not api_key:
         return {"total_usage": 0, "error": "Missing API key"}
         
@@ -15,7 +16,8 @@ def fetch_openai_usage(api_key: str) -> dict:
     try:
         resp = requests.get(
             f"https://api.openai.com/v1/dashboard/billing/usage?start_date={start_date}&end_date={end_date}", 
-            headers=headers
+            headers=headers,
+            timeout=10
         )
         if resp.status_code == 200:
             return resp.json()
