@@ -31,3 +31,16 @@ def test_load_config_projects_json(monkeypatch):
     assert len(config["projects"]) == 2
     assert config["projects"]["proj-1"]["slack_channel_id"] == "C1"
     assert config["projects"]["proj-2"]["teams_url"] == "http://teams"
+
+def test_load_config_cloud_credentials(monkeypatch):
+    monkeypatch.setenv("TEST_MODE", "true")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "aws-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "aws-secret")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/path/to/gcp.json")
+    
+    from chat.config import load_config
+    config = load_config()
+    
+    assert config["aws_access_key_id"] == "aws-key"
+    assert config["aws_secret_access_key"] == "aws-secret"
+    assert config["google_application_credentials"] == "/path/to/gcp.json"

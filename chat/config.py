@@ -34,5 +34,8 @@ def load_config():
         "openai_api_key": os.environ.get("OPENAI_API_KEY"),
         "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY"),
         "gemini_api_key": os.environ.get("GEMINI_API_KEY"),
+        "aws_access_key_id": os.environ.get("AWS_ACCESS_KEY_ID"),
+        "aws_secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
+        "google_application_credentials": os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"),
         "projects": projects
     }
