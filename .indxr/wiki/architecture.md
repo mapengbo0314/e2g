@@ -9,18 +9,9 @@ source_files:
 - harness/discovery_engine.py
 - harness/indexer_wrapper.py
 - harness/minting_engine.py
-generated_at_ref: 4bbe7939e71fff4da4165e7e47ab641f11589b36
-generated_at: 2026-05-14T04:43:28Z
-links_to:
-- architecture
-- mod-agents
-- mod-boilerplate-agent
-- mod-harness-core
-- mod-skills
-- topic-workflow-orchestration
-- mod-documentation
-- mod-testing
-- index
+generated_at_ref: 77df166158f6da25c1fb0e84492b38d646ca42f3
+generated_at: 2026-05-14T18:56:52Z
+links_to: []
 covers:
 - 'heading:Codebase Index: e-2-g'
 - heading:The Universal Agentic Harness Lifecycle
@@ -43,10 +34,6 @@ covers:
 - fn:synthesize_domain_sme_agent
 - fn:patch_orchestrator_rules
 - fn:install_workspace_tools
-contradictions:
-- description: Wiki previously implied dispatch_rules.md was static, but mint_workspace now dynamically injects DDD agents into it.
-  source: harness/minting_engine.py:100
-  detected_at: 2026-05-14T04:43:28Z
 ---
 
 # Architecture Overview
@@ -69,23 +56,29 @@ The bootstrap layer (`harness/`) contains stateless utilities that analyze codeb
     - **Dynamic Rule Patching**: `patch_orchestrator_rules()` injects new agents into the Orchestrator's `dispatch_rules.md`.
     - **DDD Agent Injection**: During `mint_workspace`, the engine dynamically injects routing rules for discovered DDD agents into `dispatch_rules.md` just before the negative routing section.
     - **Tool Installation**: `install_workspace_tools()` downloads remote skills and configures MCPs.
-    - **Recursive Includes**: Uses `process_includes()` to resolve `@path` directives within templates, supporting placeholder replacements.
-- **CLI Orchestrator** (`harness/cli.py`): Manages the interactive flow between discovery and minting, including the `run_ddd_grill()` phase and path normalization (e.g., handling `.gemini` folder nesting).
+    - **Recursive Includes**: Uses `process_includes()` to resolve ` @path` directives within templates, supporting placeholder replacements.
+- **CLI Orchestrator** (`harness/cli.py`): Manages the interactive flow between discovery and minting, including the `run_ddd_grill()` phase and path normalization logic to prevent nesting when running the harness inside a `.gemini` folder.
 
 ### Agent Configuration Layer
 The agent configuration system uses a **Markdown-based definition system**, prioritizing human readability and ease of modification:
 
 - **Project-Specific Agents** (`.gemini/agents/`): Standalone Markdown files (e.g., `adversary.md`, `architect.md`) contain the full system prompts and mandates for subagents.
 - **Boilerplate Template** (`boilerplate-agent/agents/`): A flattened directory of agent definitions used as the source for new workspaces.
-- **Orchestration Rules**: Centralized in `boilerplate-agent/rules/`, defining the `core_mandates.md` and the `dispatch_rules.md` that govern the Hub-and-Spoke interaction.
+- **Orchestration Rules**: Centralized in `boilerplate-agent/rules/`. Governance is split into modular mandates to ensure granular control over agent behavior:
+    - `core_mandates.md`: High-level system constraints.
+    - `base_mandate.md`: General operational standards.
+    - `coding_mandate.md`: Development, typing, and TDD standards.
+    - `indexer_mandate.md`: MCP and indexing usage rules.
+    - `dispatch_rules.md`: Governs the Hub-and-Spoke interaction and phase transitions.
 
 ### Execution Layer (Skills + Orchestration)
 The execution layer supports dynamic extension and domain-aware workflows:
 
 - **Remote Skills**: Dynamic skill acquisition from external repositories via `fetch_skill()` and `fetch_remote_skill()`.
 - **Domain SME Integration**: A dedicated Domain SME subagent is minted for every workspace.
-- **Publishing & Notifications**: New support for external communication, such as the `SlackPublisher` (`chat/publishers/slack_publisher.py`).
+- **Publishing & Notifications**: External communication support, such as the `SlackPublisher` (`chat/publishers/slack_publisher.py`).
 - **DDD-Aware Workflows**: Orchestration rules enforce a lifecycle (Brainstorming -> Planning -> TDD -> Implementation) that integrates DDD context at every gate.
+- **Verification & Governance**: Includes scripts like `gatekeeper.py` (`boilerplate-agent/scripts/gatekeeper.py`) to enforce mandates during the agentic lifecycle.
 
 ## Data Flow Architecture
 
@@ -102,7 +95,7 @@ The system follows a streamlined data flow from raw codebase to fully functional
 
 - **Markdown-First**: All agent definitions and rules are Markdown files.
 - **Flat Hierarchy**: Simplified directory structures for lower context usage.
-- **Dynamic Routing**: The Orchestrator uses explicit `@agent` mentions in dispatch rules to manage the subagent lifecycle.
+- **Dynamic Routing**: The Orchestrator uses explicit ` @agent` mentions in dispatch rules to manage the subagent lifecycle.
 
 ## Key Design Invariants
 
@@ -116,56 +109,47 @@ The system follows a streamlined data flow from raw codebase to fully functional
 
 1. **Agent Format**: Full migration from JSON/YAML configurations to Markdown files in `.gemini/agents/`.
 2. **Dispatch Rule Injection**: The system now dynamically modifies `dispatch_rules.md` to register discovered DDD agents during the minting process.
-3. **Removed Legacy Files**: Removed `.gemini/orchestrator.md` and `.gemini/rules/dispatch_rules.md` from the root in favor of the `boilerplate-agent/` template structure.
-4. **Indexing Decoupling**: The harness no longer includes its own indexing engine, instead consuming index data via MCP.
-5. **Stacktrace Extraction**: The `extract_stacktrace.py` utility has moved to a test-focused location, with corresponding unit tests added.
+3. **Modular Mandates**: Governance rules have been split into domain-specific files (`base`, `coding`, `indexer`) to improve maintainability and granularity of agent constraints.
+4. **Documentation Consolidation**: Removed the internal `.indxr/wiki/` directory in favor of project-root documentation (e.g., `ARCHITECTURE.md`, `INDEX.md`).
+5. **Removed Legacy Files**: Removed `.gemini/orchestrator.md` and `.gemini/rules/dispatch_rules.md` from the root in favor of the `boilerplate-agent/` template structure.
+6. **Indexing Decoupling**: The harness no longer includes its own indexing engine, instead consuming index data via MCP.
+7. **Stacktrace Extraction**: The `extract_stacktrace.py` utility has moved to a test-focused location, with corresponding unit tests added.
 
-# Structural Diff
+# Structural Changes
 
-# Structural Changes (since May 10, 2026)
+## Changes as of May 14, 2026
 
-## Added Files
-- boilerplate-agent/scripts/update_index.sh
-- chat/publishers/slack_publisher.py
-- chat/tests/test_slack_publisher.py
-- tests/test_extract_stacktrace.py
+### Added Files
+- `boilerplate-agent/rules/base_mandate.md`
+- `boilerplate-agent/rules/coding_mandate.md`
+- `boilerplate-agent/rules/indexer_mandate.md`
+- `boilerplate-agent/scripts/gatekeeper.py`
 
-## Removed Files
-- .gemini/orchestrator.md
-- .gemini/rules/dispatch_rules.md
-- .gemini/scripts/extract_stacktrace.py
-- .github/workflows/update-indexer.yml
-- .indxr/wiki/architecture.md
-- .indxr/wiki/index.md
-- .indxr/wiki/manifest.yaml
-- .indxr/wiki/modules/mod-agents.md
-- .indxr/wiki/modules/mod-boilerplate-agent.md
-- .indxr/wiki/modules/mod-documentation.md
-- .indxr/wiki/modules/mod-harness-core.md
-- .indxr/wiki/modules/mod-skills.md
-- .indxr/wiki/modules/mod-testing.md
-- .indxr/wiki/topics/topic-workflow-orchestration.md
+### Removed Files
+- Entire `.indxr/wiki/` directory (consolidated into root docs).
 
-## Modified Files
+## Changes as of May 10, 2026
 
-### chat/fetchers/ai_usage.py
+### Added Files
+- `boilerplate-agent/scripts/update_index.sh`
+- `chat/publishers/slack_publisher.py`
+- `chat/tests/test_slack_publisher.py`
+- `tests/test_extract_stacktrace.py`
+
+### Modified Files
+
+#### chat/fetchers/ai_usage.py
 ~ `def fetch_openai_usage(api_key: Optional[str]) -> dict` (api_key is now optional)
 
-### harness/minting_engine.py
+#### harness/minting_engine.py
 + Logic in `mint_workspace` to inject DDD agents into `dispatch_rules.md`.
-~ `process_includes` updated to handle `@path` directives and placeholder replacements.
+~ `process_includes` updated to handle ` @path` directives and placeholder replacements.
 
-### harness/cli.py
+#### harness/cli.py
 + Added path normalization logic to prevent nesting when running the harness inside a `.gemini` folder.
 
-# Other Wiki Pages
-[[architecture]] — Architecture Overview
-[[mod-agents]] — Agent Configuration System
-[[mod-boilerplate-agent]] — Boilerplate Agent System
-[[mod-harness-core]] — Core Harness Components
-[[mod-skills]] — Skills System
-[[topic-workflow-orchestration]] — Workflow Orchestration and Phase Management
-[[mod-documentation]] — Technical Documentation and Specifications
-[[mod-testing]] — Testing Infrastructure
-[[index]] — Wiki Index
-
+# Project Documentation
+- `ARCHITECTURE.md` — This document
+- `INDEX.md` — Comprehensive Codebase Index and API Surface
+- `GEMINI.md` — Agentic Harness instructions and routing rules
+- `ONBOARDING_GUIDE.md` — Guide for setting up new projects with the harness

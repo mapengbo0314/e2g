@@ -3,8 +3,8 @@ id: index
 title: Wiki Index
 page_type: index
 source_files: []
-generated_at_ref: 4bbe7939e71fff4da4165e7e47ab641f11589b36
-generated_at: 2026-05-14T04:43:28Z
+generated_at_ref: 77df166158f6da25c1fb0e84492b38d646ca42f3
+generated_at: 2026-05-14T18:56:52Z
 links_to:
 - architecture
 - mod-agents
@@ -17,29 +17,30 @@ links_to:
 covers: []
 ---
 
-# Codebase Wiki Index
+# Wiki Index
 
 ## Architecture
-- **Architecture Overview**: The universal agentic harness lifecycle and core execution flow. [[architecture]]
+- [[architecture]] — **Architecture Overview**: High-level overview of the e-2-g system, the Universal Agentic Harness Lifecycle, and core entry points like `main` and `run_ddd_grill`.
 
 ## Modules
-- **Agent Configuration System**: System-wide configuration and management of agent definitions. [[mod-agents]]
-- **Boilerplate Agent System**: Standards for agent metadata keys and structure (name, type, skills). [[mod-boilerplate-agent]]
-- **Core Harness Components**: Implementation of core CLI functions including workspace minting, tech stack detection, and tool installation. [[mod-harness-core]]
-- **Technical Documentation & Specs**: AST-grounded enrichment pipeline, tree-sitter integration, and harness initialization design. [[mod-documentation]]
-- **Skills System**: Framework for managing and fetching modular agent skills. [[mod-skills]]
-- **Testing Infrastructure**: Test suites for discovery engines, MCP context, and the E2G indexing pipeline bug log. [[mod-testing]]
+- [[mod-agents]] — **Agent Configuration System**: Documentation on how agents are configured and managed within the harness.
+- [[mod-boilerplate-agent]] — **Boilerplate Agent System**: Reference for agent metadata keys including name, type, entrypoints, and skills.
+- [[mod-harness-core]] — **Core Harness Components**: Technical implementation details for workspace minting, tech stack detection, and tool installation.
+- [[mod-skills]] — **Skills System**: General overview of the agent skills infrastructure.
+- [[mod-documentation]] — **Technical Documentation and Specifications**: Collection of design documents, including AST-grounded enrichment, Tree-sitter integration, and the `harness init` CLI.
+- [[mod-testing]] — **Testing Infrastructure**: Central hub for the bug log and unit/integration tests for discovery engines and context acquisition.
 
 ## Topics
-- **Workflow Orchestration**: Management of execution phases and orchestrator routing logic. [[topic-workflow-orchestration]]
+- [[topic-workflow-orchestration]] — **Workflow Orchestration and Phase Management**: Deep dive into how the harness manages execution phases and agent routing.
 
 ---
 
 ## Quick Reference
-- **Understand the big picture** → [[architecture]]
-- **Define or modify agents** → [[mod-agents]] or [[mod-boilerplate-agent]]
-- **Work with core logic (minting/discovery)** → [[mod-harness-core]]
-- **Review workflow phases & orchestration** → [[topic-workflow-orchestration]]
-- **Deep dive into AST indexing or specs** → [[mod-documentation]]
-- **Debug failures or run tests** → [[mod-testing]]
-
+| To understand... | Go to... |
+| :--- | :--- |
+| **System Lifecycle & Entrypoints** | [[architecture]] |
+| **Workspace Initialization Logic** | [[mod-harness-core]] |
+| **Agent Metadata & Metadata Keys** | [[mod-boilerplate-agent]] |
+| **Workflow Phases & Hub-and-Spoke** | [[topic-workflow-orchestration]] |
+| **Design Docs & Refactor Plans** | [[mod-documentation]] |
+| **Test Coverage & Known Bugs** | [[mod-testing]] |
