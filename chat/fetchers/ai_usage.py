@@ -26,3 +26,13 @@ def fetch_openai_usage(api_key: Optional[str]) -> dict:
     except Exception as e:
         logging.error(f"OpenAI fetch failed: {e}")
         return {"total_usage": 0, "error": str(e)}
+
+def fetch_anthropic_usage(api_key: Optional[str]) -> dict:
+    if not api_key:
+        return {"total_usage": 0, "error": "Missing API key"}
+    return {"total_usage": 0, "status": "stubbed"}
+
+def fetch_gemini_usage(api_key: Optional[str]) -> dict:
+    if not api_key:
+        return {"total_usage": 0, "error": "Missing API key"}
+    return {"total_usage": 0, "status": "stubbed"}

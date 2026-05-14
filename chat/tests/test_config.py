@@ -8,9 +8,13 @@ def test_load_config_test_mode(monkeypatch):
     monkeypatch.setenv("PROJECT_ID", "proj-1")
     monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
     monkeypatch.setenv("REPO", "owner/repo")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-test")
     
     config = load_config()
     assert config["slack_bot_token"] == "xoxb-test"
+    assert config["anthropic_api_key"] == "sk-ant-test"
+    assert config["gemini_api_key"] == "gemini-test"
     assert "proj-1" in config["projects"]
     assert config["projects"]["proj-1"]["slack_channel_id"] == "C123"
     assert config["projects"]["proj-1"]["repo"] == "owner/repo"

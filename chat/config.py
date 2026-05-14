@@ -32,5 +32,7 @@ def load_config():
         "slack_bot_token": os.environ.get("SLACK_BOT_TOKEN"),
         "github_token": os.environ.get("GITHUB_TOKEN"),
         "openai_api_key": os.environ.get("OPENAI_API_KEY"),
+        "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY"),
+        "gemini_api_key": os.environ.get("GEMINI_API_KEY"),
         "projects": projects
     }

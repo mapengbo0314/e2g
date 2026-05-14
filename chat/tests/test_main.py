@@ -40,22 +40,30 @@ def test_run_report_teams(mock_load, mock_teams):
 
     mock_teams.assert_called_once_with("https://teams.webhook.url", {"project": "proj-teams", "stats": {}})
 
+@patch('chat.main.fetch_gemini_usage')
+@patch('chat.main.fetch_anthropic_usage')
 @patch('chat.main.fetch_openai_usage')
 @patch('chat.main.load_config')
-def test_run_report_openai_fetched_once(mock_load, mock_openai):
+def test_run_report_ai_fetched_once(mock_load, mock_openai, mock_anthropic, mock_gemini):
     mock_load.return_value = {
         "openai_api_key": "openai-key",
+        "anthropic_api_key": "anthropic-key",
+        "gemini_api_key": "gemini-key",
         "projects": {
             "proj-1": {},
             "proj-2": {}
         }
     }
     mock_openai.return_value = {"usage": 100}
+    mock_anthropic.return_value = {"status": "stubbed"}
+    mock_gemini.return_value = {"status": "stubbed"}
 
     run_report()
 
     # Should only be called once, outside the project loop
     mock_openai.assert_called_once_with("openai-key")
+    mock_anthropic.assert_called_once_with("anthropic-key")
+    mock_gemini.assert_called_once_with("gemini-key")
 
 @patch('chat.main.publish_to_slack')
 @patch('chat.main.fetch_github_stats')

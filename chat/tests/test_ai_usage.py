@@ -1,5 +1,5 @@
 # chat/tests/test_ai_usage.py
-from chat.fetchers.ai_usage import fetch_openai_usage
+from chat.fetchers.ai_usage import fetch_openai_usage, fetch_anthropic_usage, fetch_gemini_usage
 from unittest.mock import patch
 import requests
 
@@ -46,3 +46,17 @@ def test_fetch_openai_usage_exception(mock_get):
     stats = fetch_openai_usage("fake-key")
     assert stats["total_usage"] == 0
     assert stats["error"] == "Connection error"
+
+def test_fetch_anthropic_usage():
+    stats_no_key = fetch_anthropic_usage("")
+    assert stats_no_key["error"] == "Missing API key"
+    
+    stats_with_key = fetch_anthropic_usage("fake-key")
+    assert stats_with_key["status"] == "stubbed"
+
+def test_fetch_gemini_usage():
+    stats_no_key = fetch_gemini_usage("")
+    assert stats_no_key["error"] == "Missing API key"
+    
+    stats_with_key = fetch_gemini_usage("fake-key")
+    assert stats_with_key["status"] == "stubbed"

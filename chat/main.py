@@ -1,6 +1,6 @@
 from chat.config import load_config
 from chat.fetchers.github_stats import fetch_github_stats
-from chat.fetchers.ai_usage import fetch_openai_usage
+from chat.fetchers.ai_usage import fetch_openai_usage, fetch_anthropic_usage, fetch_gemini_usage
 from chat.publishers.slack_publisher import publish_to_slack
 from chat.publishers.teams_publisher import publish_to_teams
 import logging
@@ -15,6 +15,20 @@ def run_report():
             global_openai_stats = fetch_openai_usage(config["openai_api_key"])
         except Exception as e:
             logging.error(f"Failed to fetch global OpenAI usage: {e}")
+            
+    global_anthropic_stats = None
+    if config.get("anthropic_api_key"):
+        try:
+            global_anthropic_stats = fetch_anthropic_usage(config["anthropic_api_key"])
+        except Exception as e:
+            logging.error(f"Failed to fetch global Anthropic usage: {e}")
+            
+    global_gemini_stats = None
+    if config.get("gemini_api_key"):
+        try:
+            global_gemini_stats = fetch_gemini_usage(config["gemini_api_key"])
+        except Exception as e:
+            logging.error(f"Failed to fetch global Gemini usage: {e}")
     
     for project_id, proj_config in config.get("projects", {}).items():
         logging.info(f"Processing project: {project_id}")
@@ -28,6 +42,10 @@ def run_report():
                 
             if global_openai_stats:
                 report_data["stats"]["openai"] = global_openai_stats
+            if global_anthropic_stats:
+                report_data["stats"]["anthropic"] = global_anthropic_stats
+            if global_gemini_stats:
+                report_data["stats"]["gemini"] = global_gemini_stats
                 
             warnings = {}
             for stat_key, stat_val in list(report_data["stats"].items()):
