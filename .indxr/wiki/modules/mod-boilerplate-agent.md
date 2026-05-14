@@ -114,3 +114,4 @@ The discovery system integrates with the project's environment to ensure high-fi
 3.  **Rule-Based Orchestration**: Behavior is governed by explicit, versioned rules in Markdown rather than hardcoded logic.
 4.  **Contextual Grounding**: Deep integration with the project index (via `indxr`) to maintain accuracy without token bloat.
 
+

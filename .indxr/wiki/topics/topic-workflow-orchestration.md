@@ -88,3 +88,4 @@ The harness includes advanced automation for workspace setup:
 **Tool Orchestration**: Automated installation of workspace tools, skills, and MCP configurations during the minting process.
 
 
+

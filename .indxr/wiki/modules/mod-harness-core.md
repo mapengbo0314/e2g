@@ -8,9 +8,11 @@ source_files:
 - harness/indexer_wrapper.py
 - harness/indexing/main.py
 - harness/minting_engine.py
-generated_at_ref: b341f91c9dedfba9ea77683443093879cad39600
-generated_at: 2026-05-12T23:04:50Z
-links_to: []
+generated_at_ref: 4bbe7939e71fff4da4165e7e47ab641f11589b36
+generated_at: 2026-05-14T04:43:28Z
+links_to:
+- architecture
+- onboardingindxr-ci-automation
 covers:
 - fn:parse_args
 - fn:run_ddd_grill
@@ -35,50 +37,56 @@ covers:
 
 # Core Harness Components
 
-The core harness components form the operational backbone of the E2G system, orchestrating the discovery-to-deployment pipeline through specialized modules that handle CLI interaction, agent discovery, and workspace generation. The system has evolved from a traditional indexing-based approach to a dynamic, onboarding-centric architecture focused on Domain-Driven Design (DDD) principles and interactive refinement.
+The core harness components form the operational backbone of the E2G system, orchestrating the discovery-to-deployment pipeline through specialized modules that handle CLI interaction, agent discovery, and workspace generation. The system has moved away from heavy indexing-based approaches toward a dynamic, onboarding-centric architecture focused on Domain-Driven Design (DDD) principles and interactive refinement.
 
 ## Command Line Interface (cli.py)
 
 The CLI serves as the primary entry point, parsing user arguments and delegating to the appropriate subsystems. `parse_args()` returns an `argparse.Namespace` with fields for project path, output directory, and optional bundle override.
 
-`main()` orchestrates the pipeline, which now includes an interactive DDD context grilling phase. `run_ddd_grill()` engages users with alignment questions to better understand project requirements and domain context. This human-in-the-loop approach ensures the generated agents are grounded in the specific needs of the project.
+`main()` orchestrates the pipeline and now includes **Path Normalization** logic to ensure consistency. If a user provides a path directly to a `.gemini` folder, the CLI automatically backtracks to the project root for discovery while maintaining the `.gemini` folder as the target for workspace minting.
+
+The pipeline includes an interactive DDD context grilling phase via `run_ddd_grill()`, which engages users with alignment questions to better ground the generated agents in the specific needs of the project.
 
 ## Discovery Engine (discovery_engine.py)
 
-The discovery engine focuses on lightweight context acquisition and tech-stack profiling to drive agent recommendations. Key functions include:
+The discovery engine focuses on lightweight context acquisition and tech-stack profiling. Key functions include:
 
-- **`acquire_mcp_context()`** - Acquires project context from core wiki files. It supports a `detailed` mode for exhaustive reads and allows specifying a `bundle_path` to target specific documentation sets or indices.
-- **`detect_tech_stack()`** - Performs heuristic detection of the project's technology stack by searching up to 2 levels deep for configuration files (e.g., `package.json`, `pyproject.toml`).
-- **`discover_ddd_context()`** - Extracts Domain-Driven Design context using remote skills and deterministic questions, establishing the architectural foundation for the workspace.
-- **`discover_agents()`** - Recommends specialized agents based on the project context, feature fetcher specifications, and DDD insights.
-- **`generate_onboarding_domain_doc()`** - A critical new component that generates an `ONBOARDING_DOMAIN.md` template using LLM profiling. This document serves as the bridge between discovery and minting, allowing users to verify discovered tools and domain concepts before they are baked into the workspace.
+- **`acquire_mcp_context()`** - Acquires project context from core wiki files. It supports a `detailed` mode for exhaustive reads.
+- **`detect_tech_stack()`** - Performs heuristic detection of the technology stack by searching up to 2 levels deep for configuration files (e.g., `package.json`, `pyproject.toml`).
+- **`discover_ddd_context()`** - Extracts Domain-Driven Design context using remote skills and deterministic questions.
+- **`discover_agents()`** - Recommends specialized agents based on project context and DDD insights.
+- **`discover_custom_agent()`** - A new utility to generate system prompts for custom, user-defined agents based on specific names and specifications.
+- **`generate_onboarding_domain_doc()`** - Generates an `ONBOARDING_DOMAIN.md` template. This document serves as the bridge between discovery and minting, allowing users to verify discovered tools and domain concepts.
 
-The engine integrates with remote skills through `fetch_skill()`, which retrieves definitions from remote URLs or falls back to local storage, enabling dynamic capability enhancement.
+The engine integrates with remote skills through `fetch_skill()`, which retrieves definitions from remote URLs or falls back to local storage.
 
 ## Workspace Generation (minting_engine.py)
 
-The minting engine transforms discovered context and user-validated plans into a functional workspace. It has been significantly expanded to handle dynamic tool installation and SME (Subject Matter Expert) synthesis.
+The minting engine transforms discovered context and user-validated plans into a functional workspace.
 
-- **`mint_workspace()`** - Copies boilerplate templates and injects configurations. It now includes logic to dynamically inject DDD agents into the `dispatch_rules.md` of the generated workspace, ensuring the Orchestrator can route tasks to them immediately.
-- **`process_includes()`** - Recursively resolves `@path` includes at the start of lines in template files, applying placeholders and enabling modular, reusable configuration.
+- **`mint_workspace()`** - Copies boilerplate templates and injects configurations. It now features **Dynamic Dispatch Injection**: it automatically injects discovered DDD agents into the `dispatch_rules.md` of the generated workspace, placing them immediately before the "Negative Routing Rules" section.
+- **`process_includes()`** - Recursively resolves `@path` includes at the start of lines in template files, enabling modular configuration.
 - **`synthesize_domain_sme_agent()`** - Generates a specialized domain SME agent deterministically based on the content of the user-reviewed `ONBOARDING_DOMAIN.md`.
 - **`patch_orchestrator_rules()`** - Injects the newly synthesized SME agent into the Orchestrator's dispatch rules within the target workspace.
-- **`install_workspace_tools()`** - Automates workspace setup by downloading remote skills and configuring MCPs locally based on the tool checklists parsed from the onboarding document.
+- **`install_workspace_tools()`** - Automates workspace setup by downloading remote skills and configuring MCPs locally based on the tool checklists.
 
-The engine uses `wait_for_user_review_and_read_domain()` to pause execution, allowing the user to edit and approve the generated domain document before final synthesis and tool installation proceed.
+The engine uses `wait_for_user_review_and_read_domain()` to pause execution, allowing the user to approve the domain manifest before final synthesis and tool installation proceed.
 
 ## Module Interactions
 
-The redesigned data flow emphasizes context efficiency and user-driven refinement:
+The redesigned data flow emphasizes context efficiency:
 
-1. **Tech Stack Detection** (`detect_tech_stack`) → Identifies core technologies and languages.
-2. **Context Acquisition** (`acquire_mcp_context`) → Gathers lightweight project metadata and wiki content.
-3. **DDD Discovery** (`discover_ddd_context`) → Establishes the domain foundation and ubiquitous language.
-4. **Onboarding Generation** (`generate_onboarding_domain_doc`) → Creates a reviewable domain manifest and tool checklist.
-5. **User Review** (`wait_for_user_review_and_read_domain`) → Human-in-the-loop validation of discovered tools and domain concepts.
-6. **SME Synthesis & Tooling** (`synthesize_domain_sme_agent` + `install_workspace_tools`) → Creates custom domain agents and installs selected skills/MCPs.
-7. **Workspace Minting** (`mint_workspace`) → Final assembly, template cloning, and configuration injection (including dynamic dispatch rule updates).
+1. **Tech Stack Detection** (`detect_tech_stack`) → Identifies core technologies.
+2. **Context Acquisition** (`acquire_mcp_context`) → Gathers lightweight metadata.
+3. **DDD Discovery** (`discover_ddd_context`) → Establishes the domain foundation.
+4. **Onboarding Generation** (`generate_onboarding_domain_doc`) → Creates a reviewable domain manifest.
+5. **User Review** (`wait_for_user_review_and_read_domain`) → Human-in-the-loop validation.
+6. **SME Synthesis & Tooling** (`synthesize_domain_sme_agent` + `install_workspace_tools`) → Creates custom agents and installs skills/MCPs.
+7. **Workspace Minting** (`mint_workspace`) → Final assembly, including **Dynamic Dispatch Rule** updates to route tasks to new DDD agents.
 
-**Removed Components**: The `indexer_wrapper.py` and `indexing/main.py` modules have been eliminated, reflecting the shift away from heavy indexing toward lightweight, wiki-based context acquisition and interactive profiling. This reduces external dependencies and simplifies the operational model.
+**Removed Components**: The `indexer_wrapper.py` and `indexing/main.py` modules, along with the associated `.indxr/wiki` documentation, have been fully eliminated. The system now relies entirely on interactive profiling and lightweight wiki acquisition rather than heavy pre-indexing.
 
-
+## Other Wiki Pages
+*Note: Several specialized documentation modules have been deprecated or consolidated following the removal of the heavy indexing subsystem.*
+- [[architecture]] — Architecture Overview
+- [[onboarding/indxr-ci-automation]] — CI Automation and LLM Provider configuration.

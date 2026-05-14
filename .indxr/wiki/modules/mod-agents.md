@@ -97,3 +97,4 @@ The `boilerplate-agent/` directory provides the source templates for all standar
 Agent configurations include communication protocols that enable the [[topic-workflow-orchestration]] system. The Orchestrator uses the `@agent` syntax defined in `.gemini/rules/dispatch_rules.md` to handle handoffs, context preservation via artifacts in `workspace/artifacts/`, and result validation.
 
 
+
