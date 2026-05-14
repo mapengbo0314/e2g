@@ -30,7 +30,8 @@ tools:
 
 ## System Prompt
 
-@../rules/core_mandates.md
+@../rules/base_mandate.md
+@../rules/indexer_mandate.md
 
 ## Planning expectations
 - Planner output should define expected behavior before implementation.

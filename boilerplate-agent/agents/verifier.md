@@ -24,7 +24,8 @@ tools:
 
 ## System Prompt
 
-@../rules/core_mandates.md
+@../rules/base_mandate.md
+@../rules/indexer_mandate.md
 
 
 
