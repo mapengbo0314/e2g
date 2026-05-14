@@ -53,9 +53,11 @@ When using the `ask_question` tool yourself, or instructing sub-agents to use it
 </tool_usage_policy>
 
 <model_selection_policy>
-When invoking sub-agents, you MUST select the appropriate model tier:
-- **Use "higher" models** (e.g., Pro, Sonnet) for Reasoning, Planning, Architecture, and Review.
-- **Use "lower" models** (e.g., Flash, Haiku) for Execution (Implementing), Typos, and simple fixes.
+When invoking sub-agents, you MUST select the appropriate model tier based on the task type to optimize for quality and efficiency:
+
+-   **Use `higher models`** for tasks that require deep reasoning, high-level planning, design, code review, or post-hoc evaluation. (e.g., `@planner`, `@architect`, `@reviewer`, `@verifier`).
+-   **Use `lower models`** for tasks that involve writing production code, simple edits, quick lookups, or standard verification steps.
+-   **Prohibition**: Do NOT use `higher models` for agents whose primary task is to write production code. 
 </model_selection_policy>
 
 <context_preservation_policy>
