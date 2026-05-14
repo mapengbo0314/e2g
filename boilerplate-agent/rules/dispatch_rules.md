@@ -37,7 +37,7 @@ Before routing, you MUST assess the complexity of the user's request to save tok
 </tool_delegation_policy>
 
 <tool_usage_policy>
-When using the `ask_question` tool yourself, or instructing sub-agents to use it, you MUST follow these UX constraints:
+When using the `ask_user` tool yourself, or instructing sub-agents to use it, you MUST follow these UX constraints:
 
 - **Constraints**:
    - Do NOT put large text/code in the question title.
@@ -48,8 +48,8 @@ When using the `ask_question` tool yourself, or instructing sub-agents to use it
 - **When Invoking Sub-Agents**: You MUST pass these constraints in the sub-agent's prompt.
 
 - **Examples for Yourself**:
-   - **[Simple Question]**: Output background context as regular chat text first, and then call `ask_question(question="Do you want to proceed with approach A or B?", options=["Approach A", "Approach B"])`.
-   - **[Large Context Question]**: Creating `plan_review.md`, providing a markdown link to it in chat, and then calling `ask_question(question="Do you approve the implementation plan in [plan_review.md](file:///path/to/plan_review.md)?", options=["Yes", "No"])`.
+   - **[Simple Question]**: Output background context as regular chat text first, and then call `ask_user(question="Do you want to proceed with approach A or B?", options=["Approach A", "Approach B"])`.
+   - **[Large Context Question]**: Creating `plan_review.md`, providing a markdown link to it in chat, and then calling `ask_user(question="Do you approve the implementation plan in [plan_review.md](file:///path/to/plan_review.md)?", options=["Yes", "No"])`.
 </tool_usage_policy>
 
 <model_selection_policy>
