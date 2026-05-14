@@ -115,3 +115,4 @@ The discovery system integrates with the project's environment to ensure high-fi
 4.  **Contextual Grounding**: Deep integration with the project index (via `indxr`) to maintain accuracy without token bloat.
 
 
+

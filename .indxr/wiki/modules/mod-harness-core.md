@@ -90,3 +90,4 @@ The redesigned data flow emphasizes context efficiency:
 *Note: Several specialized documentation modules have been deprecated or consolidated following the removal of the heavy indexing subsystem.*
 - [[architecture]] — Architecture Overview
 - [[onboarding/indxr-ci-automation]] — CI Automation and LLM Provider configuration.
+
