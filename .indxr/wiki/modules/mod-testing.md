@@ -109,3 +109,4 @@ The test infrastructure validates critical handoff points between harness compon
 
 These tests serve as integration contracts, ensuring that changes to [[mod-harness-core]] components don't break the lifecycle phases described in [[architecture]].
 
+

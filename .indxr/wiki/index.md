@@ -42,3 +42,4 @@ covers: []
 - **To research technical designs (AST, Tree-sitter, Injection)** → [[mod-documentation]]
 - **To debug orchestration phases or workflow transitions** → [[topic-workflow-orchestration]]
 - **To view known bugs or unit test coverage** → [[mod-testing]]
+
