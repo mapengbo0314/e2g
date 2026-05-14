@@ -36,11 +36,11 @@ def test_load_config_cloud_credentials(monkeypatch):
     monkeypatch.setenv("TEST_MODE", "true")
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "aws-key")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "aws-secret")
-    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", "/path/to/gcp.json")
+    monkeypatch.setenv("GCP_SERVICE_ACCOUNT_JSON", '{"type": "service_account"}')
     
     from chat.config import load_config
     config = load_config()
     
     assert config["aws_access_key_id"] == "aws-key"
     assert config["aws_secret_access_key"] == "aws-secret"
-    assert config["google_application_credentials"] == "/path/to/gcp.json"
+    assert config["gcp_service_account_json"] == '{"type": "service_account"}'
