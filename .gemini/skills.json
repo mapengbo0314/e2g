@@ -14,6 +14,18 @@
     },
     "meta-learning": {
       "path": "meta-learning/SKILL.md"
+    },
+    "dac-1-discovery": {
+      "path": "skills/dac-1-discovery/SKILL.md"
+    },
+    "dac-2-proposal": {
+      "path": "skills/dac-2-proposal/SKILL.md"
+    },
+    "dac-3-validation": {
+      "path": "skills/dac-3-validation/SKILL.md"
+    },
+    "dac-4-implementation": {
+      "path": "skills/dac-4-implementation/SKILL.md"
     }
   }
 }

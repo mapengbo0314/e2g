@@ -2,6 +2,11 @@
 
 When onboarding a new repository, follow these steps to ensure the `indxr` codebase wiki automatically updates on every Pull Request.
 
+## The "GitHub Magic" (How this works)
+You don't need to click any buttons to install this automation. GitHub automatically watches the `.github/workflows/` directory in your codebase. The act of **committing and pushing** the workflow file (created in Step 2) is what "installs" and activates the GitHub Action.
+
+---
+
 ## Step 1: Create the Helper Script
 
 Create a script at `scripts/update_index.sh` to handle the execution and commit logic:
@@ -15,15 +20,23 @@ cd "$(dirname "$0")/.."
 
 echo "=== Running indxr wiki update ==="
 
-# Fallback to checking keys if needed
-if [ -z "$GEMINI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENAI_API_KEY" ]; then
+# Auto-detect provider and configure LLM execution
+if [ -n "$GEMINI_API_KEY" ]; then
+    echo "Using Gemini CLI as the LLM backend..."
+    # Gemini requires us to use the gemini-cli as a shim via INDXR_LLM_COMMAND
+    export GEMINI_CLI_TRUST_WORKSPACE=true
+    export INDXR_LLM_COMMAND="gemini --skip-trust -p \"\""
+elif [ -n "$ANTHROPIC_API_KEY" ] || [ -n "$OPENAI_API_KEY" ]; then
+    echo "Using native indxr API support..."
+    # No INDXR_LLM_COMMAND needed, indxr reads these keys natively.
+else
     echo "Error: No LLM API key found in environment."
     echo "Please ensure GEMINI_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY is set."
     exit 1
 fi
 
 # Run the update
-npx --yes indxr wiki update
+indxr wiki update
 
 echo "=== Checking for index changes ==="
 

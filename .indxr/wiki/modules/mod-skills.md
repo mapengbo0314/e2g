@@ -72,3 +72,5 @@ The skills system supports:
 Skills maintain strict specification in `SKILL.md`. The standardized structure allows the harness to treat skills as black boxes while maintaining discoverability and composability.
 
 The system assumes skills are stateless and idempotent - they operate on input data and produce deterministic outputs without side effects beyond their defined scope. This enables safe parallel execution and reproducible results across multiple harness runs.
+
+

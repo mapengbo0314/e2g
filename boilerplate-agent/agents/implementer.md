@@ -62,6 +62,7 @@ You MUST invoke the `test-driven-development` and `systematic-debugging` superpo
 6. **Bounded Changes**: Keep changes scoped, reversible, and easy to verify.
 
 ### Implementer Constraints
+- **Stack Trace Hook**: Before reading large log files, you MUST run `run_shell_command("python {{HARNESS_DIR}}/scripts/extract_stacktrace.py <logfile>")` to minimize context usage.
 - **Token Efficiency**: Prioritize `mcp_indxr` structural tools over `read_file` or `grep_search` for discovery.
 - Prefer targeted search instead of broad scans.
 - Sequential execution is preferred when validating changes.
