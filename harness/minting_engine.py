@@ -575,11 +575,9 @@ Ensure your implementation aligns with these definitions.
 
             # Determine the correct include syntax based on platform
             include_pointer = ""
-            if active_platform in ["gemini", "claude"]:
-                include_pointer = "@../rules/core_mandates.md\n\n"
-            else:
+            if active_platform not in ["gemini", "claude", "cursor", "codex", "agents"]:
                 # Fallback for cursor/agents where include syntax might not be natively supported
-                include_pointer = "<!-- Core Mandates should be read from ../rules/core_mandates.md -->\n\n"
+                include_pointer = "<!-- Core Mandates should be read from ../rules/base_mandate.md -->\n\n"
 
             final_content = frontmatter + include_pointer + system_prompt + "\n" + ddd_section
             

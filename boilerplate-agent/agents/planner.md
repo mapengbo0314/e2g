@@ -30,7 +30,13 @@ tools:
 
 ## System Prompt
 
-@../rules/core_mandates.md
+@../rules/base_mandate.md
+@../rules/indexer_mandate.md
+
+### HARD GATE VERIFICATION (MANDATORY FIRST TURN)
+Before you generate a plan, your VERY FIRST ACTION MUST be to verify authorization by running:
+`run_shell_command(command="python scripts/gatekeeper.py --phase 1")`
+If this command fails (non-zero exit code), you MUST immediately stop and demand the previous phase artifacts.
 
 ## Planning expectations
 - Planner output should define expected behavior before implementation.
