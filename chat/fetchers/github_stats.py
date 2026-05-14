@@ -26,15 +26,18 @@ def fetch_github_stats(token: str, repo: str) -> dict:
     query = """
     query($owner: String!, $name: String!, $since: DateTime!) {
       repository(owner: $owner, name: $name) {
-        pullRequests(states: MERGED, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) {
+        pullRequests(first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) {
           nodes {
+            createdAt
+            mergedAt
             additions
             deletions
-            mergedAt
           }
         }
         issues(states: CLOSED, labels: ["bug"], first: 100, filterBy: {since: $since}) {
-          totalCount
+          nodes {
+            closedAt
+          }
         }
         releases(first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
           nodes {
@@ -63,19 +66,37 @@ def fetch_github_stats(token: str, repo: str) -> dict:
             if not repo_data:
                 return {**default_stats, "error": "Repository not found"}
                 
-            # Filter PRs merged within the last 7 days
+            # Parse PRs for submitted and merged
             prs = repo_data.get("pullRequests", {}).get("nodes", [])
-            recent_prs = []
+            prs_submitted = 0
+            lines_added = 0
+            lines_deleted = 0
+            
             for pr in prs:
+                # Check if submitted in the window
+                created_at_str = pr.get("createdAt")
+                if created_at_str:
+                    created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                    if created_at >= seven_days_ago_dt:
+                        prs_submitted += 1
+                        
+                # Check if merged in the window
                 merged_at_str = pr.get("mergedAt")
                 if merged_at_str:
-                    # Parse ISO format (handling Z timezone)
                     merged_at = datetime.fromisoformat(merged_at_str.replace("Z", "+00:00")).replace(tzinfo=None)
                     if merged_at >= seven_days_ago_dt:
-                        recent_prs.append(pr)
+                        lines_added += pr.get("additions", 0)
+                        lines_deleted += pr.get("deletions", 0)
                         
-            lines_added = sum(pr.get("additions", 0) for pr in recent_prs)
-            lines_deleted = sum(pr.get("deletions", 0) for pr in recent_prs)
+            # Parse Issues for closed
+            issues = repo_data.get("issues", {}).get("nodes", [])
+            bugs_closed = 0
+            for issue in issues:
+                closed_at_str = issue.get("closedAt")
+                if closed_at_str:
+                    closed_at = datetime.fromisoformat(closed_at_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                    if closed_at >= seven_days_ago_dt:
+                        bugs_closed += 1
             
             # Filter releases within the last 7 days
             releases = repo_data.get("releases", {}).get("nodes", [])
@@ -88,10 +109,10 @@ def fetch_github_stats(token: str, repo: str) -> dict:
                         recent_releases += 1
             
             return {
-                "prs_submitted": len(recent_prs),
+                "prs_submitted": prs_submitted,
                 "lines_added": lines_added,
                 "lines_deleted": lines_deleted,
-                "bugs_closed": repo_data.get("issues", {}).get("totalCount", 0),
+                "bugs_closed": bugs_closed,
                 "releases_done": recent_releases
             }
         else:
