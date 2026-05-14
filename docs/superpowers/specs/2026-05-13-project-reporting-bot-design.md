@@ -1,7 +1,13 @@
 # Design: Project Reporting Scheduled Bot
 
 ## 1. Overview
-A stateless serverless application designed to run on a weekly schedule. It aggregates metrics from AI platforms, GitHub, etc., and publishes reports to Slack and Microsoft Teams for various projects.
+A stateless serverless application designed to run on a weekly schedule. It aggregates metrics from AI platforms, GitHub, cloud infrastructure, etc., and publishes reports to Slack and Microsoft Teams for various projects.
+
+### 1.1 Comprehensive Metrics Expansion
+We track the following metric categories:
+1.  **Harness / AI Metrics:** Tokens in/out consumed, number of times prompted, and cost of tokens across OpenAI, Anthropic, and Gemini.
+2.  **Repository / Engineering Metrics:** PRs submitted, code line changes, bugs closed, and releases done via GitHub.
+3.  **Infrastructure Metrics:** Costs of infrastructure like GCP or AWS, fetched dynamically based on available credentials.
 
 ## 2. Architecture & Data Flow
 **Infrastructure:**
@@ -25,8 +31,9 @@ The code will be housed in a new `chat/` directory within the root repository.
 
 *   `chat/main.py`: The entry point orchestrating the flow.
 *   `chat/config.py`: Handles connections to NoSQL and Secret Manager.
-*   `chat/fetchers/ai_usage.py`: Connects to OpenAI/Anthropic APIs.
-*   `chat/fetchers/github_stats.py`: Connects to GitHub API.
+*   `chat/fetchers/ai_usage.py`: Connects to OpenAI, Anthropic, and Gemini APIs.
+*   `chat/fetchers/github_stats.py`: Connects to GitHub API for engineering metrics.
+*   `chat/fetchers/cloud_costs.py`: Dynamically fetches AWS and GCP infrastructure costs.
 *   `chat/publishers/slack_publisher.py`: Posts messages using the Slack Bot Token.
 *   `chat/publishers/teams_publisher.py`: Posts JSON payloads to Teams Power Automate URLs.
 
