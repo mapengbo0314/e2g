@@ -15,6 +15,6 @@ def fetch_github_stats(token: str, repo: str) -> dict:
             return {"recent_prs_count": len(prs)}
         else:
             return {"recent_prs_count": 0, "error": f"API error: {resp.status_code}"}
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         logging.error(f"GitHub fetch failed: {e}")
         return {"recent_prs_count": 0, "error": str(e)}
