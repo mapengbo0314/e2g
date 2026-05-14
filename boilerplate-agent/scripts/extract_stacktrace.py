@@ -1,27 +1,58 @@
 #!/usr/bin/env python3
 import sys
 import re
+from collections import deque
 
-def extract_trace(log_content):
+def extract_trace(file_path):
     # Heuristic for finding common stack trace patterns
     patterns = [
         r"Traceback \(most recent call last\):", # Python
-        r"Error: .*?\n\s+at ",                 # Node
         r"panic: ",                            # Go
         r"AssertionError"                      # Generic
     ]
+    node_pattern = r"^\s*at "
     
-    lines = log_content.splitlines()
-    for idx, line in enumerate(lines):
-        if any(re.search(p, line) for p in patterns):
-            # Capture from start of trace to the end of the log (or next block)
-            # This ensures we get the full error context
-            return "\n".join(lines[idx:idx+100]) # Cap at 100 lines
+    last_lines = deque(maxlen=40)
+    
+    try:
+        with open(file_path, 'r') as f:
+            for line in f:
+                line_content = line.rstrip()
+                
+                # Check for standard patterns
+                if any(re.search(p, line_content) for p in patterns):
+                    trace = [line_content]
+                    for _ in range(99):
+                        try:
+                            trace.append(next(f).rstrip())
+                        except StopIteration:
+                            break
+                    return "\n".join(trace)
+                
+                # Node.js specific: if we see 'at ', take the previous line too if it looks like an error
+                if re.search(node_pattern, line_content):
+                    trace = []
+                    if last_lines:
+                        # Include previous line as it often contains the error message
+                        trace.append(last_lines[-1])
+                    trace.append(line_content)
+                    for _ in range(98):
+                        try:
+                            trace.append(next(f).rstrip())
+                        except StopIteration:
+                            break
+                    return "\n".join(trace)
+                
+                last_lines.append(line_content)
+    except FileNotFoundError:
+        return f"Error: File not found: {file_path}"
+    except Exception as e:
+        return f"Error reading file: {e}"
             
-    return "\n".join(lines[-40:]) # Fallback to tail
+    return "\n".join(last_lines)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
+        print(f"Usage: {sys.argv[0]} <logfile>")
         sys.exit(1)
-    with open(sys.argv[1], 'r') as f:
-        print(extract_trace(f.read()))
+    print(extract_trace(sys.argv[1]))
