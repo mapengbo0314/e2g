@@ -1,24 +1,29 @@
 from chat.fetchers.github_stats import fetch_github_stats
 from unittest.mock import patch
 import requests
+from datetime import datetime
 
 @patch('chat.fetchers.github_stats.requests.post')
 def test_fetch_github_stats_success(mock_post):
+    today_str = datetime.utcnow().isoformat() + "Z"
     mock_post.return_value.status_code = 200
     mock_post.return_value.json.return_value = {
         "data": {
             "repository": {
                 "pullRequests": {
                     "nodes": [
-                        {"additions": 100, "deletions": 50},
-                        {"additions": 200, "deletions": 10}
+                        {"additions": 100, "deletions": 50, "mergedAt": today_str},
+                        {"additions": 200, "deletions": 10, "mergedAt": today_str}
                     ]
                 },
                 "issues": {
                     "totalCount": 5
                 },
                 "releases": {
-                    "totalCount": 2
+                    "nodes": [
+                        {"createdAt": today_str},
+                        {"createdAt": today_str}
+                    ]
                 }
             }
         }
