@@ -1,12 +1,19 @@
-# chat/fetchers/ai_usage.py
 import requests
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
 def fetch_openai_usage(api_key: Optional[str]) -> dict:
+    default_stats = {
+        "tokens_consumed": 0,
+        "cost": 0.0,
+        "prompt_count": "N/A",
+        "status": "error"
+    }
+    
     if not api_key:
-        return {"total_usage": 0, "error": "Missing API key"}
+        default_stats["error"] = "Missing API key"
+        return default_stats
         
     headers = {"Authorization": f"Bearer {api_key}"}
     # For a real implementation, you'd calculate dates. Stubbing for now.
@@ -20,19 +27,50 @@ def fetch_openai_usage(api_key: Optional[str]) -> dict:
             timeout=10
         )
         if resp.status_code == 200:
-            return resp.json()
+            data = resp.json()
+            total_usage_cents = data.get("total_usage", 0)
+            return {
+                "tokens_consumed": 0,
+                "cost": total_usage_cents / 100.0,
+                "prompt_count": "N/A",
+                "status": "success"
+            }
         else:
-            return {"total_usage": 0, "error": f"API error: {resp.status_code}"}
+            default_stats["error"] = f"API error: {resp.status_code}"
+            return default_stats
     except Exception as e:
         logging.error(f"OpenAI fetch failed: {e}")
-        return {"total_usage": 0, "error": str(e)}
+        default_stats["error"] = str(e)
+        return default_stats
 
 def fetch_anthropic_usage(api_key: Optional[str]) -> dict:
     if not api_key:
-        return {"total_usage": 0, "error": "Missing API key"}
-    return {"total_usage": 0, "status": "stubbed"}
+        return {
+            "tokens_consumed": 0,
+            "cost": 0.0,
+            "prompt_count": "N/A",
+            "status": "error",
+            "error": "Missing API key"
+        }
+    return {
+        "tokens_consumed": 0,
+        "cost": 0.0,
+        "prompt_count": "N/A",
+        "status": "API unsupported"
+    }
 
 def fetch_gemini_usage(api_key: Optional[str]) -> dict:
     if not api_key:
-        return {"total_usage": 0, "error": "Missing API key"}
-    return {"total_usage": 0, "status": "stubbed"}
+        return {
+            "tokens_consumed": 0,
+            "cost": 0.0,
+            "prompt_count": "N/A",
+            "status": "error",
+            "error": "Missing API key"
+        }
+    return {
+        "tokens_consumed": 0,
+        "cost": 0.0,
+        "prompt_count": "N/A",
+        "status": "API unsupported"
+    }
