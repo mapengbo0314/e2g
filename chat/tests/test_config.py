@@ -1,4 +1,5 @@
 import os
+import json
 from chat.config import load_config
 
 def test_load_config_test_mode(monkeypatch):
@@ -6,8 +7,23 @@ def test_load_config_test_mode(monkeypatch):
     monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test")
     monkeypatch.setenv("PROJECT_ID", "proj-1")
     monkeypatch.setenv("SLACK_CHANNEL_ID", "C123")
+    monkeypatch.setenv("REPO", "owner/repo")
     
     config = load_config()
     assert config["slack_bot_token"] == "xoxb-test"
     assert "proj-1" in config["projects"]
     assert config["projects"]["proj-1"]["slack_channel_id"] == "C123"
+    assert config["projects"]["proj-1"]["repo"] == "owner/repo"
+
+def test_load_config_projects_json(monkeypatch):
+    monkeypatch.setenv("TEST_MODE", "true")
+    projects_data = {
+        "proj-1": {"slack_channel_id": "C1", "repo": "o/r1"},
+        "proj-2": {"teams_url": "http://teams", "repo": "o/r2"}
+    }
+    monkeypatch.setenv("PROJECTS_JSON", json.dumps(projects_data))
+    
+    config = load_config()
+    assert len(config["projects"]) == 2
+    assert config["projects"]["proj-1"]["slack_channel_id"] == "C1"
+    assert config["projects"]["proj-2"]["teams_url"] == "http://teams"

@@ -1,4 +1,5 @@
 import os
+import json
 from dotenv import load_dotenv
 
 def load_config():
@@ -6,17 +7,26 @@ def load_config():
     if test_mode:
         load_dotenv()
         
-    # In test mode, build a dummy project config from env vars
-    project_id = os.environ.get("PROJECT_ID", "default-proj")
-    slack_channel_id = os.environ.get("SLACK_CHANNEL_ID")
-    teams_url = os.environ.get("TEAMS_URL")
-    
-    projects = {
-        project_id: {
-            "slack_channel_id": slack_channel_id,
-            "teams_url": teams_url
+    projects_json_str = os.environ.get("PROJECTS_JSON")
+    if projects_json_str:
+        try:
+            projects = json.loads(projects_json_str)
+        except json.JSONDecodeError:
+            projects = {}
+    else:
+        # Build a single-project config from flat env vars
+        project_id = os.environ.get("PROJECT_ID", "default-proj")
+        slack_channel_id = os.environ.get("SLACK_CHANNEL_ID")
+        teams_url = os.environ.get("TEAMS_URL")
+        repo = os.environ.get("REPO")
+        
+        projects = {
+            project_id: {
+                "slack_channel_id": slack_channel_id,
+                "teams_url": teams_url,
+                "repo": repo
+            }
         }
-    }
     
     return {
         "slack_bot_token": os.environ.get("SLACK_BOT_TOKEN"),

@@ -29,6 +29,15 @@ def run_report():
             if global_openai_stats:
                 report_data["stats"]["openai"] = global_openai_stats
                 
+            warnings = {}
+            for stat_key, stat_val in list(report_data["stats"].items()):
+                if isinstance(stat_val, dict) and "error" in stat_val:
+                    warnings[stat_key] = stat_val.pop("error")
+                    logging.warning(f"Error in {stat_key} stats for project {project_id}: {warnings[stat_key]}")
+            
+            if warnings:
+                report_data["warnings"] = warnings
+                
             # Publish
             if proj_config.get("slack_channel_id"):
                 publish_to_slack(config.get("slack_bot_token"), proj_config["slack_channel_id"], report_data)

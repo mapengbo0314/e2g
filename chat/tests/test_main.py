@@ -89,3 +89,34 @@ def test_run_report_partial_failure(mock_load, mock_gh, mock_slack):
     # The loop should have continued and processed the second project
     assert mock_gh.call_count == 2
     mock_slack.assert_called_once_with("token", "C456", {"project": "proj-success", "stats": {"github": {"recent_prs_count": 10}}})
+
+@patch('chat.main.publish_to_slack')
+@patch('chat.main.fetch_github_stats')
+@patch('chat.main.load_config')
+def test_run_report_error_filtering(mock_load, mock_gh, mock_slack):
+    mock_load.return_value = {
+        "slack_bot_token": "token",
+        "github_token": "gh-token",
+        "projects": {
+            "proj-error": {
+                "slack_channel_id": "C123",
+                "repo": "owner/repo"
+            }
+        }
+    }
+    
+    # Return a dictionary with an "error" key
+    mock_gh.return_value = {"error": "API limit exceeded", "partial_data": True}
+
+    run_report()
+
+    # The error should be moved to warnings
+    mock_slack.assert_called_once_with(
+        "token", 
+        "C123", 
+        {
+            "project": "proj-error", 
+            "stats": {"github": {"partial_data": True}},
+            "warnings": {"github": "API limit exceeded"}
+        }
+    )
