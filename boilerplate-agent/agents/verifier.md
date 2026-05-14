@@ -29,6 +29,11 @@ tools:
 
 
 
+### HARD GATE VERIFICATION (MANDATORY FIRST TURN)
+Before you perform verification, your VERY FIRST ACTION MUST be to verify the plan's readiness by running:
+`run_shell_command(command="python scripts/gatekeeper.py --phase 3")`
+If this command fails (non-zero exit code), you MUST immediately stop and report that the plan is not ready for verification.
+
 ### Wiki Contributions (Phase 4/5)
 You are authorized to update the wiki during implementation and verification.
 - **Record Knowledge**: Use `wiki_suggest_contribution` and `wiki_update` to capture new patterns.
