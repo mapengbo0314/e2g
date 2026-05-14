@@ -1,6 +1,7 @@
 from chat.config import load_config
 from chat.fetchers.github_stats import fetch_github_stats
 from chat.fetchers.ai_usage import fetch_openai_usage, fetch_anthropic_usage, fetch_gemini_usage
+from chat.fetchers.cloud_costs import fetch_aws_cost, fetch_gcp_cost
 from chat.publishers.slack_publisher import publish_to_slack
 from chat.publishers.teams_publisher import publish_to_teams
 import logging
@@ -29,6 +30,20 @@ def run_report():
             global_gemini_stats = fetch_gemini_usage(config["gemini_api_key"])
         except Exception as e:
             logging.error(f"Failed to fetch global Gemini usage: {e}")
+            
+    global_aws_stats = None
+    if config.get("aws_access_key_id") and config.get("aws_secret_access_key"):
+        try:
+            global_aws_stats = fetch_aws_cost(config["aws_access_key_id"], config["aws_secret_access_key"])
+        except Exception as e:
+            logging.error(f"Failed to fetch global AWS cost: {e}")
+            
+    global_gcp_stats = None
+    if config.get("gcp_service_account_json"):
+        try:
+            global_gcp_stats = fetch_gcp_cost(config["gcp_service_account_json"])
+        except Exception as e:
+            logging.error(f"Failed to fetch global GCP cost: {e}")
     
     for project_id, proj_config in config.get("projects", {}).items():
         logging.info(f"Processing project: {project_id}")

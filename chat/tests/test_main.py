@@ -98,6 +98,27 @@ def test_run_report_partial_failure(mock_load, mock_gh, mock_slack):
     assert mock_gh.call_count == 2
     mock_slack.assert_called_once_with("token", "C456", {"project": "proj-success", "stats": {"github": {"recent_prs_count": 10}}})
 
+@patch('chat.main.fetch_gcp_cost')
+@patch('chat.main.fetch_aws_cost')
+@patch('chat.main.load_config')
+def test_run_report_cloud_costs_fetched_once(mock_load, mock_aws, mock_gcp):
+    mock_load.return_value = {
+        "aws_access_key_id": "aws-key",
+        "aws_secret_access_key": "aws-secret",
+        "gcp_service_account_json": "gcp-json",
+        "projects": {
+            "proj-1": {},
+            "proj-2": {}
+        }
+    }
+    mock_aws.return_value = {"cost": 10.0}
+    mock_gcp.return_value = {"cost": 5.0}
+
+    run_report()
+
+    mock_aws.assert_called_once_with("aws-key", "aws-secret")
+    mock_gcp.assert_called_once_with("gcp-json")
+
 @patch('chat.main.publish_to_slack')
 @patch('chat.main.fetch_github_stats')
 @patch('chat.main.load_config')
